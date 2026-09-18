@@ -9,9 +9,7 @@ import {
 import { readPackageListCache } from "./volcano-package-list-cache";
 import { buildUsageMapsFromPackageRows } from "./volcano-package-usage-map";
 import { resolveVolcanoEffectiveActivationStatus } from "./volcano-effective-activation";
-import {
-  VOLCANO_TOS_DEFAULT_PREFIX,
-} from "./volcano-tos-regions";
+import { VOLCANO_TOS_DEFAULT_PREFIX } from "./volcano-tos-regions";
 import type {
   VolcanoApiKeyStatus,
   VolcanoInterfaceMetadata,
@@ -173,10 +171,7 @@ export function buildVolcanoSnapshotFromMetadata(
     apiKey: {
       masked: "••••••••",
       expiresAt: metadata.arkApiKeyExpiresAt ?? null,
-      status: getVolcanoApiKeyStatus(
-        metadata.arkApiKeyExpiresAt,
-        keyPending
-      ),
+      status: getVolcanoApiKeyStatus(metadata.arkApiKeyExpiresAt, keyPending),
     },
     balance: null,
     ...(packageListCachedAt ? { packageListCachedAt } : {}),

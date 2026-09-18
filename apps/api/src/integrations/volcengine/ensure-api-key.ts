@@ -13,7 +13,10 @@ import {
   ensureVolcanoModelEndpoints,
 } from "./ensure-volcano-endpoints";
 import { isVolcanoArkNotOpenedError } from "./errors";
-import { getVolcanoArkApiKey, volcanoNeedsModelScopedArkKey } from "./get-api-key";
+import {
+  getVolcanoArkApiKey,
+  volcanoNeedsModelScopedArkKey,
+} from "./get-api-key";
 import {
   isVolcanoMetadata,
   normalizeVolcanoInterfaceMetadata,
@@ -150,10 +153,7 @@ export async function ensureVolcanoApiKey(params: {
         throw error;
       }
 
-      if (
-        decryptedExisting &&
-        !isDeferredVolcanoArkApiKey(decryptedExisting)
-      ) {
+      if (decryptedExisting && !isDeferredVolcanoArkApiKey(decryptedExisting)) {
         apiKey = decryptedExisting;
       } else if (await canDeferVolcanoArkApiKey({ credentials })) {
         apiKey = "";

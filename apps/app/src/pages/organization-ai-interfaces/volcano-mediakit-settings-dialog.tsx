@@ -36,9 +36,13 @@ interface VolcanoMediaKitSettingsDialogProps {
 
 function hasSelectedMediaKitFeature(config: VolcanoMediaKitConfig): boolean {
   return (
-    VOLCANO_MEDIKIT_VIDEO_ENHANCE_MODES.some((mode) => config.videoEnhance[mode]) ||
+    VOLCANO_MEDIKIT_VIDEO_ENHANCE_MODES.some(
+      (mode) => config.videoEnhance[mode]
+    ) ||
     config.videoTrim.enabled ||
-    VOLCANO_MEDIKIT_SUBTITLE_ERASE_MODES.some((mode) => config.subtitleErase[mode])
+    VOLCANO_MEDIKIT_SUBTITLE_ERASE_MODES.some(
+      (mode) => config.subtitleErase[mode]
+    )
   );
 }
 
@@ -220,7 +224,10 @@ export function VolcanoMediaKitSettingsDialog({
           >
             {t("common.cancel")}
           </Button>
-          <Button disabled={isSaving || !canSave} onClick={() => void handleSave()}>
+          <Button
+            disabled={isSaving || !canSave}
+            onClick={() => void handleSave()}
+          >
             {isSaving ? t("common.saving") : t("common.save")}
           </Button>
         </DialogFooter>

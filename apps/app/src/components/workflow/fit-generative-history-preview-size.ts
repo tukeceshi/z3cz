@@ -20,11 +20,7 @@ export function fitGenerativeHistoryPreviewSize(
     return null;
   }
 
-  const scale = Math.min(
-    1,
-    maxHeight / naturalHeight,
-    maxWidth / naturalWidth
-  );
+  const scale = Math.min(1, maxHeight / naturalHeight, maxWidth / naturalWidth);
 
   return {
     width: naturalWidth * scale,

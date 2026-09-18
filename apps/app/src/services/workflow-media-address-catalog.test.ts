@@ -69,7 +69,9 @@ describe("workflow-media-address-catalog", () => {
       mediaId: "media-1",
       urlSet: EMPTY_WORKFLOW_MEDIA_ADDRESS,
     });
-    expect(recallMediaDisplayUrlSet({ ...scope, mediaId: "media-1" })).toBeNull();
+    expect(
+      recallMediaDisplayUrlSet({ ...scope, mediaId: "media-1" })
+    ).toBeNull();
   });
 
   it("forgets sets for a media id", () => {

@@ -1,23 +1,13 @@
 import type { WorkflowMediaValue } from "@dafthunk/types";
 
-
-
 import {
-
   uploadGenerativeMediaFile,
-
   uploadGenerativeMediaFromLocalStaging,
-
 } from "@/services/stage-generative-media";
-
-
 
 export { uploadGenerativeMediaFromLocalStaging };
 
-
-
 export async function uploadGenerativeMedia(params: {
-
   readonly organizationId: string;
 
   readonly workflowId?: string;
@@ -27,11 +17,8 @@ export async function uploadGenerativeMedia(params: {
   readonly cloudConfigured: boolean;
 
   readonly mediaKind?: "ai-image" | "ai-video" | "ai-audio" | "reference";
-
 }): Promise<WorkflowMediaValue> {
-
   return uploadGenerativeMediaFile({
-
     organizationId: params.organizationId,
 
     workflowId: params.workflowId,
@@ -41,9 +28,5 @@ export async function uploadGenerativeMedia(params: {
     cloudConfigured: params.cloudConfigured,
 
     mediaKind: params.mediaKind ?? "reference",
-
   });
-
 }
-
-

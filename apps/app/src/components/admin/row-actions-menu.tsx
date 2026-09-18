@@ -14,10 +14,7 @@ interface RowActionsMenuProps {
   label?: string;
 }
 
-export function RowActionsMenu({
-  children,
-  label,
-}: RowActionsMenuProps) {
+export function RowActionsMenu({ children, label }: RowActionsMenuProps) {
   const { t } = useTranslation();
   const resolvedLabel = label ?? t("common.openMenu");
 

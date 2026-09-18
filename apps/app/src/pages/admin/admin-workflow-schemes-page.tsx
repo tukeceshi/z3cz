@@ -6,10 +6,7 @@ import type {
   WorkflowTrigger,
 } from "@dafthunk/types";
 import { WORKFLOW_SCHEME_OMNIPOTENT_ID } from "@dafthunk/types";
-import {
-  ALL_WORKFLOW_RUNTIMES,
-  ALL_WORKFLOW_TRIGGERS,
-} from "@dafthunk/types";
+import { ALL_WORKFLOW_RUNTIMES, ALL_WORKFLOW_TRIGGERS } from "@dafthunk/types";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 
@@ -146,7 +143,8 @@ export function AdminWorkflowSchemesPage() {
   const [isSaving, setIsSaving] = useState(false);
 
   const visibleSchemes = useMemo(
-    () => schemes.filter((scheme) => scheme.id !== WORKFLOW_SCHEME_OMNIPOTENT_ID),
+    () =>
+      schemes.filter((scheme) => scheme.id !== WORKFLOW_SCHEME_OMNIPOTENT_ID),
     [schemes]
   );
 
@@ -230,7 +228,9 @@ export function AdminWorkflowSchemesPage() {
       toast.success(t("adminWorkflowSchemes.saveSuccess"));
     } catch (error) {
       toast.error(
-        error instanceof Error ? error.message : t("adminWorkflowSchemes.saveError")
+        error instanceof Error
+          ? error.message
+          : t("adminWorkflowSchemes.saveError")
       );
     } finally {
       setIsSaving(false);
@@ -288,7 +288,9 @@ export function AdminWorkflowSchemesPage() {
           <TableHeader>
             <TableRow>
               <TableHead>{t("adminWorkflowSchemes.columns.name")}</TableHead>
-              <TableHead>{t("adminWorkflowSchemes.columns.runtimes")}</TableHead>
+              <TableHead>
+                {t("adminWorkflowSchemes.columns.runtimes")}
+              </TableHead>
               <TableHead>{t("adminWorkflowSchemes.columns.nodes")}</TableHead>
               <TableHead>{t("adminWorkflowSchemes.columns.status")}</TableHead>
               <TableHead className="text-right">
@@ -301,7 +303,9 @@ export function AdminWorkflowSchemesPage() {
               <TableRow key={scheme.id}>
                 <TableCell>
                   <div className="font-medium">{scheme.name}</div>
-                  <div className="text-xs text-muted-foreground">{scheme.id}</div>
+                  <div className="text-xs text-muted-foreground">
+                    {scheme.id}
+                  </div>
                 </TableCell>
                 <TableCell>{scheme.allowedRuntimes.length}</TableCell>
                 <TableCell>
@@ -365,12 +369,17 @@ export function AdminWorkflowSchemesPage() {
           <form onSubmit={handleSave} className="space-y-6">
             {!editingScheme ? (
               <div>
-                <Label htmlFor="scheme-id">{t("adminWorkflowSchemes.id")}</Label>
+                <Label htmlFor="scheme-id">
+                  {t("adminWorkflowSchemes.id")}
+                </Label>
                 <Input
                   id="scheme-id"
                   value={form.id}
                   onChange={(event) =>
-                    setForm((current) => ({ ...current, id: event.target.value }))
+                    setForm((current) => ({
+                      ...current,
+                      id: event.target.value,
+                    }))
                   }
                   placeholder="ai-content"
                   className="mt-2"
@@ -381,12 +390,17 @@ export function AdminWorkflowSchemesPage() {
             ) : null}
 
             <div>
-              <Label htmlFor="scheme-name">{t("adminWorkflowSchemes.name")}</Label>
+              <Label htmlFor="scheme-name">
+                {t("adminWorkflowSchemes.name")}
+              </Label>
               <Input
                 id="scheme-name"
                 value={form.name}
                 onChange={(event) =>
-                  setForm((current) => ({ ...current, name: event.target.value }))
+                  setForm((current) => ({
+                    ...current,
+                    name: event.target.value,
+                  }))
                 }
                 className="mt-2"
                 required
@@ -412,12 +426,17 @@ export function AdminWorkflowSchemesPage() {
             </div>
 
             <div>
-              <Label htmlFor="scheme-icon">{t("adminWorkflowSchemes.icon")}</Label>
+              <Label htmlFor="scheme-icon">
+                {t("adminWorkflowSchemes.icon")}
+              </Label>
               <Input
                 id="scheme-icon"
                 value={form.icon}
                 onChange={(event) =>
-                  setForm((current) => ({ ...current, icon: event.target.value }))
+                  setForm((current) => ({
+                    ...current,
+                    icon: event.target.value,
+                  }))
                 }
                 className="mt-2"
                 placeholder="layers"

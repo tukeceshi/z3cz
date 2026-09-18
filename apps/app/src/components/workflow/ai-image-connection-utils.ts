@@ -12,9 +12,7 @@ import {
   isAiImageAllowedReferenceNodeType,
 } from "./ai-image-node-utils";
 import { nodeIdUnderPanePointer } from "./connection-pane-hit-test";
-import {
-  snapGenerativeContentBorderPoint,
-} from "./generative-node-content-geometry";
+import { snapGenerativeContentBorderPoint } from "./generative-node-content-geometry";
 import type { WorkflowEdgeType } from "./workflow-types";
 
 type AiImageReferenceEdge = Pick<
@@ -36,7 +34,10 @@ interface AiImageSnapTarget {
 interface FlowConnection {
   readonly inProgress: boolean;
   readonly fromNode: InternalNode<Node> | null;
-  readonly fromHandle: { readonly type: string; readonly id?: string | null } | null;
+  readonly fromHandle: {
+    readonly type: string;
+    readonly id?: string | null;
+  } | null;
   readonly to: { readonly x: number; readonly y: number } | null;
   readonly toNode?: InternalNode<Node> | null;
   readonly pointer?: { readonly x: number; readonly y: number } | null;
@@ -133,7 +134,9 @@ export function findAiImageConnectionTargetNodeId(
   const pointer = connectionPointer(connection);
   if (!pointer) return null;
 
-  const resolveTarget = (targetId: string | null | undefined): string | null => {
+  const resolveTarget = (
+    targetId: string | null | undefined
+  ): string | null => {
     if (!targetId || targetId === connection.fromNode?.id) return null;
     if (!isAiImageValidHighlightTarget(connection, targetId, nodeLookup)) {
       return null;
@@ -166,15 +169,17 @@ export function findAiImageConnectionSnap(
   return aiImageSnapFromNode(node);
 }
 
-export function snapAiImageReferenceBorderPoint(
-  node: InternalNode<Node>
-): { x: number; y: number } {
+export function snapAiImageReferenceBorderPoint(node: InternalNode<Node>): {
+  x: number;
+  y: number;
+} {
   return snapGenerativeContentBorderPoint(node, "left");
 }
 
-export function snapAiImageOutputBorderPoint(
-  node: InternalNode<Node>
-): { x: number; y: number } {
+export function snapAiImageOutputBorderPoint(node: InternalNode<Node>): {
+  x: number;
+  y: number;
+} {
   return snapGenerativeContentBorderPoint(node, "right");
 }
 

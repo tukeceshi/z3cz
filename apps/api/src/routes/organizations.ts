@@ -30,7 +30,10 @@ import {
   updateMembershipPermissions,
   updateOrganizationName,
 } from "../db/queries";
-import { requireOrganizationOwner, requireOrganizationPathMatch } from "../middleware/org-permissions";
+import {
+  requireOrganizationOwner,
+  requireOrganizationPathMatch,
+} from "../middleware/org-permissions";
 import { createEmailService } from "../services/email-service";
 import { getSubAccountInvitationEmail } from "../services/email-templates";
 import {
@@ -72,7 +75,10 @@ organizationRoutes.get("/", async (c) => {
 });
 
 organizationRoutes.post("/", async (c) => {
-  return c.json({ error: "Creating additional organizations is not allowed" }, 403);
+  return c.json(
+    { error: "Creating additional organizations is not allowed" },
+    403
+  );
 });
 
 organizationRoutes.patch(
@@ -102,7 +108,10 @@ organizationRoutes.patch(
     );
 
     if (!organization) {
-      return c.json({ error: "Organization not found or permission denied" }, 404);
+      return c.json(
+        { error: "Organization not found or permission denied" },
+        404
+      );
     }
 
     const response: UpdateOrganizationResponse = { organization };
@@ -114,23 +123,30 @@ organizationRoutes.delete("/:id", async (c) => {
   return c.json({ error: "Organizations cannot be deleted" }, 403);
 });
 
-organizationRoutes.get("/:id/memberships", requireOrganizationOwner(), async (c) => {
-  const db = createDatabase(c.env);
-  const organizationId = c.req.param("id") ?? "";
-  const memberships = await getOrganizationMembershipsWithUsers(db, organizationId);
+organizationRoutes.get(
+  "/:id/memberships",
+  requireOrganizationOwner(),
+  async (c) => {
+    const db = createDatabase(c.env);
+    const organizationId = c.req.param("id") ?? "";
+    const memberships = await getOrganizationMembershipsWithUsers(
+      db,
+      organizationId
+    );
 
-  const response: ListMembershipsResponse = {
-    memberships: memberships.map((m) => ({
-      ...m,
-      role: normalizeOrganizationRole(m.role),
-      permissions:
-        normalizeOrganizationRole(m.role) === "owner"
-          ? null
-          : parseSubAccountPermissions(m.permissions),
-    })),
-  };
-  return c.json(response);
-});
+    const response: ListMembershipsResponse = {
+      memberships: memberships.map((m) => ({
+        ...m,
+        role: normalizeOrganizationRole(m.role),
+        permissions:
+          normalizeOrganizationRole(m.role) === "owner"
+            ? null
+            : parseSubAccountPermissions(m.permissions),
+      })),
+    };
+    return c.json(response);
+  }
+);
 
 organizationRoutes.patch(
   "/:id/memberships/permissions",
@@ -213,26 +229,30 @@ organizationRoutes.delete(
   }
 );
 
-organizationRoutes.get("/:id/invitations", requireOrganizationOwner(), async (c) => {
-  const db = createDatabase(c.env);
-  const organizationId = c.req.param("id") ?? "";
-  const invitations = await getOrganizationInvitations(db, organizationId);
+organizationRoutes.get(
+  "/:id/invitations",
+  requireOrganizationOwner(),
+  async (c) => {
+    const db = createDatabase(c.env);
+    const organizationId = c.req.param("id") ?? "";
+    const invitations = await getOrganizationInvitations(db, organizationId);
 
-  const response: ListInvitationsResponse = {
-    invitations: invitations.map((inv) => ({
-      id: inv.id,
-      email: inv.email,
-      organizationId: inv.organizationId,
-      permissions: parseSubAccountPermissions(inv.permissions),
-      status: inv.status as "pending" | "accepted" | "declined" | "expired",
-      expiresAt: inv.expiresAt,
-      createdAt: inv.createdAt,
-      updatedAt: inv.updatedAt,
-      inviter: inv.inviter,
-    })),
-  };
-  return c.json(response);
-});
+    const response: ListInvitationsResponse = {
+      invitations: invitations.map((inv) => ({
+        id: inv.id,
+        email: inv.email,
+        organizationId: inv.organizationId,
+        permissions: parseSubAccountPermissions(inv.permissions),
+        status: inv.status as "pending" | "accepted" | "declined" | "expired",
+        expiresAt: inv.expiresAt,
+        createdAt: inv.createdAt,
+        updatedAt: inv.updatedAt,
+        inviter: inv.inviter,
+      })),
+    };
+    return c.json(response);
+  }
+);
 
 organizationRoutes.post(
   "/:id/invitations",
@@ -273,7 +293,9 @@ organizationRoutes.post(
     }
 
     const allInvitations = await getOrganizationInvitations(db, organizationId);
-    const createdInvitation = allInvitations.find((inv) => inv.id === invitation.id);
+    const createdInvitation = allInvitations.find(
+      (inv) => inv.id === invitation.id
+    );
 
     if (!createdInvitation) {
       return c.json({ error: "Failed to retrieve created invitation" }, 500);
@@ -299,7 +321,10 @@ organizationRoutes.post(
       });
 
       if (!emailResult.success) {
-        console.warn("Failed to send sub-account invitation email:", emailResult.error);
+        console.warn(
+          "Failed to send sub-account invitation email:",
+          emailResult.error
+        );
       }
     }
 
@@ -341,7 +366,10 @@ organizationRoutes.delete(
     );
 
     if (!success) {
-      return c.json({ error: "Permission denied or invitation not found" }, 403);
+      return c.json(
+        { error: "Permission denied or invitation not found" },
+        403
+      );
     }
 
     const response: DeleteInvitationResponse = { success: true };

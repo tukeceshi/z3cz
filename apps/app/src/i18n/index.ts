@@ -6,10 +6,7 @@ export const LOCALE_STORAGE_KEY = "dafthunk-locale";
 
 export type { TranslationDictionary };
 
-const localeLoaders: Record<
-  AppLocale,
-  () => Promise<TranslationDictionary>
-> = {
+const localeLoaders: Record<AppLocale, () => Promise<TranslationDictionary>> = {
   en: async () => {
     const module = await import("./locales/en");
     return module.en;
@@ -73,19 +70,13 @@ export function createTranslator(
   dictionary: TranslationDictionary,
   fallbackDictionary?: TranslationDictionary
 ) {
-  return (
-    key: string,
-    params?: Record<string, string | number>
-  ): string => {
+  return (key: string, params?: Record<string, string | number>): string => {
     let value = getNestedValue(dictionary, key);
     if (value === undefined && fallbackDictionary) {
       value = getNestedValue(fallbackDictionary, key);
     }
     if (value === undefined && locale !== "en") {
-      value = getNestedValue(
-        localeCache.get("en") ?? dictionary,
-        key
-      );
+      value = getNestedValue(localeCache.get("en") ?? dictionary, key);
     }
     if (value === undefined) {
       return key;
@@ -97,7 +88,10 @@ export function createTranslator(
 
     return Object.entries(params).reduce(
       (result, [paramKey, paramValue]) =>
-        result.replace(new RegExp(`\\{\\{${paramKey}\\}\\}`, "g"), String(paramValue)),
+        result.replace(
+          new RegExp(`\\{\\{${paramKey}\\}\\}`, "g"),
+          String(paramValue)
+        ),
       value
     );
   };

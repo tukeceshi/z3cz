@@ -1,4 +1,10 @@
-import { useCallback, useLayoutEffect, useRef, useState, type RefObject } from "react";
+import {
+  useCallback,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type RefObject,
+} from "react";
 
 import { useTranslation } from "@/components/locale-provider";
 import { Textarea } from "@/components/ui/textarea";
@@ -161,7 +167,9 @@ export function StudioTextOutputView({
               readOnly={!isTextEditing}
               contentKey={contentKey}
               onLayoutUpdated={
-                isGenerating && !isTextEditing ? scrollToTailIfAllowed : undefined
+                isGenerating && !isTextEditing
+                  ? scrollToTailIfAllowed
+                  : undefined
               }
             />
             <div className="h-16 shrink-0" aria-hidden="true" />

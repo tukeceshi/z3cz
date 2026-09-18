@@ -108,10 +108,7 @@ function mergeDirectUploadRule(
         ]),
       ];
   const mergedExposeHeaders = [
-    ...new Set([
-      ...current.exposeHeaders,
-      ...directUploadRule.exposeHeaders,
-    ]),
+    ...new Set([...current.exposeHeaders, ...directUploadRule.exposeHeaders]),
   ];
 
   const mergedRule: TosCorsRule = {

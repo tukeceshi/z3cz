@@ -53,9 +53,7 @@ function ErrorLine({
   readonly className: string;
   readonly truncate?: boolean;
 }) {
-  return (
-    <p className={cn(className, truncate && "truncate")}>{text}</p>
-  );
+  return <p className={cn(className, truncate && "truncate")}>{text}</p>;
 }
 
 function ErrorLineStack({
@@ -153,11 +151,14 @@ export function GenerativeCardErrorBlock({
       };
 
       let visibleBodyLineCount = bodyLines.length;
-      while (visibleBodyLineCount > 0 && !fits({
-        visibleBodyLineCount,
-        truncateLastLine: false,
-        truncateTitle: false,
-      })) {
+      while (
+        visibleBodyLineCount > 0 &&
+        !fits({
+          visibleBodyLineCount,
+          truncateLastLine: false,
+          truncateTitle: false,
+        })
+      ) {
         visibleBodyLineCount -= 1;
       }
 
@@ -261,7 +262,9 @@ export function GenerativeCardErrorDetailDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-md">
         <DialogHeader>
-          <DialogTitle>{t("workflow.generativeErrors.detailTitle")}</DialogTitle>
+          <DialogTitle>
+            {t("workflow.generativeErrors.detailTitle")}
+          </DialogTitle>
         </DialogHeader>
         <div className="max-h-[min(60vh,420px)] overflow-y-auto whitespace-pre-wrap break-words text-sm leading-relaxed text-foreground/90">
           {detailText}

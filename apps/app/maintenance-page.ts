@@ -153,11 +153,7 @@ export async function handleMaintenanceHomepageRequest(
   }
 
   const accept = req.headers.accept ?? "";
-  if (
-    accept.length > 0 &&
-    !accept.includes("text/html") &&
-    accept !== "*/*"
-  ) {
+  if (accept.length > 0 && !accept.includes("text/html") && accept !== "*/*") {
     next();
     return;
   }

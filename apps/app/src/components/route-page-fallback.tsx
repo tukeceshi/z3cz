@@ -7,7 +7,9 @@ interface RoutePageFallbackProps {
 
 export type { RoutePageFallbackProps };
 
-export function RoutePageFallback({ variant = "inset" }: RoutePageFallbackProps) {
+export function RoutePageFallback({
+  variant = "inset",
+}: RoutePageFallbackProps) {
   if (variant === "full") {
     return (
       <div className="flex min-h-screen items-center justify-center gap-2">

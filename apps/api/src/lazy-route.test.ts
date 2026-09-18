@@ -16,10 +16,9 @@ describe("lazyRoute", () => {
       lazyRoute(async () => ({ default: sub }))
     );
 
-    const list = await app.request(
-      "http://localhost/org-123/workflows",
-      { method: "GET" }
-    );
+    const list = await app.request("http://localhost/org-123/workflows", {
+      method: "GET",
+    });
     expect(list.status).toBe(200);
     await expect(list.json()).resolves.toEqual({ scope: "list" });
 
@@ -39,7 +38,10 @@ describe("lazyRoute", () => {
     sub.get("/", (c) => c.text("types"));
 
     const app = new Hono<ApiContext>();
-    app.route("/types", lazyRoute(async () => ({ default: sub })));
+    app.route(
+      "/types",
+      lazyRoute(async () => ({ default: sub }))
+    );
 
     const response = await app.request("http://localhost/types", {
       method: "GET",

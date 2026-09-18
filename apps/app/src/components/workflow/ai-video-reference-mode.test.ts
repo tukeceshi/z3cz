@@ -23,18 +23,27 @@ import {
 import { evaluateAiVideoReferenceStructural } from "./ai-video-reference-policy";
 import type { GenerativeReferenceChip } from "./generative-reference-utils";
 import type { WorkflowNodeType } from "./workflow-types";
-import { testWorkflowNodeData, testWorkflowParam } from "./workflow-test-fixtures";
+import {
+  testWorkflowNodeData,
+  testWorkflowParam,
+} from "./workflow-test-fixtures";
 
 describe("shouldShowReferenceModeAutoSwitchNotice", () => {
   it("shows at most once per node and reference count signature", () => {
     resetReferenceModeAutoSwitchNoticesForNode("video-1");
     const counts = { imageCount: 3, videoCount: 0, audioCount: 0 };
 
-    expect(shouldShowReferenceModeAutoSwitchNotice("video-1", counts)).toBe(true);
-    expect(shouldShowReferenceModeAutoSwitchNotice("video-1", counts)).toBe(false);
+    expect(shouldShowReferenceModeAutoSwitchNotice("video-1", counts)).toBe(
+      true
+    );
+    expect(shouldShowReferenceModeAutoSwitchNotice("video-1", counts)).toBe(
+      false
+    );
 
     resetReferenceModeAutoSwitchNoticesForNode("video-1");
-    expect(shouldShowReferenceModeAutoSwitchNotice("video-1", counts)).toBe(true);
+    expect(shouldShowReferenceModeAutoSwitchNotice("video-1", counts)).toBe(
+      true
+    );
   });
 });
 

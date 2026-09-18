@@ -94,7 +94,9 @@ function readTopLevelString(
   return trimmed.length > 0 ? trimmed : undefined;
 }
 
-function normalizeAspectRatio(value: string): ForwardingVideoAspectRatio | null {
+function normalizeAspectRatio(
+  value: string
+): ForwardingVideoAspectRatio | null {
   const normalized = value.trim().replace(/\s+/g, "");
   return FORWARDING_VIDEO_ASPECT_RATIOS.includes(
     normalized as ForwardingVideoAspectRatio
@@ -142,9 +144,7 @@ export function resolveForwardingVideoSize(params: {
   const requestResolution = readTopLevelString(params.sourceBody, "resolution");
   const resolutionTier =
     params.lockedResolution ??
-    (requestResolution
-      ? normalizeResolutionTier(requestResolution)
-      : null);
+    (requestResolution ? normalizeResolutionTier(requestResolution) : null);
 
   if (!resolutionTier) {
     return undefined;

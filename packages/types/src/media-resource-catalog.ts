@@ -2,7 +2,9 @@ import type { CloudAccelerationStatus } from "./cloud-acceleration";
 
 export type MediaResourceKind = "cloud" | "local" | "ephemeral";
 
-export function isMediaResourceKind(value: unknown): value is MediaResourceKind {
+export function isMediaResourceKind(
+  value: unknown
+): value is MediaResourceKind {
   return value === "cloud" || value === "local" || value === "ephemeral";
 }
 

@@ -1,4 +1,7 @@
-import type { WorkflowPublicMessage, WorkflowPublicState } from "@dafthunk/types";
+import type {
+  WorkflowPublicMessage,
+  WorkflowPublicState,
+} from "@dafthunk/types";
 
 import type { Bindings } from "../context";
 import { getAgentByName } from "../durable-objects/agent-utils";
@@ -24,10 +27,9 @@ export async function registerActiveEditorWorkflow(
     return;
   }
 
-  const existing =
-    (await env.KV.get(ACTIVE_EDITOR_WORKFLOWS_KV_KEY, "json")) as
-      | string[]
-      | null;
+  const existing = (await env.KV.get(ACTIVE_EDITOR_WORKFLOWS_KV_KEY, "json")) as
+    | string[]
+    | null;
   const ids = new Set(existing ?? []);
   ids.add(workflowId);
   await env.KV.put(ACTIVE_EDITOR_WORKFLOWS_KV_KEY, JSON.stringify([...ids]));
@@ -41,10 +43,9 @@ export async function unregisterActiveEditorWorkflow(
     return;
   }
 
-  const existing =
-    (await env.KV.get(ACTIVE_EDITOR_WORKFLOWS_KV_KEY, "json")) as
-      | string[]
-      | null;
+  const existing = (await env.KV.get(ACTIVE_EDITOR_WORKFLOWS_KV_KEY, "json")) as
+    | string[]
+    | null;
   if (!existing?.length) {
     return;
   }

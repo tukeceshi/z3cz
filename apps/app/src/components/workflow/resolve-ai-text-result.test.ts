@@ -34,7 +34,12 @@ function createTextNode(
     inputs: [],
     outputs: [
       { id: AI_TEXT_OUTPUT_ID, name: "text", type: "string", value: "" },
-      { id: AI_TEXT_BODY_OUTPUT_ID, name: "textBody", type: "string", value: "" },
+      {
+        id: AI_TEXT_BODY_OUTPUT_ID,
+        name: "textBody",
+        type: "string",
+        value: "",
+      },
     ],
     metadata: undefined,
     ...overrides,
@@ -45,7 +50,12 @@ describe("resolve-ai-text-result", () => {
   it("reads full body from textBody and ignores the generation prompt input", () => {
     const node = createTextNode({
       inputs: [
-        { id: "prompt", name: "prompt", type: "string", value: "generate me a poem" },
+        {
+          id: "prompt",
+          name: "prompt",
+          type: "string",
+          value: "generate me a poem",
+        },
         {
           id: AI_TEXT_RESULT_INPUT_ID,
           name: AI_TEXT_RESULT_INPUT_ID,
@@ -121,7 +131,12 @@ describe("resolve-ai-text-result", () => {
     const node = createTextNode({
       metadata: { aiTextGenerating: "1" },
       outputs: [
-        { id: AI_TEXT_OUTPUT_ID, name: "text", type: "string", value: "preview" },
+        {
+          id: AI_TEXT_OUTPUT_ID,
+          name: "text",
+          type: "string",
+          value: "preview",
+        },
         {
           id: AI_TEXT_BODY_OUTPUT_ID,
           name: "textBody",
@@ -149,7 +164,12 @@ describe("resolve-ai-text-result", () => {
         },
       ],
       outputs: [
-        { id: AI_TEXT_OUTPUT_ID, name: "text", type: "string", value: "preview" },
+        {
+          id: AI_TEXT_OUTPUT_ID,
+          name: "text",
+          type: "string",
+          value: "preview",
+        },
         {
           id: AI_TEXT_BODY_OUTPUT_ID,
           name: "textBody",
@@ -192,7 +212,12 @@ describe("resolve-ai-text-result", () => {
         },
       ],
       outputs: [
-        { id: AI_TEXT_OUTPUT_ID, name: "text", type: "string", value: "preview" },
+        {
+          id: AI_TEXT_OUTPUT_ID,
+          name: "text",
+          type: "string",
+          value: "preview",
+        },
         {
           id: AI_TEXT_BODY_OUTPUT_ID,
           name: "textBody",

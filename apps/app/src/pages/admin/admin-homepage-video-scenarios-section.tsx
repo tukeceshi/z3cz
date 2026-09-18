@@ -158,9 +158,7 @@ function ScenarioDurationControl(props: {
 
   const commitSeconds = useCallback(
     (next: number) => {
-      props.onSecondsChange(
-        clampSeconds(next, 1, LANDING_TIME_MAX_SEC)
-      );
+      props.onSecondsChange(clampSeconds(next, 1, LANDING_TIME_MAX_SEC));
     },
     [props.onSecondsChange]
   );
@@ -272,7 +270,9 @@ export function AdminHomepageVideoScenariosSection(
 
   const sortedScenarios = useMemo(
     () =>
-      [...props.scenarios].sort((left, right) => left.sortOrder - right.sortOrder),
+      [...props.scenarios].sort(
+        (left, right) => left.sortOrder - right.sortOrder
+      ),
     [props.scenarios]
   );
 
@@ -621,7 +621,9 @@ export function AdminHomepageVideoScenariosSection(
                   />
                 </div>
                 <div className="grid gap-1">
-                  <Label htmlFor="homepage_scenario_ref_count">带参考段数</Label>
+                  <Label htmlFor="homepage_scenario_ref_count">
+                    带参考段数
+                  </Label>
                   <CredentialPlainInput
                     id="homepage_scenario_ref_count"
                     name="homepage_scenario_ref_count"
@@ -642,7 +644,9 @@ export function AdminHomepageVideoScenariosSection(
                   />
                 </div>
                 <div className="grid gap-1">
-                  <Label htmlFor="homepage_scenario_ref_sec">平均参考秒数</Label>
+                  <Label htmlFor="homepage_scenario_ref_sec">
+                    平均参考秒数
+                  </Label>
                   <CredentialPlainInput
                     id="homepage_scenario_ref_sec"
                     name="homepage_scenario_ref_sec"

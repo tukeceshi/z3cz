@@ -13,7 +13,10 @@ function resolveImageMimeType(blob: Blob, mimeType?: string): string | null {
   return null;
 }
 
-async function loadImageBitmap(blob: Blob, mimeType: string): Promise<ImageBitmap> {
+async function loadImageBitmap(
+  blob: Blob,
+  mimeType: string
+): Promise<ImageBitmap> {
   if (blob.type === mimeType) {
     return createImageBitmap(blob);
   }

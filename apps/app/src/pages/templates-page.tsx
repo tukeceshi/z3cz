@@ -132,9 +132,7 @@ function TemplatesPageContent() {
     return (
       <InsetError
         title={t("pages.templates.title")}
-        errorMessage={
-          templatesError.message || t("pages.templates.loadFailed")
-        }
+        errorMessage={templatesError.message || t("pages.templates.loadFailed")}
       />
     );
   }

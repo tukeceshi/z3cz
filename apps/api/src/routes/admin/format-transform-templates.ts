@@ -123,7 +123,9 @@ adminFormatTransformTemplateRoutes.post(
   zValidator("json", createTemplateSchema),
   async (c) => {
     const db = createDatabase(c.env);
-    const input = c.req.valid("json") satisfies CreateFormatTransformTemplateRequest;
+    const input = c.req.valid(
+      "json"
+    ) satisfies CreateFormatTransformTemplateRequest;
     const jwtPayload = c.get("jwtPayload");
     const userId = jwtPayload?.sub;
 
@@ -147,7 +149,9 @@ adminFormatTransformTemplateRoutes.patch(
   async (c) => {
     const db = createDatabase(c.env);
     const id = c.req.param("id");
-    const input = c.req.valid("json") satisfies UpdateFormatTransformTemplateRequest;
+    const input = c.req.valid(
+      "json"
+    ) satisfies UpdateFormatTransformTemplateRequest;
     const jwtPayload = c.get("jwtPayload");
     const userId = jwtPayload?.sub;
 

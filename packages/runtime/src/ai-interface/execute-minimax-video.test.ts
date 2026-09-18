@@ -77,7 +77,8 @@ describe("pollMinimaxVideoTask", () => {
 
     const result = await pollMinimaxVideoTask({
       apiKey: "test-key",
-      pollUrl: "https://example.com/v2/query/video_generation/2092606496913080320",
+      pollUrl:
+        "https://example.com/v2/query/video_generation/2092606496913080320",
     });
 
     expect(result).toEqual({
@@ -101,7 +102,8 @@ describe("pollMinimaxVideoTask", () => {
 
     const result = await pollMinimaxVideoTask({
       apiKey: "test-key",
-      pollUrl: "https://example.com/v2/query/video_generation/2092606496913080320",
+      pollUrl:
+        "https://example.com/v2/query/video_generation/2092606496913080320",
     });
 
     expect(result).toEqual({

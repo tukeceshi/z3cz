@@ -11,7 +11,10 @@ import {
 const adminModelInvocationsRoutes = new Hono<ApiContext>();
 
 adminModelInvocationsRoutes.get("/", async (c) => {
-  const limit = Math.min(Math.max(1, Number(c.req.query("limit") ?? "20")), 100);
+  const limit = Math.min(
+    Math.max(1, Number(c.req.query("limit") ?? "20")),
+    100
+  );
   const offset = Math.max(0, Number(c.req.query("offset") ?? "0"));
   const dateFrom = c.req.query("dateFrom");
   const dateTo = c.req.query("dateTo");
@@ -19,12 +22,13 @@ adminModelInvocationsRoutes.get("/", async (c) => {
   const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
   const validatedDateFrom =
     dateFrom && dateRegex.test(dateFrom) ? dateFrom : undefined;
-  const validatedDateTo =
-    dateTo && dateRegex.test(dateTo) ? dateTo : undefined;
+  const validatedDateTo = dateTo && dateRegex.test(dateTo) ? dateTo : undefined;
   const hasDateFilter =
     validatedDateFrom !== undefined || validatedDateTo !== undefined;
   const tzOffsetMinutes =
-    hasDateFilter && tzOffsetRaw !== undefined ? Number(tzOffsetRaw) : undefined;
+    hasDateFilter && tzOffsetRaw !== undefined
+      ? Number(tzOffsetRaw)
+      : undefined;
 
   const db = createDatabase(c.env);
   const result = await listAdminAiModelInvocations(db, {

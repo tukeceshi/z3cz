@@ -46,9 +46,11 @@ describe("hasDomTextSelection", () => {
   });
 
   it("defaults to window.getSelection when no argument is passed", () => {
-    const spy = vi.spyOn(window, "getSelection").mockReturnValue(
-      mockSelection({ collapsed: false, rangeCount: 1, text: "studio" })
-    );
+    const spy = vi
+      .spyOn(window, "getSelection")
+      .mockReturnValue(
+        mockSelection({ collapsed: false, rangeCount: 1, text: "studio" })
+      );
     expect(hasDomTextSelection()).toBe(true);
     spy.mockRestore();
   });

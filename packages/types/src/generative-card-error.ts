@@ -42,8 +42,8 @@ export function getGenerativeCardLines(
   if (error.cardLines?.length) {
     return error.cardLines;
   }
-  const lines = [error.summary, error.subline].filter(
-    (line): line is string => Boolean(line?.trim())
+  const lines = [error.summary, error.subline].filter((line): line is string =>
+    Boolean(line?.trim())
   );
   return lines.length > 0 ? lines : [error.summary];
 }
@@ -101,7 +101,10 @@ export function parseTextModelFailureMessageToCardError(
     return undefined;
   }
 
-  const lines = detail.split("\n").map((line) => line.trim()).filter(Boolean);
+  const lines = detail
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean);
   const firstLine = lines[0];
   if (!firstLine) {
     return undefined;
@@ -153,7 +156,10 @@ export function normalizeGenerativeCardError(raw: string): GenerativeCardError {
     return textModel;
   }
 
-  const lines = trimmed.split("\n").map((line) => line.trim()).filter(Boolean);
+  const lines = trimmed
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean);
   const firstLine = lines[0] ?? trimmed;
   const summary = truncateSummary(firstLine);
 

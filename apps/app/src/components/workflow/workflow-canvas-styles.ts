@@ -10,7 +10,8 @@ export const WORKFLOW_CANVAS_CLASS = "workflow-canvas" as const;
 /** Dot grid spacing — light and dark (PixVerse uses 20px). */
 export const WORKFLOW_CANVAS_DOT_GAP_PX = 20;
 
-export const WORKFLOW_CANVAS_DOT_DARK_FILL = "rgba(255, 255, 255, 0.25)" as const;
+export const WORKFLOW_CANVAS_DOT_DARK_FILL =
+  "rgba(255, 255, 255, 0.25)" as const;
 
 /** PixVerse selected node border in dark mode. */
 export const WORKFLOW_NODE_SELECTED_BORDER_DARK = "#959595" as const;
@@ -31,7 +32,8 @@ export const WORKFLOW_MULTI_SELECTED_CLASS = "wf-multi-selected" as const;
 export const WORKFLOW_MULTI_SELECT_OVERFLOW_PX = 30 as const;
 
 /** Node internals that must not receive clicks during Shift / multi-select. */
-export const WORKFLOW_NODE_CARD_INTERACT_CLASS = "wf-node-card-interact" as const;
+export const WORKFLOW_NODE_CARD_INTERACT_CLASS =
+  "wf-node-card-interact" as const;
 
 export const WORKFLOW_NODE_BOTTOM_PANEL_GATE_CLASS =
   "wf-node-bottom-panel" as const;

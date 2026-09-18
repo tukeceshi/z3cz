@@ -10,7 +10,10 @@ import {
   listBootstrapBucketObjectKeys,
   uploadBootstrapShellToR2,
 } from "./bootstrap-r2-client";
-import { getBootstrapStorageProvider, resolveBootstrapR2SecretAccessKey } from "./bootstrap-settings";
+import {
+  getBootstrapStorageProvider,
+  resolveBootstrapR2SecretAccessKey,
+} from "./bootstrap-settings";
 import { createBootstrapTosClient } from "./bootstrap-storage-sources";
 import { parseRemoteBootstrapManifest } from "./bootstrap-sync-plan";
 
@@ -18,7 +21,10 @@ async function resolveR2Credentials(
   settings: BootstrapSettings,
   env: Bindings
 ): Promise<BootstrapR2Credentials> {
-  const secretAccessKey = await resolveBootstrapR2SecretAccessKey(settings, env);
+  const secretAccessKey = await resolveBootstrapR2SecretAccessKey(
+    settings,
+    env
+  );
   return {
     accountId: settings.accountId,
     accessKeyId: settings.accessKeyId,

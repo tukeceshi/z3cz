@@ -1,8 +1,11 @@
 import { isAiVideoEnhancePanel } from "@dafthunk/types";
 
-export const GENERATIVE_CONTENT_MODE_META_KEY = "generativeContentMode" as const;
-export const GENERATIVE_CARD_EDITING_META_KEY = "generativeCardEditing" as const;
-export const GENERATIVE_BOTTOM_PANEL_META_KEY = "generativeBottomPanel" as const;
+export const GENERATIVE_CONTENT_MODE_META_KEY =
+  "generativeContentMode" as const;
+export const GENERATIVE_CARD_EDITING_META_KEY =
+  "generativeCardEditing" as const;
+export const GENERATIVE_BOTTOM_PANEL_META_KEY =
+  "generativeBottomPanel" as const;
 
 export const GENERATIVE_CONTENT_MODE_MANUAL = "manual" as const;
 export const GENERATIVE_CONTENT_MODE_GENERATED = "generated" as const;
@@ -11,7 +14,10 @@ export const GENERATIVE_BOTTOM_PANEL_NONE = "none" as const;
 export function isGenerativeManualContent(
   metadata: Record<string, string> | undefined
 ): boolean {
-  return metadata?.[GENERATIVE_CONTENT_MODE_META_KEY] === GENERATIVE_CONTENT_MODE_MANUAL;
+  return (
+    metadata?.[GENERATIVE_CONTENT_MODE_META_KEY] ===
+    GENERATIVE_CONTENT_MODE_MANUAL
+  );
 }
 
 export function isGenerativeCardEditing(
@@ -23,7 +29,10 @@ export function isGenerativeCardEditing(
 export function isGenerativeBottomPanelHidden(
   metadata: Record<string, string> | undefined
 ): boolean {
-  return metadata?.[GENERATIVE_BOTTOM_PANEL_META_KEY] === GENERATIVE_BOTTOM_PANEL_NONE;
+  return (
+    metadata?.[GENERATIVE_BOTTOM_PANEL_META_KEY] ===
+    GENERATIVE_BOTTOM_PANEL_NONE
+  );
 }
 
 export function withGenerativeBottomPanelHidden(

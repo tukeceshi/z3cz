@@ -127,7 +127,9 @@ function OutputPreview({
   const value = output.value;
 
   if (value === null || value === undefined || value === "") {
-    return <span className="text-sm italic text-muted-foreground">{emptyLabel}</span>;
+    return (
+      <span className="text-sm italic text-muted-foreground">{emptyLabel}</span>
+    );
   }
 
   if (typeof value === "string") {
@@ -269,7 +271,10 @@ export function FeedbackFormPage() {
 
   useEffect(() => {
     if (!signedToken) {
-      setState({ status: "error", message: t("pages.feedbackForm.invalidLink") });
+      setState({
+        status: "error",
+        message: t("pages.feedbackForm.invalidLink"),
+      });
       return;
     }
 
@@ -278,7 +283,8 @@ export function FeedbackFormPage() {
         if (!res.ok) {
           const data = await res.json().catch(() => ({}));
           throw new Error(
-            (data as { error?: string }).error || t("pages.feedbackForm.loadFailed")
+            (data as { error?: string }).error ||
+              t("pages.feedbackForm.loadFailed")
           );
         }
         return res.json();
@@ -324,7 +330,8 @@ export function FeedbackFormPage() {
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
         const error =
-          (data as { error?: string }).error || t("pages.feedbackForm.submitFailed");
+          (data as { error?: string }).error ||
+          t("pages.feedbackForm.submitFailed");
         if (res.status === 409) {
           setState({ status: "already_submitted" });
         } else {
@@ -338,7 +345,9 @@ export function FeedbackFormPage() {
       setState({
         status: "error",
         message:
-          err instanceof Error ? err.message : t("pages.feedbackForm.submitFailed"),
+          err instanceof Error
+            ? err.message
+            : t("pages.feedbackForm.submitFailed"),
       });
     }
   }, [state, signedToken, responses, t]);
@@ -378,7 +387,9 @@ export function FeedbackFormPage() {
               <Check className="h-5 w-5 text-green-600" />
             </div>
             <CardTitle>{t("pages.feedbackForm.successTitle")}</CardTitle>
-            <CardDescription>{t("pages.feedbackForm.successDescription")}</CardDescription>
+            <CardDescription>
+              {t("pages.feedbackForm.successDescription")}
+            </CardDescription>
           </CardHeader>
         </Card>
       </div>
@@ -473,7 +484,9 @@ export function FeedbackFormPage() {
                         }))
                       }
                       disabled={isSubmitting}
-                      optionalCommentLabel={t("pages.feedbackForm.optionalComment")}
+                      optionalCommentLabel={t(
+                        "pages.feedbackForm.optionalComment"
+                      )}
                     />
                   ))
                 )}

@@ -51,7 +51,9 @@ export async function updateAdminSiteSettings(
 
 export function useAdminFeatureConfig() {
   const { data, error, isLoading, mutate } = useSWR(FEATURE_CONFIG_KEY, () =>
-    makeRequest<{ featureConfig: PlatformFeatureConfig }>("/admin/feature-config")
+    makeRequest<{ featureConfig: PlatformFeatureConfig }>(
+      "/admin/feature-config"
+    )
   );
 
   return {

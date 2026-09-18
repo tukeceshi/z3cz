@@ -11,7 +11,14 @@ import {
 import DownloadIcon from "lucide-react/icons/download";
 import HistoryIcon from "lucide-react/icons/history";
 import Maximize2Icon from "lucide-react/icons/maximize-2";
-import { useCallback, useEffect, useMemo, useState, type MouseEvent, type ReactNode } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+  type MouseEvent,
+  type ReactNode,
+} from "react";
 import { useParams } from "react-router";
 import { useEdges, useNodes, type Edge as ReactFlowEdge } from "@xyflow/react";
 
@@ -36,16 +43,10 @@ import {
   readAiImageResultHistory,
   withAiImageHistorySelection,
 } from "./ai-image-node-utils";
-import {
-  AiImageHistoryOverlay,
-} from "./ai-image-history-overlay";
-import {
-  readAiTextResultHistory,
-} from "./ai-text-node-utils";
+import { AiImageHistoryOverlay } from "./ai-image-history-overlay";
+import { readAiTextResultHistory } from "./ai-text-node-utils";
 import { commitAiTextHistorySelection } from "./commit-ai-text-value";
-import {
-  AiTextHistoryOverlay,
-} from "./ai-text-history-overlay";
+import { AiTextHistoryOverlay } from "./ai-text-history-overlay";
 import {
   readAiVideoCardDisplay,
   readAiVideoResultHistory,
@@ -181,13 +182,21 @@ export function GenerativeNodeTopToolbar({
       : null;
 
   const imageHistory =
-    nodeType === AI_IMAGE_NODE_TYPE ? readAiImageResultHistory(data.inputs) : null;
+    nodeType === AI_IMAGE_NODE_TYPE
+      ? readAiImageResultHistory(data.inputs)
+      : null;
   const videoHistory =
-    nodeType === AI_VIDEO_NODE_TYPE ? readAiVideoResultHistory(data.inputs) : null;
+    nodeType === AI_VIDEO_NODE_TYPE
+      ? readAiVideoResultHistory(data.inputs)
+      : null;
   const audioHistory =
-    nodeType === AI_AUDIO_NODE_TYPE ? readAiAudioResultHistory(data.inputs) : null;
+    nodeType === AI_AUDIO_NODE_TYPE
+      ? readAiAudioResultHistory(data.inputs)
+      : null;
   const textHistory =
-    nodeType === AI_TEXT_NODE_TYPE ? readAiTextResultHistory(data.inputs) : null;
+    nodeType === AI_TEXT_NODE_TYPE
+      ? readAiTextResultHistory(data.inputs)
+      : null;
 
   const historyCount =
     imageHistory?.items.length ??
@@ -231,7 +240,9 @@ export function GenerativeNodeTopToolbar({
   const canDownload = canDownloadMedia || canDownloadText;
 
   const videoEnhanceCoverCandidate =
-    nodeType === AI_VIDEO_NODE_TYPE ? readVideoEnhanceCoverCandidate(data) : null;
+    nodeType === AI_VIDEO_NODE_TYPE
+      ? readVideoEnhanceCoverCandidate(data)
+      : null;
   const cloudVideoForEnhance =
     nodeType === AI_VIDEO_NODE_TYPE ? readCloudVideoCoverResource(data) : null;
   const [cacheCoverReady, setCacheCoverReady] = useState(false);

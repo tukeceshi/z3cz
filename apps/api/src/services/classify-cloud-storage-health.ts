@@ -23,10 +23,7 @@ const AUTH_INVALID_CODES = new Set([
   "AccessDenied",
 ]);
 
-const PERMISSION_DENIED_CODES = new Set([
-  "AccessDenied",
-  "Forbidden",
-]);
+const PERMISSION_DENIED_CODES = new Set(["AccessDenied", "Forbidden"]);
 
 const BUCKET_MISSING_CODES = new Set(["NoSuchBucket", "NoSuchKey"]);
 
@@ -87,10 +84,7 @@ export function classifyCloudStorageHealthFromTos(params: {
     };
   }
 
-  if (
-    httpStatus === 403 ||
-    (tosCode && PERMISSION_DENIED_CODES.has(tosCode))
-  ) {
+  if (httpStatus === 403 || (tosCode && PERMISSION_DENIED_CODES.has(tosCode))) {
     if (messageMatchesAccountSuspended(message)) {
       return {
         status: "blocked",
@@ -140,7 +134,9 @@ export function classifyCloudStorageHealthFromError(
   }
 
   const message =
-    error instanceof Error ? error.message : "Cloud storage health check failed";
+    error instanceof Error
+      ? error.message
+      : "Cloud storage health check failed";
   return {
     status: "degraded",
     reason: null,

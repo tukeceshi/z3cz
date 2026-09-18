@@ -57,9 +57,9 @@ describe("isClientCancelledTextModelError", () => {
 
 describe("isTransientTextModelUpstreamError", () => {
   it("treats abort/timeout as transient", () => {
-    expect(isTransientTextModelUpstreamError("This operation was aborted")).toBe(
-      true
-    );
+    expect(
+      isTransientTextModelUpstreamError("This operation was aborted")
+    ).toBe(true);
     expect(isTransientTextModelUpstreamError("请求超时")).toBe(true);
   });
 

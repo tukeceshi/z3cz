@@ -2,7 +2,10 @@ import type {
   AiInterfaceProvider,
   AiInterfaceRuntimeArtifact,
 } from "@dafthunk/types";
-import { CLAUDE_PROVIDER_CARD_ID, VOLCANO_PRODUCT_DISPLAY_NAME_ZH } from "@dafthunk/types";
+import {
+  CLAUDE_PROVIDER_CARD_ID,
+  VOLCANO_PRODUCT_DISPLAY_NAME_ZH,
+} from "@dafthunk/types";
 
 import {
   compileAiInterfaceSourceSpec,

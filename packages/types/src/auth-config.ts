@@ -109,7 +109,9 @@ export function isSmtpConfigured(email: EmailAuthConfig): boolean {
   );
 }
 
-export function mergeAuthConfig(partial: Partial<AuthConfig> | null | undefined): AuthConfig {
+export function mergeAuthConfig(
+  partial: Partial<AuthConfig> | null | undefined
+): AuthConfig {
   if (!partial) {
     return { ...DEFAULT_AUTH_CONFIG };
   }

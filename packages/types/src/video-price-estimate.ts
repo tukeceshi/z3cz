@@ -527,7 +527,9 @@ export function computeOptimalReferenceSeconds(
 }
 
 export function formatOptimalReferenceSecondsDisplay(seconds: number): string {
-  const snapped = fromDurationTenths(Math.round(snapVideoTrimSec(seconds) * 10));
+  const snapped = fromDurationTenths(
+    Math.round(snapVideoTrimSec(seconds) * 10)
+  );
   if (!Number.isFinite(snapped) || snapped <= 0) {
     return "0";
   }
@@ -550,7 +552,8 @@ export function computeVideoBillingTokens(params: {
     return Math.round(outputDurationSec * tps);
   }
 
-  const minDuration = computeReferenceVideoMinBillingDurationSec(outputDurationSec);
+  const minDuration =
+    computeReferenceVideoMinBillingDurationSec(outputDurationSec);
   const billingDuration = Math.max(
     inputDurationSec + outputDurationSec,
     minDuration

@@ -1,4 +1,7 @@
-import type { Edge as ReactFlowEdge, Node as ReactFlowNode } from "@xyflow/react";
+import type {
+  Edge as ReactFlowEdge,
+  Node as ReactFlowNode,
+} from "@xyflow/react";
 import { useEffect, useMemo, useState } from "react";
 import { useParams } from "react-router";
 
@@ -7,7 +10,10 @@ import {
   isReferencedAiTextPendingFromEdges,
   resolveReferencedAiTextFromEdges,
 } from "@/components/workflow/resolve-ai-text-result";
-import type { WorkflowEdgeType, WorkflowNodeType } from "@/components/workflow/workflow-types";
+import type {
+  WorkflowEdgeType,
+  WorkflowNodeType,
+} from "@/components/workflow/workflow-types";
 
 interface UseResolvedReferencedPromptParams {
   readonly nodeId: string;
@@ -46,8 +52,10 @@ export function useResolvedReferencedPrompt(
         })),
         nodes: params.nodes.map((node) => ({
           id: node.id,
-          excerpt: node.data.outputs?.find((output) => output.id === "text")?.value,
-          result: node.data.inputs?.find((input) => input.id === "result")?.value,
+          excerpt: node.data.outputs?.find((output) => output.id === "text")
+            ?.value,
+          result: node.data.inputs?.find((input) => input.id === "result")
+            ?.value,
           staging: node.data.metadata?.aiTextStagingState,
           generating: node.data.metadata?.aiTextGenerating,
         })),

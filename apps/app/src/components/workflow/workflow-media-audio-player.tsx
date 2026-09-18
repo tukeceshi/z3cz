@@ -13,7 +13,10 @@ import { useTranslation } from "@/components/locale-provider";
 import { cn } from "@/utils/utils";
 
 import { formatVideoTime } from "./capture-video-frame";
-import { LibTvAudioProgressLine, LibTvAudioWaveform } from "./libtv-audio-waveform";
+import {
+  LibTvAudioProgressLine,
+  LibTvAudioWaveform,
+} from "./libtv-audio-waveform";
 import { useAudioWaveform } from "./use-audio-waveform";
 
 export interface WorkflowMediaAudioPlayerProps {
@@ -286,7 +289,10 @@ export function WorkflowMediaAudioPlayer({
             {timeLabel}
           </div>
           <div className="justify-self-center">
-            <LibTvPlayButton isPlaying={isPlaying} onToggle={handleTogglePlay} />
+            <LibTvPlayButton
+              isPlaying={isPlaying}
+              onToggle={handleTogglePlay}
+            />
           </div>
           <div
             className="justify-self-end text-sm tabular-nums text-muted-foreground opacity-0"
@@ -329,7 +335,9 @@ export function WorkflowMediaAudioPlayer({
       {waveformWindow}
 
       <div className="mt-3 flex items-center justify-between gap-3">
-        <span className="text-sm tabular-nums text-muted-foreground">{timeLabel}</span>
+        <span className="text-sm tabular-nums text-muted-foreground">
+          {timeLabel}
+        </span>
         <LibTvPlayButton
           isPlaying={isPlaying}
           onToggle={handleTogglePlay}

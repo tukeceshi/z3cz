@@ -68,7 +68,10 @@ function bindingFromEntry(params: {
   });
 
   return {
-    optionId: buildOrgModelOptionId(params.interfaceId, params.entry.instanceId),
+    optionId: buildOrgModelOptionId(
+      params.interfaceId,
+      params.entry.instanceId
+    ),
     instanceId: params.entry.instanceId,
     canonicalId: params.model.canonicalId,
     interfaceId: params.interfaceId,
@@ -95,7 +98,9 @@ export function buildOrgModelBindings(params: {
   readonly platformModels: readonly PlatformAiModel[];
   readonly interfaces: readonly OrgBindingInterface[];
 }): OrgModelBindingBase[] {
-  const visibleModels = params.platformModels.filter((model) => model.platformEnabled);
+  const visibleModels = params.platformModels.filter(
+    (model) => model.platformEnabled
+  );
   const bindings: OrgModelBindingBase[] = [];
 
   for (const model of visibleModels) {

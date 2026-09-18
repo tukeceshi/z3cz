@@ -130,7 +130,9 @@ function buildNodeType(
   };
 }
 
-function buildTestPayload(source: AiInterfaceSourceSpec): Record<string, unknown> {
+function buildTestPayload(
+  source: AiInterfaceSourceSpec
+): Record<string, unknown> {
   const payload: Record<string, unknown> = {
     model: source.io.defaultModel,
   };
@@ -155,42 +157,45 @@ export function compileAiInterfaceSourceSpec(params: {
   const { source, version } = params;
   const sync = source.execution.sync;
 
-  const artifactWithoutChecksum: Omit<AiInterfaceRuntimeArtifact, "checksum"> = {
-    schemaVersion: AI_INTERFACE_RUNTIME_SCHEMA_VERSION,
-    templateId: source.meta.id,
-    version,
-    provider: source.meta.provider,
-    connection: {
-      baseUrl: source.connection.baseUrl.replace(/\/$/, ""),
-      authType: source.connection.authType,
-      headerName:
-        source.connection.headerName ??
-        (source.connection.authType === "header" ? "X-Api-Key" : "Authorization"),
-      authPrefix:
-        source.connection.authPrefix ??
-        (source.connection.authType === "bearer" ? "Bearer " : ""),
-      defaultHeaders: source.connection.defaultHeaders ?? {},
-      timeoutMs: source.connection.timeoutMs ?? 180_000,
-    },
-    execution: {
-      mode: "sync",
-      sync: {
-        method: "POST",
-        path: sync.path.startsWith("/") ? sync.path : `/${sync.path}`,
-        bodySlots: sync.bodyMappings.map(mapBodySlot),
-        responseTextPath: [...splitDotPath(sync.responseTextPath)],
-        usagePromptPath: sync.usagePromptPath
-          ? [...splitDotPath(sync.usagePromptPath)]
-          : undefined,
-        usageCompletionPath: sync.usageCompletionPath
-          ? [...splitDotPath(sync.usageCompletionPath)]
-          : undefined,
+  const artifactWithoutChecksum: Omit<AiInterfaceRuntimeArtifact, "checksum"> =
+    {
+      schemaVersion: AI_INTERFACE_RUNTIME_SCHEMA_VERSION,
+      templateId: source.meta.id,
+      version,
+      provider: source.meta.provider,
+      connection: {
+        baseUrl: source.connection.baseUrl.replace(/\/$/, ""),
+        authType: source.connection.authType,
+        headerName:
+          source.connection.headerName ??
+          (source.connection.authType === "header"
+            ? "X-Api-Key"
+            : "Authorization"),
+        authPrefix:
+          source.connection.authPrefix ??
+          (source.connection.authType === "bearer" ? "Bearer " : ""),
+        defaultHeaders: source.connection.defaultHeaders ?? {},
+        timeoutMs: source.connection.timeoutMs ?? 180_000,
       },
-    },
-    nodeType: buildNodeType(source, version),
-    fields: [...source.io.fields],
-    testPayload: buildTestPayload(source),
-  };
+      execution: {
+        mode: "sync",
+        sync: {
+          method: "POST",
+          path: sync.path.startsWith("/") ? sync.path : `/${sync.path}`,
+          bodySlots: sync.bodyMappings.map(mapBodySlot),
+          responseTextPath: [...splitDotPath(sync.responseTextPath)],
+          usagePromptPath: sync.usagePromptPath
+            ? [...splitDotPath(sync.usagePromptPath)]
+            : undefined,
+          usageCompletionPath: sync.usageCompletionPath
+            ? [...splitDotPath(sync.usageCompletionPath)]
+            : undefined,
+        },
+      },
+      nodeType: buildNodeType(source, version),
+      fields: [...source.io.fields],
+      testPayload: buildTestPayload(source),
+    };
 
   const checksum = computeAiInterfaceChecksum(artifactWithoutChecksum);
 

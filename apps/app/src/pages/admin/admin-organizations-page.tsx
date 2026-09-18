@@ -116,10 +116,7 @@ export function AdminOrganizationsPage() {
     isOrganizationsLoading,
   } = useAdminOrganizations(page, limit, search || undefined);
 
-  const columns = useMemo(
-    () => createColumns(navigate, t),
-    [navigate, t]
-  );
+  const columns = useMemo(() => createColumns(navigate, t), [navigate, t]);
 
   if (isOrganizationsLoading) {
     return <InsetLoading title={t("admin.organizations.title")} />;

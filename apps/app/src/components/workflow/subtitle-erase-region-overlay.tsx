@@ -220,11 +220,9 @@ export function SubtitleEraseRegionOverlay() {
         const dx = point.x - interaction.start.x;
         const dy = point.y - interaction.start.y;
         const width =
-          interaction.originRect.bottomRightX -
-          interaction.originRect.topLeftX;
+          interaction.originRect.bottomRightX - interaction.originRect.topLeftX;
         const height =
-          interaction.originRect.bottomRightY -
-          interaction.originRect.topLeftY;
+          interaction.originRect.bottomRightY - interaction.originRect.topLeftY;
         const left = Math.min(
           1 - width,
           Math.max(0, interaction.originRect.topLeftX + dx)

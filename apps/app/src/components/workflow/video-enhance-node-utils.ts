@@ -11,7 +11,10 @@ import {
   type VolcanoMediaKitPricingResolution,
   type WorkflowMediaValue,
 } from "@dafthunk/types";
-import type { Edge as ReactFlowEdge, Node as ReactFlowNode } from "@xyflow/react";
+import type {
+  Edge as ReactFlowEdge,
+  Node as ReactFlowNode,
+} from "@xyflow/react";
 
 import {
   getCachedMediaNaturalSize,
@@ -44,7 +47,11 @@ export interface VideoEnhanceSourceGraphContext {
 export function readVideoEnhanceCoverCandidate(
   data: WorkflowNodeType
 ): MediaReference | null {
-  const display = readAiVideoCardDisplay(data.inputs, data.outputs, data.metadata);
+  const display = readAiVideoCardDisplay(
+    data.inputs,
+    data.outputs,
+    data.metadata
+  );
   const cover = display.coverMedia[0];
   if (!cover || !isResourceIdReference(cover)) {
     return null;
@@ -90,7 +97,9 @@ export async function isVideoEnhanceCoverReady(params: {
 export function readManualVideoReferences(
   data: WorkflowNodeType
 ): readonly WorkflowMediaValue[] {
-  const value = data.inputs.find((input) => input.id === "manual_videos")?.value;
+  const value = data.inputs.find(
+    (input) => input.id === "manual_videos"
+  )?.value;
   if (!Array.isArray(value)) {
     return [];
   }
@@ -195,9 +204,7 @@ export function resolveVideoEnhanceSourceTier(
   return tierFromNode ?? VIDEO_ENHANCE_DEFAULT_SOURCE_TIER;
 }
 
-export function isAiVideoEnhanceNode(
-  data: WorkflowNodeType
-): boolean {
+export function isAiVideoEnhanceNode(data: WorkflowNodeType): boolean {
   return (
     data.nodeType === AI_VIDEO_NODE_TYPE && isAiVideoEnhancePanel(data.metadata)
   );

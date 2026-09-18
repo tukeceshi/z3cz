@@ -6,9 +6,6 @@ export function MediaDisplayLoadingPlaceholder({
   readonly className?: string;
 }) {
   return (
-    <div
-      className={cn("bg-muted/30 animate-pulse", className)}
-      aria-hidden
-    />
+    <div className={cn("bg-muted/30 animate-pulse", className)} aria-hidden />
   );
 }

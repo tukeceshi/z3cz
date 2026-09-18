@@ -63,7 +63,8 @@ export function VideoEnhanceToolbarButton({
   const { id: workflowId } = useParams<{ id: string }>();
   const { getOrgUrl } = useOrgUrl();
   const { disabled: workflowDisabled } = useWorkflow();
-  const { createEnhanceSiblingNode } = useVideoEnhanceToSiblingNode(sourceNodeId);
+  const { createEnhanceSiblingNode } =
+    useVideoEnhanceToSiblingNode(sourceNodeId);
   const {
     interfaceId: mediaKitInterfaceId,
     config: mediaKitConfig,
@@ -72,10 +73,11 @@ export function VideoEnhanceToolbarButton({
 
   const [open, setOpen] = useState(false);
   const [showHint, setShowHint] = useState(false);
-  const [sourceTier, setSourceTier] = useState<VolcanoMediaKitPricingResolution | null>(
+  const [sourceTier, setSourceTier] =
+    useState<VolcanoMediaKitPricingResolution | null>(null);
+  const [draftConfig, setDraftConfig] = useState<VideoEnhanceNodeConfig | null>(
     null
   );
-  const [draftConfig, setDraftConfig] = useState<VideoEnhanceNodeConfig | null>(null);
   const cacheTierRequestRef = useRef(0);
 
   const enabledModes = mediaKitConfig?.enabledVideoModes ?? [];
@@ -123,7 +125,11 @@ export function VideoEnhanceToolbarButton({
 
     setShowHint(false);
     setSourceTier(initialTier);
-    setDraftConfig(modes.length > 0 ? createDefaultVideoEnhanceConfig(modes, initialTier) : null);
+    setDraftConfig(
+      modes.length > 0
+        ? createDefaultVideoEnhanceConfig(modes, initialTier)
+        : null
+    );
     setOpen(true);
 
     if (
@@ -227,7 +233,13 @@ export function VideoEnhanceToolbarButton({
 
     resetPopoverState();
     setOpen(true);
-  }, [isMediaKitLoading, mediaKitConfig, mediaKitReady, openPopover, resetPopoverState]);
+  }, [
+    isMediaKitLoading,
+    mediaKitConfig,
+    mediaKitReady,
+    openPopover,
+    resetPopoverState,
+  ]);
 
   const handleGenerate = useCallback(() => {
     if (!canGenerate || !draftConfig) {
@@ -336,7 +348,9 @@ export function VideoEnhanceToolbarButton({
             </div>
           </>
         ) : isMediaKitLoading ? (
-          <div className="p-4 text-sm text-muted-foreground">{t("common.loading")}</div>
+          <div className="p-4 text-sm text-muted-foreground">
+            {t("common.loading")}
+          </div>
         ) : null}
       </PopoverContent>
     </Popover>

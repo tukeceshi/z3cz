@@ -15,10 +15,7 @@ import { refreshOrgCloudStorageHealthAfterConfigChange } from "../../services/as
 import { mergeVolcanoTosStorage } from "../../services/resolve-org-cloud-storage";
 import { withApiKeyHint } from "../../utils/api-key-hint";
 import { ensureVolcanoTosBucketCreated } from "./create-volcano-tos-bucket";
-import {
-  ensureVolcanoApiKey,
-  getVolcanoCredentials,
-} from "./ensure-api-key";
+import { ensureVolcanoApiKey, getVolcanoCredentials } from "./ensure-api-key";
 import {
   isVolcanoMetadata,
   parseInterfaceMetadata,
@@ -60,13 +57,18 @@ async function setSetupStatus(params: {
     }
   }
 
-  await updateOrganizationAiInterface(db, params.organizationId, params.interfaceId, {
-    volcanoSetupStatus: params.status,
-    ...(metadataRaw ? { metadata: metadataRaw } : {}),
-    ...(params.apiKeyEncrypted
-      ? { apiKeyEncrypted: params.apiKeyEncrypted }
-      : {}),
-  });
+  await updateOrganizationAiInterface(
+    db,
+    params.organizationId,
+    params.interfaceId,
+    {
+      volcanoSetupStatus: params.status,
+      ...(metadataRaw ? { metadata: metadataRaw } : {}),
+      ...(params.apiKeyEncrypted
+        ? { apiKeyEncrypted: params.apiKeyEncrypted }
+        : {}),
+    }
+  );
 }
 
 async function applyTosSetup(params: {
@@ -244,10 +246,7 @@ export async function processVolcanoInterfaceSetup(
   } catch (error) {
     const messageText =
       error instanceof Error ? error.message : "Volcano setup failed";
-    console.error(
-      `[volcano-setup] failed for ${message.interfaceId}:`,
-      error
-    );
+    console.error(`[volcano-setup] failed for ${message.interfaceId}:`, error);
     await setSetupStatus({
       env,
       organizationId: message.organizationId,

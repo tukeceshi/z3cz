@@ -23,10 +23,7 @@ export function handleStudioListNodeClick(
   }
 
   if (state.hasSecondary) {
-    if (
-      nodeId === state.primaryNodeId ||
-      nodeId === state.secondaryNodeId
-    ) {
+    if (nodeId === state.primaryNodeId || nodeId === state.secondaryNodeId) {
       return;
     }
     actions.openSecondary(nodeId);

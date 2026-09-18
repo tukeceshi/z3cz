@@ -112,7 +112,11 @@ function MultiSelectShortcutRow({
   );
 }
 
-function DeleteShortcutRow({ deleteKeyLabel }: { readonly deleteKeyLabel: string }) {
+function DeleteShortcutRow({
+  deleteKeyLabel,
+}: {
+  readonly deleteKeyLabel: string;
+}) {
   return (
     <div className={KBD_COMBO_CLASS}>
       <ShortcutKbdWithIcon
@@ -160,7 +164,9 @@ function readShortcutKeys(item: object): readonly string[] | undefined {
   if (!("keys" in item) || !Array.isArray(item.keys)) {
     return undefined;
   }
-  return item.keys.every((key) => typeof key === "string") ? item.keys : undefined;
+  return item.keys.every((key) => typeof key === "string")
+    ? item.keys
+    : undefined;
 }
 
 function readShortcutKeysContent(item: object): ReactNode | undefined {
@@ -197,7 +203,9 @@ function LibtvShortcutRow({
           ))}
         </span>
       ) : (
-        <span className={cn(MUTED_LABEL_CLASS, "min-w-0 flex-1 pr-2 text-left")}>
+        <span
+          className={cn(MUTED_LABEL_CLASS, "min-w-0 flex-1 pr-2 text-left")}
+        >
           {label}
         </span>
       )}
@@ -308,7 +316,10 @@ export function CanvasShortcutHintButton({
   const trigger = (
     <button
       type="button"
-      className={cn(canvasDockButtonClassName, !collapsed && canvasDockButtonActiveClassName)}
+      className={cn(
+        canvasDockButtonClassName,
+        !collapsed && canvasDockButtonActiveClassName
+      )}
       aria-label={
         collapsed
           ? t("workflow.canvas.shortcutHint.expand")
@@ -433,67 +444,67 @@ export function CanvasShortcutHintPanel({
           role="region"
           aria-label={t("workflow.canvas.shortcutHint.title")}
         >
-        <div className="mb-4 flex items-center justify-between gap-3">
-          <span className="text-sm font-medium text-neutral-800 dark:text-neutral-200">
-            {t("workflow.canvas.shortcutHint.title")}
-          </span>
-          <button
-            type="button"
-            className="rounded-lg p-0.5 text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-neutral-800 dark:hover:bg-neutral-800 dark:hover:text-neutral-100"
-            aria-label={t("workflow.canvas.shortcutHint.collapse")}
-            title={t("workflow.canvas.shortcutHint.collapse")}
-            onClick={(event) => {
-              event.stopPropagation();
-              onClose();
-            }}
-          >
-            <X className="size-4" />
-          </button>
-        </div>
-
-        <div className="flex items-stretch gap-5">
-          <div className="flex min-w-0 flex-1 flex-col gap-3">
-            {leftShortcuts.map((item) => (
-              <LibtvShortcutRow
-                key={
-                  "label" in item && typeof item.label === "string"
-                    ? item.label
-                    : (readShortcutLabelLines(item)?.join("-") ?? "")
-                }
-                label={
-                  "label" in item && typeof item.label === "string"
-                    ? item.label
-                    : undefined
-                }
-                labelLines={readShortcutLabelLines(item)}
-                keys={readShortcutKeys(item)}
-                keysContent={readShortcutKeysContent(item)}
-              />
-            ))}
+          <div className="mb-4 flex items-center justify-between gap-3">
+            <span className="text-sm font-medium text-neutral-800 dark:text-neutral-200">
+              {t("workflow.canvas.shortcutHint.title")}
+            </span>
+            <button
+              type="button"
+              className="rounded-lg p-0.5 text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-neutral-800 dark:hover:bg-neutral-800 dark:hover:text-neutral-100"
+              aria-label={t("workflow.canvas.shortcutHint.collapse")}
+              title={t("workflow.canvas.shortcutHint.collapse")}
+              onClick={(event) => {
+                event.stopPropagation();
+                onClose();
+              }}
+            >
+              <X className="size-4" />
+            </button>
           </div>
 
-          <div className={COLUMN_DIVIDER_CLASS} aria-hidden />
+          <div className="flex items-stretch gap-5">
+            <div className="flex min-w-0 flex-1 flex-col gap-3">
+              {leftShortcuts.map((item) => (
+                <LibtvShortcutRow
+                  key={
+                    "label" in item && typeof item.label === "string"
+                      ? item.label
+                      : (readShortcutLabelLines(item)?.join("-") ?? "")
+                  }
+                  label={
+                    "label" in item && typeof item.label === "string"
+                      ? item.label
+                      : undefined
+                  }
+                  labelLines={readShortcutLabelLines(item)}
+                  keys={readShortcutKeys(item)}
+                  keysContent={readShortcutKeysContent(item)}
+                />
+              ))}
+            </div>
 
-          <div className="flex min-w-0 flex-1 flex-col gap-3">
-            {rightShortcuts.map((item) => (
-              <LibtvShortcutRow
-                key={
-                  "label" in item && typeof item.label === "string"
-                    ? item.label
-                    : (readShortcutLabelLines(item)?.join("-") ?? "")
-                }
-                label={
-                  "label" in item && typeof item.label === "string"
-                    ? item.label
-                    : undefined
-                }
-                labelLines={readShortcutLabelLines(item)}
-                keys={readShortcutKeys(item)}
-                keysContent={readShortcutKeysContent(item)}
-              />
-            ))}
+            <div className={COLUMN_DIVIDER_CLASS} aria-hidden />
+
+            <div className="flex min-w-0 flex-1 flex-col gap-3">
+              {rightShortcuts.map((item) => (
+                <LibtvShortcutRow
+                  key={
+                    "label" in item && typeof item.label === "string"
+                      ? item.label
+                      : (readShortcutLabelLines(item)?.join("-") ?? "")
+                  }
+                  label={
+                    "label" in item && typeof item.label === "string"
+                      ? item.label
+                      : undefined
+                  }
+                  labelLines={readShortcutLabelLines(item)}
+                  keys={readShortcutKeys(item)}
+                  keysContent={readShortcutKeysContent(item)}
+                />
+              ))}
+            </div>
           </div>
-        </div>
         </div>
 
         <span

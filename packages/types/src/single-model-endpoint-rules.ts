@@ -25,10 +25,14 @@ export interface ResolvedSingleModelVideoEndpoints {
   readonly useFullSubmitUrl: boolean;
 }
 
-export const OFFICIAL_VIDEO_SUBMIT_PATH = "/contents/generations/tasks" as const;
+export const OFFICIAL_VIDEO_SUBMIT_PATH =
+  "/contents/generations/tasks" as const;
 
 export function usesOfficialSingleModelEndpointRules(
-  metadata: Pick<SingleModelProviderMetadata, "endpointRules"> | null | undefined
+  metadata:
+    | Pick<SingleModelProviderMetadata, "endpointRules">
+    | null
+    | undefined
 ): boolean {
   return metadata?.endpointRules?.useOfficial !== false;
 }
@@ -69,9 +73,11 @@ export function resolveSingleModelVideoEndpoints(params: {
   readonly category?: SingleModelPresetCategory | string;
   readonly supportsTaskCancel?: boolean;
 }): ResolvedSingleModelVideoEndpoints {
-  const category = params.category ?? params.metadata?.singleModelCategory ?? "video";
+  const category =
+    params.category ?? params.metadata?.singleModelCategory ?? "video";
   const submitPath = resolveDefaultVideoSubmitPath(category);
-  const useFullSubmitUrl = params.metadata?.endpointRules?.useFullSubmitUrl === true;
+  const useFullSubmitUrl =
+    params.metadata?.endpointRules?.useFullSubmitUrl === true;
 
   if (usesOfficialSingleModelEndpointRules(params.metadata ?? undefined)) {
     return {

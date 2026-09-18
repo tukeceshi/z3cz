@@ -29,11 +29,7 @@ export function resolveStagingCardLayout(
     return { width: AI_AUDIO_CARD_WIDTH_PX, height: AI_AUDIO_CARD_HEIGHT_PX };
   }
 
-  if (
-    naturalSize &&
-    naturalSize.width > 0 &&
-    naturalSize.height > 0
-  ) {
+  if (naturalSize && naturalSize.width > 0 && naturalSize.height > 0) {
     return computeMediaCardSize(naturalSize.width, naturalSize.height);
   }
 

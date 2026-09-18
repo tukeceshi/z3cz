@@ -50,12 +50,18 @@ const cloudAccelerationRoutes = new Hono<ApiContext>();
 
 cloudAccelerationRoutes.use("*", jwtMiddleware);
 cloudAccelerationRoutes.use("*", requireAiInterfacesAccess());
-cloudAccelerationRoutes.use("*", createRequireFeatureMiddleware("ai-interfaces"));
+cloudAccelerationRoutes.use(
+  "*",
+  createRequireFeatureMiddleware("ai-interfaces")
+);
 
 cloudAccelerationRoutes.get("/interfaces", async (c) => {
   const organizationId = c.get("organizationId")!;
   const db = createDatabase(c.env);
-  const entries = await listOrgAiInterfaceCloudAccelerations(db, organizationId);
+  const entries = await listOrgAiInterfaceCloudAccelerations(
+    db,
+    organizationId
+  );
   const response: ListAiInterfaceCloudAccelerationResponse = { entries };
   return c.json(response);
 });
@@ -112,20 +118,23 @@ cloudAccelerationRoutes.post(
   }
 );
 
-cloudAccelerationRoutes.post("/interfaces/:aiInterfaceId/disable", async (c) => {
-  const organizationId = c.get("organizationId")!;
-  const aiInterfaceId = c.req.param("aiInterfaceId");
-  const db = createDatabase(c.env);
-  const disabled = await disableOrgAiInterfaceCloudAcceleration(
-    db,
-    organizationId,
-    aiInterfaceId
-  );
-  if (!disabled) {
-    return c.json({ error: "Interface cloud acceleration not found" }, 404);
+cloudAccelerationRoutes.post(
+  "/interfaces/:aiInterfaceId/disable",
+  async (c) => {
+    const organizationId = c.get("organizationId")!;
+    const aiInterfaceId = c.req.param("aiInterfaceId");
+    const db = createDatabase(c.env);
+    const disabled = await disableOrgAiInterfaceCloudAcceleration(
+      db,
+      organizationId,
+      aiInterfaceId
+    );
+    if (!disabled) {
+      return c.json({ error: "Interface cloud acceleration not found" }, 404);
+    }
+    return c.json({ success: true });
   }
-  return c.json({ success: true });
-});
+);
 
 cloudAccelerationRoutes.post(
   "/interfaces/:aiInterfaceId/enable-always",
@@ -188,7 +197,9 @@ cloudAccelerationRoutes.put(
       } satisfies { settings: PersistWorkerPoolSettings });
     } catch (error) {
       const message =
-        error instanceof Error ? error.message : "Failed to update pool settings";
+        error instanceof Error
+          ? error.message
+          : "Failed to update pool settings";
       console.error("Error updating organization persist worker pool:", error);
       const status = message === "Organization not found" ? 404 : 500;
       return c.json({ error: message }, status);
@@ -281,7 +292,9 @@ cloudAccelerationRoutes.delete("/workers/:id", async (c) => {
     return c.json({ success: true });
   } catch (error) {
     const message =
-      error instanceof Error ? error.message : "Failed to delete persist worker";
+      error instanceof Error
+        ? error.message
+        : "Failed to delete persist worker";
     console.error("Error deleting organization persist worker:", error);
     const status = message === "Persist worker not found" ? 404 : 400;
     return c.json({ error: message }, status);

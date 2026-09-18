@@ -7,7 +7,9 @@ import type {
 import type { Database } from "../db";
 import { listPlatformAiModels } from "../db/platform-ai-model-queries";
 
-function mapPlatformCatalogModel(model: PlatformAiModel): PlatformCatalogModelOption {
+function mapPlatformCatalogModel(
+  model: PlatformAiModel
+): PlatformCatalogModelOption {
   return {
     canonicalId: model.canonicalId,
     displayName: model.displayName,

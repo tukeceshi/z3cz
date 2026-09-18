@@ -35,7 +35,9 @@ export function ceilDurationStepSec(valueSec: number): number {
   );
 }
 
-export function videoTrimSelectionDurationSec(range: VideoTrimRangeSec): number {
+export function videoTrimSelectionDurationSec(
+  range: VideoTrimRangeSec
+): number {
   const startTenths = toDurationTenths(range.startSec);
   const endTenths = toDurationTenths(range.endSec);
   return fromDurationTenths(Math.max(0, endTenths - startTenths));
@@ -106,7 +108,9 @@ export function clampVideoTrimRange(
   let endSec = snapVideoTrimSec(
     Math.min(duration, Math.max(effectiveMin, range.endSec))
   );
-  let startSec = snapVideoTrimSec(Math.max(0, Math.min(range.startSec, endSec)));
+  let startSec = snapVideoTrimSec(
+    Math.max(0, Math.min(range.startSec, endSec))
+  );
 
   endSec = Math.min(duration, Math.max(effectiveMin, endSec));
   startSec = Math.max(0, Math.min(startSec, endSec));
@@ -167,8 +171,7 @@ export function applyVideoTrimTimeFieldEdit(params: {
   readonly videoDurationSec: number;
   readonly minSelectionSec?: number;
 }): VideoTrimRangeSec {
-  const minSelectionSec =
-    params.minSelectionSec ?? VIDEO_TRIM_MIN_DURATION_SEC;
+  const minSelectionSec = params.minSelectionSec ?? VIDEO_TRIM_MIN_DURATION_SEC;
   const duration = resolveVideoDurationSec(params.videoDurationSec);
   const effectiveMin = resolveEffectiveMinSelectionSec(
     params.videoDurationSec,
@@ -179,11 +182,7 @@ export function applyVideoTrimTimeFieldEdit(params: {
   if (params.field === "start") {
     const endSec = params.range.endSec;
     const startSec = Math.max(0, Math.min(snapped, endSec - effectiveMin));
-    return clampVideoTrimRange(
-      { startSec, endSec },
-      duration,
-      minSelectionSec
-    );
+    return clampVideoTrimRange({ startSec, endSec }, duration, minSelectionSec);
   }
 
   if (params.field === "end") {
@@ -192,11 +191,7 @@ export function applyVideoTrimTimeFieldEdit(params: {
       duration,
       Math.max(snapped, startSec + effectiveMin)
     );
-    return clampVideoTrimRange(
-      { startSec, endSec },
-      duration,
-      minSelectionSec
-    );
+    return clampVideoTrimRange({ startSec, endSec }, duration, minSelectionSec);
   }
 
   const startSec = params.range.startSec;
@@ -239,7 +234,9 @@ export function splitVideoRetakeSegments(
   videoDurationSec: number
 ): readonly VideoRetakeSegment[] {
   const duration = resolveVideoDurationSec(videoDurationSec);
-  const startSec = snapVideoTrimSec(Math.max(0, Math.min(range.startSec, duration)));
+  const startSec = snapVideoTrimSec(
+    Math.max(0, Math.min(range.startSec, duration))
+  );
   const endSec = snapVideoTrimSec(
     Math.max(startSec, Math.min(range.endSec, duration))
   );
@@ -255,7 +252,10 @@ export function splitVideoRetakeSegments(
 
   segments.push({
     role: "retake",
-    range: { startSec, endSec: Math.max(endSec, startSec + VIDEO_TRIM_MIN_DURATION_SEC) },
+    range: {
+      startSec,
+      endSec: Math.max(endSec, startSec + VIDEO_TRIM_MIN_DURATION_SEC),
+    },
   });
 
   if (duration - endSec >= VIDEO_TRIM_MIN_DURATION_SEC) {

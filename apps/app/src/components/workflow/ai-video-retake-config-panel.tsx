@@ -116,7 +116,10 @@ import { useBufferedTextValue } from "./use-buffered-text-value";
 import { useGenerativeParamsEditor } from "./use-generative-params-editor";
 import { useGenerativeReferenceConnection } from "./use-generative-reference-connection";
 import { useGenerativeVideoFileUpload } from "./use-generative-video-file-upload";
-import { useAiVideoRetakeDraft, withAiVideoRetakeDraft } from "./ai-video-retake-node-utils";
+import {
+  useAiVideoRetakeDraft,
+  withAiVideoRetakeDraft,
+} from "./ai-video-retake-node-utils";
 import { useRetakePlaybackUrl } from "./retake-playback-url-context";
 import { applySelectedModelRecord } from "./generative-model-binding";
 import { runVideoRetakePipeline } from "./run-video-retake-pipeline";
@@ -156,12 +159,16 @@ const RETAKE_TRIGGER_SUMMARY_FIELD_NAMES = new Set([
 ]);
 
 function readModelResolutionFallback(
-  generationFields: readonly { readonly name: string; readonly default?: unknown }[]
+  generationFields: readonly {
+    readonly name: string;
+    readonly default?: unknown;
+  }[]
 ): string {
   const base = buildDefaultVideoGenerationParams(
     generationFields as readonly import("@dafthunk/types").UpstreamParamProfileField[]
   );
-  return typeof base.resolution === "string" && base.resolution.trim().length > 0
+  return typeof base.resolution === "string" &&
+    base.resolution.trim().length > 0
     ? base.resolution
     : "720p";
 }
@@ -232,7 +239,8 @@ export function AiVideoRetakeConfigPanel({
     isAiVideoGenerating(data.metadata) ||
     isGenerativeProgressBusyPhase(progressPhase);
 
-  const typedNodes = nodes as unknown as readonly ReactFlowNode<WorkflowNodeType>[];
+  const typedNodes =
+    nodes as unknown as readonly ReactFlowNode<WorkflowNodeType>[];
   const flowNodeRefs = useMemo(
     () => typedNodes.map((node) => ({ id: node.id, data: node.data })),
     [typedNodes]
@@ -248,7 +256,8 @@ export function AiVideoRetakeConfigPanel({
     [data.inputs, edges, flowNodeRefs, nodeId]
   );
   const sourceMedia = primaryVideoRef?.media;
-  const primaryVideoEdgeId = primaryVideoRef?.edgeId ?? draft.primaryVideoEdgeId;
+  const primaryVideoEdgeId =
+    primaryVideoRef?.edgeId ?? draft.primaryVideoEdgeId;
   const promptValue = getInputString(data, "prompt");
   const hasRetakeHistory = hasRetakeOwnResource(data.inputs);
 
@@ -293,7 +302,8 @@ export function AiVideoRetakeConfigPanel({
   } = useOrgVideoPickerModels(orgId);
 
   const seedance25Models = useMemo(
-    () => models.filter((model) => isSeedance25PlatformModel(model.canonicalId)),
+    () =>
+      models.filter((model) => isSeedance25PlatformModel(model.canonicalId)),
     [models]
   );
 
@@ -424,8 +434,7 @@ export function AiVideoRetakeConfigPanel({
     [allGenerationFields]
   );
 
-  const paramsVisible =
-    Boolean(selectedModel) && paramPopoverFields.length > 0;
+  const paramsVisible = Boolean(selectedModel) && paramPopoverFields.length > 0;
 
   const committedGenerationValues = useMemo(() => {
     if (!paramsVisible) {
@@ -468,18 +477,17 @@ export function AiVideoRetakeConfigPanel({
         nextResolution !== undefined &&
         String(nextResolution) !== String(prevResolution ?? "");
       const autoResolution = !modelRules
-          ? null
-          : resolveRetakeAutoResolution({
-              width: draft.sourceVideoWidth,
-              height: draft.sourceVideoHeight,
-              modelFallback: readModelResolutionFallback(
-                modelRules.generationFields
-              ),
-            });
+        ? null
+        : resolveRetakeAutoResolution({
+            width: draft.sourceVideoWidth,
+            height: draft.sourceVideoHeight,
+            modelFallback: readModelResolutionFallback(
+              modelRules.generationFields
+            ),
+          });
       const resolutionManuallyChanged =
         resolutionChanged &&
-        (autoResolution === null ||
-          String(nextResolution) !== autoResolution);
+        (autoResolution === null || String(nextResolution) !== autoResolution);
       patchDraft({
         generationParams: next,
         ...(resolutionManuallyChanged ? { resolutionManuallySet: true } : {}),
@@ -543,7 +551,10 @@ export function AiVideoRetakeConfigPanel({
     if (!paramsEditor.isParamsIdle || disabled || !updateNodeData) {
       return;
     }
-    const flowNodes = typedNodes.map((node) => ({ id: node.id, data: node.data }));
+    const flowNodes = typedNodes.map((node) => ({
+      id: node.id,
+      data: node.data,
+    }));
     const liveNodeData =
       typedNodes.find((node) => node.id === nodeId)?.data ?? data;
     const counts = countAiVideoReferenceCountsForNode(
@@ -628,7 +639,13 @@ export function AiVideoRetakeConfigPanel({
       if (!compiled.ok) {
         return;
       }
-      updateNodeInput(nodeId, "prompt", compiled.prompt, data.inputs, updateNodeData);
+      updateNodeInput(
+        nodeId,
+        "prompt",
+        compiled.prompt,
+        data.inputs,
+        updateNodeData
+      );
     },
     [
       data.inputs,
@@ -662,7 +679,13 @@ export function AiVideoRetakeConfigPanel({
     if (referencedPrompt === promptValue) {
       return;
     }
-    updateNodeInput(nodeId, "prompt", referencedPrompt, data.inputs, updateNodeData);
+    updateNodeInput(
+      nodeId,
+      "prompt",
+      referencedPrompt,
+      data.inputs,
+      updateNodeData
+    );
   }, [
     data.inputs,
     disabled,
@@ -703,7 +726,12 @@ export function AiVideoRetakeConfigPanel({
   ]);
 
   useEffect(() => {
-    if (hasPromptReference || disabled || !updateNodeData || !promptValue.trim()) {
+    if (
+      hasPromptReference ||
+      disabled ||
+      !updateNodeData ||
+      !promptValue.trim()
+    ) {
       return;
     }
     const next = replaceRetakePromptTimeRange(promptValue, draft.draftRange);
@@ -724,8 +752,8 @@ export function AiVideoRetakeConfigPanel({
   const displayPrompt =
     (hasPromptReference ? referencedPrompt : promptBuffer.value) ?? "";
 
-  const hasPromptInput = (hasPromptReference ? referencedPrompt : promptValue).trim()
-    .length > 0;
+  const hasPromptInput =
+    (hasPromptReference ? referencedPrompt : promptValue).trim().length > 0;
 
   const retakeEditTimeRangeLabel = useMemo(
     () => formatRetakeEditTimeRangeLabel(draft.draftRange),
@@ -736,7 +764,9 @@ export function AiVideoRetakeConfigPanel({
     !hasPromptReference &&
     hasBrokenVideoPromptRefs(displayPrompt, imageEdgeIndexMap);
 
-  const promptForGenerate = (hasPromptReference ? referencedPrompt : promptValue).trim();
+  const promptForGenerate = (
+    hasPromptReference ? referencedPrompt : promptValue
+  ).trim();
 
   const promptCompiledLength = promptForGenerate.length;
 
@@ -744,7 +774,9 @@ export function AiVideoRetakeConfigPanel({
 
   const handleModelSelect = useCallback(
     (optionId: string) => {
-      const model = seedance25Models.find((entry) => entry.optionId === optionId);
+      const model = seedance25Models.find(
+        (entry) => entry.optionId === optionId
+      );
       if (!model) {
         return;
       }
@@ -802,14 +834,20 @@ export function AiVideoRetakeConfigPanel({
     return source?.data.name ?? edge.source;
   }, [edges, nodeId, typedNodes]);
 
-  const promptReferenceEditHint = t("workflow.aiVideoPanel.promptReferenceEditHint", {
-    nodeName:
-      promptReferenceSourceName ??
-      t("workflow.aiVideoPanel.promptReferenceEditHintFallback"),
-  });
+  const promptReferenceEditHint = t(
+    "workflow.aiVideoPanel.promptReferenceEditHint",
+    {
+      nodeName:
+        promptReferenceSourceName ??
+        t("workflow.aiVideoPanel.promptReferenceEditHintFallback"),
+    }
+  );
 
-  const { canConnectReference, buildReferenceConnection, appendReferenceConnection } =
-    useGenerativeReferenceConnection();
+  const {
+    canConnectReference,
+    buildReferenceConnection,
+    appendReferenceConnection,
+  } = useGenerativeReferenceConnection();
 
   const handleDisconnectEdge = (edgeId: string) => {
     if (
@@ -892,7 +930,9 @@ export function AiVideoRetakeConfigPanel({
         continue;
       }
 
-      const catalog = nodeTypes.find((entry) => entry.type === AI_IMAGE_NODE_TYPE);
+      const catalog = nodeTypes.find(
+        (entry) => entry.type === AI_IMAGE_NODE_TYPE
+      );
       if (!catalog) {
         toast.error("workflow.aiVideoPanel.referenceRejected");
         continue;
@@ -934,8 +974,7 @@ export function AiVideoRetakeConfigPanel({
         const catalogOutputs = catalog.outputs.map((param) => ({
           ...param,
           id: param.name,
-          value:
-            param.name === AI_IMAGE_OUTPUT_ID ? [value] : param.value,
+          value: param.name === AI_IMAGE_OUTPUT_ID ? [value] : param.value,
         }));
 
         const newNode = {
@@ -991,7 +1030,9 @@ export function AiVideoRetakeConfigPanel({
     if (disabled || isBusy || hasPromptReference || chip.kind !== "image") {
       return;
     }
-    promptBuffer.commit(appendVideoPromptRefToken(promptBuffer.value, chip.edgeId));
+    promptBuffer.commit(
+      appendVideoPromptRefToken(promptBuffer.value, chip.edgeId)
+    );
   };
 
   const startRetakeGeneration = useCallback(
@@ -1259,8 +1300,7 @@ export function AiVideoRetakeConfigPanel({
 
   const showGenerateAction =
     !hasRetakeHistory || draft.cardPreview === "source";
-  const showRedoAction =
-    hasRetakeHistory && draft.cardPreview === "generated";
+  const showRedoAction = hasRetakeHistory && draft.cardPreview === "generated";
   const showBackAction = hasRetakeHistory && draft.cardPreview === "source";
 
   const handleRedo = useCallback(() => {
@@ -1405,7 +1445,11 @@ export function AiVideoRetakeConfigPanel({
 
   return (
     <>
-      <GenerativeConfigPanelShell nodeId={nodeId} zoom={zoom} layout="retake-embedded">
+      <GenerativeConfigPanelShell
+        nodeId={nodeId}
+        zoom={zoom}
+        layout="retake-embedded"
+      >
         <ReferenceThumbUrlsProvider chips={referenceChips}>
           {(thumbUrls) => (
             <>
@@ -1503,9 +1547,13 @@ export function AiVideoRetakeConfigPanel({
             <div className="flex min-w-0 items-end gap-2">
               <AiTextModelPicker
                 orgId={orgId}
-                models={seedance25Models as unknown as readonly OrgTextModelOption[]}
+                models={
+                  seedance25Models as unknown as readonly OrgTextModelOption[]
+                }
                 selectedOptionId={selectedModel?.optionId ?? ""}
-                chipModel={selectedModel as unknown as OrgTextModelOption | undefined}
+                chipModel={
+                  selectedModel as unknown as OrgTextModelOption | undefined
+                }
                 disabled={disabled || isBusy}
                 isLoading={modelsLoading}
                 loadError={Boolean(modelsError)}

@@ -20,7 +20,10 @@ describe("video-concat-mediakit", () => {
     expect(isSubmitVideoConcatUrlsValid([" "])).toBe(false);
     expect(
       isSubmitVideoConcatUrlsValid(
-        Array.from({ length: 101 }, (_, index) => `https://example.com/${index}`)
+        Array.from(
+          { length: 101 },
+          (_, index) => `https://example.com/${index}`
+        )
       )
     ).toBe(false);
   });

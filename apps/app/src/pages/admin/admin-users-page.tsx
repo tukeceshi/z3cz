@@ -126,10 +126,7 @@ export function AdminUsersPage() {
     search || undefined
   );
 
-  const columns = useMemo(
-    () => createColumns(navigate, t),
-    [navigate, t]
-  );
+  const columns = useMemo(() => createColumns(navigate, t), [navigate, t]);
 
   if (isUsersLoading) {
     return <InsetLoading title={t("admin.users.title")} />;

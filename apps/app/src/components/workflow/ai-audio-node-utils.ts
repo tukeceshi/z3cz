@@ -13,7 +13,11 @@ import {
   type WorkflowMediaValue,
 } from "@dafthunk/types";
 
-import type { NodeType, WorkflowNodeType, WorkflowParameter } from "./workflow-types";
+import type {
+  NodeType,
+  WorkflowNodeType,
+  WorkflowParameter,
+} from "./workflow-types";
 import {
   AI_GENERATIVE_PANEL_HEIGHT_PX,
   AI_GENERATIVE_PANEL_PROMPT_MIN_HEIGHT_PX,
@@ -184,7 +188,9 @@ export function readAiAudioResult(
     return fromInputAudios;
   }
 
-  const fromOutput = outputs?.find((output) => output.id === AI_AUDIO_OUTPUT_ID);
+  const fromOutput = outputs?.find(
+    (output) => output.id === AI_AUDIO_OUTPUT_ID
+  );
   return parseWorkflowMediaValues(fromOutput?.value);
 }
 
@@ -203,21 +209,22 @@ export function readAiAudioResultHistory(
     selectedId?: unknown;
   };
   const rawItems = Array.isArray(record.items)
-    ? record.items.filter(
-        (entry): entry is AiAudioResultHistoryItem =>
-          !!entry &&
-          typeof entry === "object" &&
-          typeof (entry as AiAudioResultHistoryItem).id === "string" &&
-          Array.isArray((entry as AiAudioResultHistoryItem).audios) &&
-          typeof (entry as AiAudioResultHistoryItem).createdAt === "string"
-      )
-      .map((entry) => {
-        const item = entry as AiAudioResultHistoryItem & { prompt?: string };
-        return {
-          ...item,
-          prompt: typeof item.prompt === "string" ? item.prompt : "",
-        };
-      })
+    ? record.items
+        .filter(
+          (entry): entry is AiAudioResultHistoryItem =>
+            !!entry &&
+            typeof entry === "object" &&
+            typeof (entry as AiAudioResultHistoryItem).id === "string" &&
+            Array.isArray((entry as AiAudioResultHistoryItem).audios) &&
+            typeof (entry as AiAudioResultHistoryItem).createdAt === "string"
+        )
+        .map((entry) => {
+          const item = entry as AiAudioResultHistoryItem & { prompt?: string };
+          return {
+            ...item,
+            prompt: typeof item.prompt === "string" ? item.prompt : "",
+          };
+        })
     : [];
 
   const items = splitHistoryMediaRows({
@@ -304,12 +311,12 @@ export function readAiAudioCardDisplay(
     inputs.find((input) => input.id === "manual_audios")?.value
   );
   if (manual.length > 0) {
-      return {
-        coverMedia: manual,
-        isBusy: false,
-        hasCover: hasDisplayableWorkflowMedia(manual),
-        cardPhase: null,
-      };
+    return {
+      coverMedia: manual,
+      isBusy: false,
+      hasCover: hasDisplayableWorkflowMedia(manual),
+      cardPhase: null,
+    };
   }
 
   const history = readAiAudioResultHistory(inputs);
@@ -355,7 +362,12 @@ export function withAiAudioManualUpload(
     [...audios],
     "json"
   );
-  inputs = upsertInputValue(inputs, AI_AUDIO_RESULT_INPUT_ID, [...audios], "json");
+  inputs = upsertInputValue(
+    inputs,
+    AI_AUDIO_RESULT_INPUT_ID,
+    [...audios],
+    "json"
+  );
 
   const outputs = current.outputs.map((output) =>
     output.id === AI_AUDIO_OUTPUT_ID
@@ -574,10 +586,11 @@ export function withAiAudioResourcesMarkedFailed(
     nextHistory,
     "json"
   );
-  const resultAudios = readAiAudioResult(inputs, current.outputs).map((audio) =>
-    isResourceIdReference(audio) && ids.has(audio.resourceId)
-      ? markResourceRefFailed(audio)
-      : audio
+  const resultAudios = readAiAudioResult(inputs, current.outputs).map(
+    (audio) =>
+      isResourceIdReference(audio) && ids.has(audio.resourceId)
+        ? markResourceRefFailed(audio)
+        : audio
   );
   return withAiAudioResult(current, resultAudios, { inputs });
 }
@@ -615,16 +628,18 @@ export function withAiAudioResourceGeneratingCleared(
     nextHistory,
     "json"
   );
-  const resultAudios = readAiAudioResult(inputs, current.outputs).map((audio) => {
-    if (
-      isResourceIdReference(audio) &&
-      audio.generating &&
-      ids.has(audio.resourceId)
-    ) {
-      return stripGeneratingFlag(audio);
+  const resultAudios = readAiAudioResult(inputs, current.outputs).map(
+    (audio) => {
+      if (
+        isResourceIdReference(audio) &&
+        audio.generating &&
+        ids.has(audio.resourceId)
+      ) {
+        return stripGeneratingFlag(audio);
+      }
+      return audio;
     }
-    return audio;
-  });
+  );
   return withAiAudioResult(current, resultAudios, { inputs });
 }
 

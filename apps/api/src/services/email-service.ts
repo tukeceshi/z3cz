@@ -170,10 +170,14 @@ export class EmailService {
       if (this.env.RUNTIME === "node") {
         const outboxDir =
           this.env.NODE_OUTBOX_DIR ?? "/app/data/storage/outbound-emails";
-        const { sendRawMimeEmailNode } = await import("./node-send-email-binding");
+        const { sendRawMimeEmailNode } = await import(
+          "./node-send-email-binding"
+        );
         await sendRawMimeEmailNode(outboxDir, from, to, rawMime);
       } else {
-        const { sendRawMimeEmail } = await import("./email-threaded-cloudflare");
+        const { sendRawMimeEmail } = await import(
+          "./email-threaded-cloudflare"
+        );
         await sendRawMimeEmail(this.binding, from, to, rawMime);
       }
       return { success: true, rfc822MessageId, rawMime };

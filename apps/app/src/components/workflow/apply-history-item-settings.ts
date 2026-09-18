@@ -5,9 +5,7 @@ import {
   readNodeGenerationParams,
   sanitizeCardGenerationParams,
 } from "./generative-card-params";
-import {
-  generativeModelBindingHandlersForModality,
-} from "./generative-model-binding";
+import { generativeModelBindingHandlersForModality } from "./generative-model-binding";
 import { generativeReferenceMetadataForModel } from "./generative-reference-metadata";
 import {
   persistGenerativeBindingWithParams,
@@ -71,15 +69,15 @@ function sanitizeHistoryParams<T extends OrgModelBindingRef>(
 }
 
 /** Resolve history model against live catalog and write binding + sanitized params. */
-export function applyHistoryItemSettingsToNode<T extends OrgModelBindingRef>(
-  params: {
-    readonly current: WorkflowNodeType;
-    readonly modality: GenerativeModelModality;
-    readonly models: readonly T[];
-    readonly historyBinding: HistoryModelBinding;
-    readonly historyParams?: Readonly<Record<string, unknown>>;
-  }
-): ApplyHistoryItemSettingsResult {
+export function applyHistoryItemSettingsToNode<
+  T extends OrgModelBindingRef,
+>(params: {
+  readonly current: WorkflowNodeType;
+  readonly modality: GenerativeModelModality;
+  readonly models: readonly T[];
+  readonly historyBinding: HistoryModelBinding;
+  readonly historyParams?: Readonly<Record<string, unknown>>;
+}): ApplyHistoryItemSettingsResult {
   const handlers = generativeModelBindingHandlersForModality(params.modality);
   const historyBindingRef = resolveHistoryModelBinding(params.historyBinding);
   let modelUnavailable = false;

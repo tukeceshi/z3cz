@@ -55,7 +55,9 @@ export function VolcanoMediaKitRow({
       toast.success("pages.aiInterfaces.mediaKitEnhance.saved");
     } catch (error) {
       toast.errorRaw(
-        error instanceof Error ? error.message : t("pages.aiInterfaces.saveFailed")
+        error instanceof Error
+          ? error.message
+          : t("pages.aiInterfaces.saveFailed")
       );
       setConfig(snapshot);
     } finally {
@@ -95,7 +97,9 @@ export function VolcanoMediaKitRow({
       toast.success("pages.aiInterfaces.mediaKitEnhance.saved");
     } catch (error) {
       toast.errorRaw(
-        error instanceof Error ? error.message : t("pages.aiInterfaces.saveFailed")
+        error instanceof Error
+          ? error.message
+          : t("pages.aiInterfaces.saveFailed")
       );
       setConfig(snapshot);
     } finally {

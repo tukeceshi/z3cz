@@ -130,9 +130,7 @@ describe("fetchVolcanoResourcePackages", () => {
     const result = await fetchVolcanoResourcePackages({ credentials });
 
     expect(result.rows).toHaveLength(1);
-    expect(result.partialErrors).toEqual([
-      "Status=UsedUp: rate limited",
-    ]);
+    expect(result.partialErrors).toEqual(["Status=UsedUp: rate limited"]);
   });
 
   it("throws when every status fetch fails", async () => {
@@ -140,9 +138,9 @@ describe("fetchVolcanoResourcePackages", () => {
       new Error("billing unavailable")
     );
 
-    await expect(
-      fetchVolcanoResourcePackages({ credentials })
-    ).rejects.toThrow("billing unavailable");
+    await expect(fetchVolcanoResourcePackages({ credentials })).rejects.toThrow(
+      "billing unavailable"
+    );
   });
 });
 

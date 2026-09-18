@@ -43,7 +43,9 @@ export function buildWorkflowPayload(
       icon: persistableData.icon,
       functionCalling: persistableData.functionCalling,
       ...(() => {
-        const metadata = stripTransientGenerativeMetadata(persistableData.metadata);
+        const metadata = stripTransientGenerativeMetadata(
+          persistableData.metadata
+        );
         return metadata ? { metadata } : {};
       })(),
       inputs: persistableData.inputs.map((input) => {

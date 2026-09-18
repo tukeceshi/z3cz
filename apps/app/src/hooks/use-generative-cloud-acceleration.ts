@@ -2,9 +2,7 @@ import { useCallback, useRef, useState } from "react";
 
 import { useTranslation } from "@/components/locale-provider";
 import { useAppToast } from "@/hooks/use-app-toast";
-import {
-  enableAlwaysOrgInterfaceCloudAcceleration,
-} from "@/services/cloud-acceleration-service";
+import { enableAlwaysOrgInterfaceCloudAcceleration } from "@/services/cloud-acceleration-service";
 import { requestGenerationJobServerPersist } from "@/services/platform-ai-model-service";
 
 interface UseGenerativeCloudAccelerationOptions {

@@ -150,7 +150,8 @@ export async function createNodeBindings(
     TWILIO_AUTH_TOKEN: env.TWILIO_AUTH_TOKEN,
     TWILIO_PHONE_NUMBER: env.TWILIO_PHONE_NUMBER,
     SEND_EMAIL: createNodeSendEmailBinding(outboxDir),
-    SEND_EMAIL_FROM: env.SEND_EMAIL_FROM ?? `noreply@${env.EMAIL_DOMAIN ?? "mail.localhost"}`,
+    SEND_EMAIL_FROM:
+      env.SEND_EMAIL_FROM ?? `noreply@${env.EMAIL_DOMAIN ?? "mail.localhost"}`,
     NODE_OUTBOX_DIR: outboxDir,
     SUPPORT_EMAIL_HANDLE: env.SUPPORT_EMAIL_HANDLE,
     SUPPORT_EMAIL_FROM: env.SUPPORT_EMAIL_FROM,

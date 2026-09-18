@@ -95,7 +95,9 @@ export class AiAudioNode extends ExecutableNode {
     const manualAudios = context.inputs.manual_audios;
     if (Array.isArray(manualAudios) && manualAudios.length > 0) {
       const refs = manualAudios.filter(
-        (value): value is ObjectReference | MediaReference | ResourceIdReference =>
+        (
+          value
+        ): value is ObjectReference | MediaReference | ResourceIdReference =>
           isObjectReference(value) ||
           isEphemeralMediaReference(value) ||
           isResourceIdReference(value)

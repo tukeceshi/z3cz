@@ -10,7 +10,10 @@ import {
   iterateAiInterfaceChatStream,
   type AiInterfaceStreamEvent,
 } from "@dafthunk/runtime/ai-interface/execute-stream";
-import { runWithUpstreamFetch, type UpstreamRequestLogSink } from "@dafthunk/runtime/ai-interface/upstream-request-log";
+import {
+  runWithUpstreamFetch,
+  type UpstreamRequestLogSink,
+} from "@dafthunk/runtime/ai-interface/upstream-request-log";
 
 import type { Bindings } from "../context";
 import type { Database } from "../db";
@@ -37,7 +40,10 @@ export async function prepareTextModelStream(params: {
   readonly canonicalId: string;
   readonly interfaceId: string;
   readonly effectivePrompt?: string;
-  readonly messages?: readonly { readonly role: string; readonly content: string }[];
+  readonly messages?: readonly {
+    readonly role: string;
+    readonly content: string;
+  }[];
   readonly outputMaxTokens?: number;
   readonly referenceImageUrls?: readonly string[];
   readonly referenceImageInline?: readonly ReferenceImageInline[];
@@ -45,7 +51,11 @@ export async function prepareTextModelStream(params: {
   readonly tools?: unknown;
 }): Promise<
   | { readonly ok: true; readonly prepared: PreparedTextModelStream }
-  | { readonly ok: false; readonly error: string; readonly invocationError?: string }
+  | {
+      readonly ok: false;
+      readonly error: string;
+      readonly invocationError?: string;
+    }
 > {
   const candidate = await resolveOrgModelInterfaceCandidate(
     params.db,

@@ -67,10 +67,14 @@ describe("applyWorkflowNodeContentPatch", () => {
       },
     });
 
-    expect(next.inputs?.find((input) => input.id === "images_result")?.value).toEqual([
+    expect(
+      next.inputs?.find((input) => input.id === "images_result")?.value
+    ).toEqual([
       { resourceId: "pending-1", mimeType: "image/png", generating: true },
     ]);
-    expect(next.outputs?.find((output) => output.id === "images")?.value).toEqual([
+    expect(
+      next.outputs?.find((output) => output.id === "images")?.value
+    ).toEqual([
       { resourceId: "pending-1", mimeType: "image/png", generating: true },
     ]);
     expect(
@@ -100,8 +104,8 @@ describe("applyWorkflowNodeContentPatch", () => {
       },
     });
 
-    expect(next.inputs?.find((input) => input.id === "images_result")?.value).toEqual([
-      { resourceId: "done-2", mimeType: "image/png" },
-    ]);
+    expect(
+      next.inputs?.find((input) => input.id === "images_result")?.value
+    ).toEqual([{ resourceId: "done-2", mimeType: "image/png" }]);
   });
 });

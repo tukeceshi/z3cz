@@ -86,8 +86,10 @@ const summarizePermissions = (
       ? t("pages.members.permissions.edit")
       : t("pages.members.permissions.viewOnly")
   );
-  if (effective.modelCalls) parts.push(t("pages.members.permissions.modelCalls"));
-  if (effective.aiInterfaces) parts.push(t("pages.members.permissions.aiInterfaces"));
+  if (effective.modelCalls)
+    parts.push(t("pages.members.permissions.modelCalls"));
+  if (effective.aiInterfaces)
+    parts.push(t("pages.members.permissions.aiInterfaces"));
   if (effective.apiKeys) parts.push(t("pages.members.permissions.apiKeys"));
   return parts.join(" · ");
 };
@@ -96,9 +98,7 @@ const createInvitationColumns = (t: TranslateFn): ColumnDef<Invitation>[] => [
   {
     accessorKey: "email",
     header: t("pages.members.email"),
-    cell: ({ row }) => (
-      <div className="font-medium">{row.original.email}</div>
-    ),
+    cell: ({ row }) => <div className="font-medium">{row.original.email}</div>,
   },
   {
     id: "permissions",
@@ -236,7 +236,8 @@ const createMemberColumns = (t: TranslateFn): ColumnDef<MembershipRow>[] => [
                         userEmail: membership.user.email || "",
                         userName: membership.user.name,
                         permissions:
-                          membership.permissions ?? DEFAULT_SUB_ACCOUNT_PERMISSIONS,
+                          membership.permissions ??
+                          DEFAULT_SUB_ACCOUNT_PERMISSIONS,
                       },
                     })
                   )
@@ -531,17 +532,24 @@ function MembersPageContent() {
         </TabsContent>
       </Tabs>
 
-      <AlertDialog open={isInviteDialogOpen} onOpenChange={setIsInviteDialogOpen}>
+      <AlertDialog
+        open={isInviteDialogOpen}
+        onOpenChange={setIsInviteDialogOpen}
+      >
         <AlertDialogContent className="max-w-md">
           <AlertDialogHeader>
-            <AlertDialogTitle>{t("pages.members.inviteTitle")}</AlertDialogTitle>
+            <AlertDialogTitle>
+              {t("pages.members.inviteTitle")}
+            </AlertDialogTitle>
             <AlertDialogDescription>
               {t("pages.members.inviteDescription")}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <div className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="user-email">{t("pages.members.emailAddress")}</Label>
+              <Label htmlFor="user-email">
+                {t("pages.members.emailAddress")}
+              </Label>
               <Input
                 id="user-email"
                 type="email"
@@ -562,7 +570,9 @@ function MembersPageContent() {
               onClick={() => void handleInvite()}
               disabled={isProcessing || !newMemberEmail.trim()}
             >
-              {isProcessing ? t("common.loading") : t("pages.members.sendInvitation")}
+              {isProcessing
+                ? t("common.loading")
+                : t("pages.members.sendInvitation")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -574,7 +584,9 @@ function MembersPageContent() {
       >
         <AlertDialogContent className="max-w-md">
           <AlertDialogHeader>
-            <AlertDialogTitle>{t("pages.members.editPermissionsTitle")}</AlertDialogTitle>
+            <AlertDialogTitle>
+              {t("pages.members.editPermissionsTitle")}
+            </AlertDialogTitle>
             <AlertDialogDescription>
               {t("pages.members.editPermissionsDescription", {
                 name: memberToEdit?.userName ?? "",
@@ -612,7 +624,9 @@ function MembersPageContent() {
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>{t("pages.members.removeTitle")}</AlertDialogTitle>
+            <AlertDialogTitle>
+              {t("pages.members.removeTitle")}
+            </AlertDialogTitle>
             <AlertDialogDescription>
               {t("pages.members.removeDescription", {
                 name: memberToRemove?.userName ?? "",
@@ -620,7 +634,9 @@ function MembersPageContent() {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <Alert variant="destructive" className="mb-4">
-            <AlertDescription>{t("pages.members.removeWarning")}</AlertDescription>
+            <AlertDescription>
+              {t("pages.members.removeWarning")}
+            </AlertDescription>
           </Alert>
           <AlertDialogFooter>
             <AlertDialogCancel onClick={() => setMemberToRemove(null)}>
@@ -645,7 +661,9 @@ function MembersPageContent() {
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>{t("pages.members.cancelInviteTitle")}</AlertDialogTitle>
+            <AlertDialogTitle>
+              {t("pages.members.cancelInviteTitle")}
+            </AlertDialogTitle>
             <AlertDialogDescription>
               {t("pages.members.cancelInviteDescription", {
                 email: invitationToCancel?.email ?? "",

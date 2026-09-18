@@ -33,9 +33,9 @@ function createTextNode(
     nodeType: "ai-text",
     position: { x: 0, y: 0 },
     inputs: overrides?.inputs ?? [],
-    outputs:
-      overrides?.outputs ??
-      [{ id: AI_TEXT_OUTPUT_ID, name: "text", type: "string", value: "" }],
+    outputs: overrides?.outputs ?? [
+      { id: AI_TEXT_OUTPUT_ID, name: "text", type: "string", value: "" },
+    ],
     metadata: undefined,
   });
 }
@@ -51,7 +51,9 @@ describe("mergeAiTextNodeCatalogInputs", () => {
 
   it("always includes keywords input for new ai-text nodes", () => {
     const merged = mergeAiTextNodeCatalogInputs("ai-text", [], catalog);
-    const keywords = merged.find((input) => input.id === AI_TEXT_KEYWORDS_HANDLE_ID);
+    const keywords = merged.find(
+      (input) => input.id === AI_TEXT_KEYWORDS_HANDLE_ID
+    );
     expect(keywords).toMatchObject({
       id: AI_TEXT_KEYWORDS_HANDLE_ID,
       type: "any",
@@ -64,12 +66,23 @@ describe("mergeAiTextNodeCatalogInputs", () => {
   it("does not duplicate keywords when catalog already defines it", () => {
     const merged = mergeAiTextNodeCatalogInputs(
       "ai-text",
-      [{ id: AI_TEXT_KEYWORDS_HANDLE_ID, name: AI_TEXT_KEYWORDS_HANDLE_ID, type: "any" }],
+      [
+        {
+          id: AI_TEXT_KEYWORDS_HANDLE_ID,
+          name: AI_TEXT_KEYWORDS_HANDLE_ID,
+          type: "any",
+        },
+      ],
       {
         ...catalog,
         inputs: [
           ...catalog.inputs,
-          { name: AI_TEXT_KEYWORDS_HANDLE_ID, type: "any", hidden: true, repeated: true },
+          {
+            name: AI_TEXT_KEYWORDS_HANDLE_ID,
+            type: "any",
+            hidden: true,
+            repeated: true,
+          },
         ],
       }
     );
@@ -96,7 +109,10 @@ describe("ai-text-node-utils editing behavior", () => {
 
     expect(hasAiTextGeneratedHistory(generatedNode.inputs)).toBe(true);
 
-    const edited = withAiTextEditedResult(generatedNode, "edited generated text");
+    const edited = withAiTextEditedResult(
+      generatedNode,
+      "edited generated text"
+    );
     const nextNode = { ...generatedNode, ...edited } as WorkflowNodeType;
     const history = readAiTextResultHistory(nextNode.inputs);
 
@@ -105,7 +121,8 @@ describe("ai-text-node-utils editing behavior", () => {
     expect(history.items[0]?.platformModelId).toBe("seed-3.0");
     expect(history.items[0]?.providerModelId).toBe("doubao-seed-3-0");
     expect(
-      nextNode.inputs.find((input) => input.id === AI_TEXT_RESULT_INPUT_ID)?.value
+      nextNode.inputs.find((input) => input.id === AI_TEXT_RESULT_INPUT_ID)
+        ?.value
     ).toBe("edited generated text");
   });
 
@@ -139,8 +156,18 @@ describe("ai-text-node-utils editing behavior", () => {
         },
       ],
       [
-        { id: AI_TEXT_OUTPUT_ID, name: "text", type: "string", value: "excerpt" },
-        { id: AI_TEXT_BODY_OUTPUT_ID, name: "textBody", type: "string", value: "full body" },
+        {
+          id: AI_TEXT_OUTPUT_ID,
+          name: "text",
+          type: "string",
+          value: "excerpt",
+        },
+        {
+          id: AI_TEXT_BODY_OUTPUT_ID,
+          name: "textBody",
+          type: "string",
+          value: "full body",
+        },
       ]
     );
 
@@ -165,7 +192,8 @@ describe("ai-text-node-utils editing behavior", () => {
     const patch = withAiTextStreamingPreview(node, "一位成年动漫美少女");
     expect(patch.inputs).toBeUndefined();
     expect(
-      patch.outputs?.find((output) => output.id === AI_TEXT_BODY_OUTPUT_ID)?.value
+      patch.outputs?.find((output) => output.id === AI_TEXT_BODY_OUTPUT_ID)
+        ?.value
     ).toBe("一位成年动漫美少女");
     expect(
       patch.outputs?.find((output) => output.id === AI_TEXT_OUTPUT_ID)?.value
@@ -175,8 +203,18 @@ describe("ai-text-node-utils editing behavior", () => {
   it("keeps awaiting-stream until the first preview token", () => {
     const node = createTextNode({
       outputs: [
-        { id: AI_TEXT_OUTPUT_ID, name: "text", type: "string", value: "old excerpt" },
-        { id: AI_TEXT_BODY_OUTPUT_ID, name: "textBody", type: "string", value: "old body" },
+        {
+          id: AI_TEXT_OUTPUT_ID,
+          name: "text",
+          type: "string",
+          value: "old excerpt",
+        },
+        {
+          id: AI_TEXT_BODY_OUTPUT_ID,
+          name: "textBody",
+          type: "string",
+          value: "old body",
+        },
       ],
     });
     const started = withAiTextStreamingPreview(node, "");
@@ -184,7 +222,11 @@ describe("ai-text-node-utils editing behavior", () => {
     expect(isAiTextAwaitingStream(generating)).toBe(true);
 
     const firstToken = withAiTextStreamingPreview(
-      { ...node, metadata: generating, outputs: started.outputs ?? node.outputs },
+      {
+        ...node,
+        metadata: generating,
+        outputs: started.outputs ?? node.outputs,
+      },
       "一"
     );
     expect(isAiTextAwaitingStream(firstToken.metadata)).toBe(false);
@@ -202,6 +244,8 @@ describe("ai-text-node-utils editing behavior", () => {
       ],
     });
 
-    expect(readAiTextSessionBodySync(node)).toBe("| 镜头|时间线 |\n| --- | --- |");
+    expect(readAiTextSessionBodySync(node)).toBe(
+      "| 镜头|时间线 |\n| --- | --- |"
+    );
   });
 });

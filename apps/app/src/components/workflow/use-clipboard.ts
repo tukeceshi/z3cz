@@ -323,7 +323,14 @@ export function useClipboard({
     if (clipboardData.isCut) {
       setClipboardData(null);
     }
-  }, [captureHistory, disabled, clipboardData, setNodes, setEdges, createObjectUrl]);
+  }, [
+    captureHistory,
+    disabled,
+    clipboardData,
+    setNodes,
+    setEdges,
+    createObjectUrl,
+  ]);
 
   return {
     copySelected,

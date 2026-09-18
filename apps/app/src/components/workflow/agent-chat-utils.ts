@@ -273,8 +273,7 @@ export function answerHasProcess(answer: AgentChatAnswer): boolean {
   return (
     answer.thinking.trim().length > 0 ||
     answer.tools.some(
-      (tool) =>
-        tool.name.trim().length > 0 || tool.result.trim().length > 0
+      (tool) => tool.name.trim().length > 0 || tool.result.trim().length > 0
     )
   );
 }

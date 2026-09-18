@@ -17,7 +17,11 @@ export interface AiInterfaceStreamToolCall {
 }
 
 export type AiInterfaceStreamEvent =
-  | { readonly type: "delta"; readonly text: string; readonly thinking?: string }
+  | {
+      readonly type: "delta";
+      readonly text: string;
+      readonly thinking?: string;
+    }
   | {
       readonly type: "done";
       readonly text: string;
@@ -108,7 +112,9 @@ interface AccumulatedToolCall {
   arguments: string;
 }
 
-function readFirstChoice(payload: unknown): Record<string, unknown> | undefined {
+function readFirstChoice(
+  payload: unknown
+): Record<string, unknown> | undefined {
   if (!payload || typeof payload !== "object") {
     return undefined;
   }
@@ -171,7 +177,9 @@ function readToolCallsField(value: unknown): unknown[] | undefined {
     return undefined;
   }
   const toolCalls = (value as { tool_calls?: unknown }).tool_calls;
-  return Array.isArray(toolCalls) && toolCalls.length > 0 ? toolCalls : undefined;
+  return Array.isArray(toolCalls) && toolCalls.length > 0
+    ? toolCalls
+    : undefined;
 }
 
 function mergeOpenAiToolCallItems(
@@ -189,13 +197,15 @@ function mergeOpenAiToolCallItems(
     const item = raw as {
       readonly index?: unknown;
       readonly id?: unknown;
-      readonly function?: { readonly name?: unknown; readonly arguments?: unknown };
+      readonly function?: {
+        readonly name?: unknown;
+        readonly arguments?: unknown;
+      };
     };
     const index = typeof item.index === "number" ? item.index : acc.length;
     const current = acc[index] ?? { id: "", name: "", arguments: "" };
     const fn = item.function;
-    const nextArgs =
-      fn && typeof fn.arguments === "string" ? fn.arguments : "";
+    const nextArgs = fn && typeof fn.arguments === "string" ? fn.arguments : "";
     acc[index] = {
       id: typeof item.id === "string" && item.id ? item.id : current.id,
       name:
@@ -250,7 +260,8 @@ export async function* iterateAiInterfaceChatStream(params: {
   if (!supportsOpenAiMessages) {
     yield {
       type: "error",
-      error: "Streaming is only supported for OpenAI-compatible chat interfaces",
+      error:
+        "Streaming is only supported for OpenAI-compatible chat interfaces",
     };
     return;
   }

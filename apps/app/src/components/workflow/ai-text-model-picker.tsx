@@ -27,8 +27,7 @@ export function sortModelsForPicker(
 ): readonly OrgTextModelOption[] {
   return [...models].sort(
     (a, b) =>
-      a.sortOrder - b.sortOrder ||
-      a.displayName.localeCompare(b.displayName)
+      a.sortOrder - b.sortOrder || a.displayName.localeCompare(b.displayName)
   );
 }
 

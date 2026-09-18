@@ -90,7 +90,9 @@ export function clampVideoSubtitleEraseRect(
   };
 }
 
-export function isVideoSubtitleEraseRect(value: unknown): value is VideoSubtitleEraseRect {
+export function isVideoSubtitleEraseRect(
+  value: unknown
+): value is VideoSubtitleEraseRect {
   if (value === null || typeof value !== "object") {
     return false;
   }
@@ -219,9 +221,11 @@ export function withVideoSubtitleEraseRefinedDefaults(
   return {
     ...config,
     eraseMode: config.eraseMode ?? VIDEO_SUBTITLE_ERASE_DEFAULT_SCOPE,
-    modelVersion: config.modelVersion ?? VIDEO_SUBTITLE_ERASE_DEFAULT_MODEL_VERSION,
+    modelVersion:
+      config.modelVersion ?? VIDEO_SUBTITLE_ERASE_DEFAULT_MODEL_VERSION,
     outputEncodeMode:
-      config.outputEncodeMode ?? VIDEO_SUBTITLE_ERASE_DEFAULT_OUTPUT_ENCODE_MODE,
+      config.outputEncodeMode ??
+      VIDEO_SUBTITLE_ERASE_DEFAULT_OUTPUT_ENCODE_MODE,
   };
 }
 
@@ -275,11 +279,16 @@ export function parseVideoSubtitleEraseNodeConfig(
       ...(parsed.modelVersion === "v4" || parsed.modelVersion === "v5"
         ? { modelVersion: parsed.modelVersion }
         : {}),
-      ...(parsed.outputEncodeMode === "quality" || parsed.outputEncodeMode === "size"
+      ...(parsed.outputEncodeMode === "quality" ||
+      parsed.outputEncodeMode === "size"
         ? { outputEncodeMode: parsed.outputEncodeMode }
         : {}),
       ...(normalizeVideoSubtitleEraseRects(parsed.eraseRatioLocation)
-        ? { eraseRatioLocation: normalizeVideoSubtitleEraseRects(parsed.eraseRatioLocation) }
+        ? {
+            eraseRatioLocation: normalizeVideoSubtitleEraseRects(
+              parsed.eraseRatioLocation
+            ),
+          }
         : {}),
     };
   } catch {
@@ -297,7 +306,9 @@ export function serializeVideoSubtitleEraseNodeConfig(
       : {}),
     ...(config.eraseMode ? { eraseMode: config.eraseMode } : {}),
     ...(config.modelVersion ? { modelVersion: config.modelVersion } : {}),
-    ...(config.outputEncodeMode ? { outputEncodeMode: config.outputEncodeMode } : {}),
+    ...(config.outputEncodeMode
+      ? { outputEncodeMode: config.outputEncodeMode }
+      : {}),
     ...(config.eraseRatioLocation?.length
       ? { eraseRatioLocation: config.eraseRatioLocation }
       : {}),
@@ -310,7 +321,7 @@ export function withVideoSubtitleEraseNodeConfig(
 ): Record<string, string> {
   return {
     ...(metadata ?? {}),
-    [VIDEO_SUBTITLE_ERASE_META_KEY]: serializeVideoSubtitleEraseNodeConfig(config),
+    [VIDEO_SUBTITLE_ERASE_META_KEY]:
+      serializeVideoSubtitleEraseNodeConfig(config),
   };
 }
-

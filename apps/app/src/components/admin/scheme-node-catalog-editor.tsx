@@ -35,7 +35,9 @@ function parseExcludeNodeTypes(excludeNodeTypes: string): string[] {
     .filter(Boolean);
 }
 
-function valueToNodeRules(value: SchemeNodeCatalogValue): WorkflowSchemeNodeRules {
+function valueToNodeRules(
+  value: SchemeNodeCatalogValue
+): WorkflowSchemeNodeRules {
   const excludeNodeTypes = parseExcludeNodeTypes(value.excludeNodeTypes);
 
   if (value.unrestricted) {
@@ -99,7 +101,9 @@ function filterNodeTypesByScheme(
 }
 
 function catalogNodeTypes(nodeTypes: NodeType[]): NodeType[] {
-  return nodeTypes.filter((nodeType) => !nodeType.trigger && !nodeType.responder);
+  return nodeTypes.filter(
+    (nodeType) => !nodeType.trigger && !nodeType.responder
+  );
 }
 
 export function summarizeSchemeNodes(
@@ -168,11 +172,7 @@ export function SchemeNodeCatalogEditor({
       return paletteNodes;
     }
     return paletteNodes.filter((nodeType) => {
-      const haystack = [
-        nodeType.name,
-        nodeType.type,
-        ...nodeType.tags,
-      ]
+      const haystack = [nodeType.name, nodeType.type, ...nodeType.tags]
         .join(" ")
         .toLowerCase();
       return haystack.includes(term);
@@ -200,7 +200,9 @@ export function SchemeNodeCatalogEditor({
     onChange({
       ...value,
       unrestricted: false,
-      includeNodeTypes: [...new Set([...value.includeNodeTypes, ...visibleTypes])],
+      includeNodeTypes: [
+        ...new Set([...value.includeNodeTypes, ...visibleTypes]),
+      ],
     });
   };
 

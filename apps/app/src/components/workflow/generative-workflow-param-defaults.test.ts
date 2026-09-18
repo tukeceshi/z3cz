@@ -104,9 +104,7 @@ describe("commitGenerativeParamWindow", () => {
       next: { ratio: "1:1" },
       fields: FIELDS,
       nodeId: "node-1",
-      nodeInputs: [
-        { id: "params", name: "params", type: "json", value: {} },
-      ],
+      nodeInputs: [{ id: "params", name: "params", type: "json", value: {} }],
       updateNodeData,
     });
 

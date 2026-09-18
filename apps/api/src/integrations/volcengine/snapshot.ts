@@ -23,9 +23,7 @@ import {
   maskApiKey,
 } from "./ensure-api-key";
 import { isVolcanoArkApiKeyPending } from "./deferred-api-key";
-import {
-  ensureVolcanoModelsIncludePlatformCatalog,
-} from "../../services/resolve-text-model-interface";
+import { ensureVolcanoModelsIncludePlatformCatalog } from "../../services/resolve-text-model-interface";
 import {
   isVolcanoMetadata,
   parseInterfaceMetadata,

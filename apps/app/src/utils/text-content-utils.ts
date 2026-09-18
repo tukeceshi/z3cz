@@ -8,10 +8,7 @@ export async function sha256HexFromText(text: string): Promise<string> {
     .join("");
 }
 
-function longestCommonPrefixBytes(
-  left: Uint8Array,
-  right: Uint8Array
-): number {
+function longestCommonPrefixBytes(left: Uint8Array, right: Uint8Array): number {
   const limit = Math.min(left.length, right.length);
   let index = 0;
   while (index < limit && left[index] === right[index]) {

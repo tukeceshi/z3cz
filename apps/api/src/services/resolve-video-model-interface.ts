@@ -31,9 +31,8 @@ import {
   parseInterfaceMetadata,
 } from "../integrations/volcengine/metadata";
 
-export type ResolvedVideoModelInterface = ResolvedOrgModelInterface<
-  VideoModelParameterRules
->;
+export type ResolvedVideoModelInterface =
+  ResolvedOrgModelInterface<VideoModelParameterRules>;
 
 function listInjectedVideoEnhanceModelOptions(
   interfaces: Awaited<ReturnType<typeof listOrganizationAiInterfaces>>
@@ -46,7 +45,10 @@ function listInjectedVideoEnhanceModelOptions(
     }
 
     const metadata = parseInterfaceMetadata(row.metadata);
-    if (!isVolcanoMetadata(metadata) || !metadata.mediaKitApiKeyEncrypted?.trim()) {
+    if (
+      !isVolcanoMetadata(metadata) ||
+      !metadata.mediaKitApiKeyEncrypted?.trim()
+    ) {
       continue;
     }
 
@@ -104,8 +106,9 @@ export async function listOrgVideoModelOptions(
 
     return {
       ...binding,
-      unavailableReason:
-        binding.unavailableReason as OrgVideoModelUnavailableReason | undefined,
+      unavailableReason: binding.unavailableReason as
+        | OrgVideoModelUnavailableReason
+        | undefined,
       parameterRules: applyVideoCapabilityLimits(
         platformRules,
         capabilityLimits
@@ -119,7 +122,10 @@ export async function listOrgVideoModelOptions(
     };
   });
 
-  return [...platformModelsList, ...listInjectedVideoEnhanceModelOptions(interfaces)];
+  return [
+    ...platformModelsList,
+    ...listInjectedVideoEnhanceModelOptions(interfaces),
+  ];
 }
 
 export async function resolveVideoModelInterface(
@@ -148,9 +154,9 @@ export async function resolveVideoModelInterface(
       return null;
     }
 
-    const ifaceRow = (await listOrganizationAiInterfaces(db, organizationId)).find(
-      (row) => row.id === interfaceId
-    );
+    const ifaceRow = (
+      await listOrganizationAiInterfaces(db, organizationId)
+    ).find((row) => row.id === interfaceId);
     if (!ifaceRow?.enabled) {
       return null;
     }

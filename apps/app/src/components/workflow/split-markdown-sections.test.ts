@@ -12,7 +12,9 @@ describe("splitMarkdownSections", () => {
     const markdown = "Intro\n\nplain text\n\n| A | B |";
     const parts = splitMarkdownSections(markdown);
 
-    expect(parts).toEqual([{ type: "preamble", start: 0, end: markdown.length }]);
+    expect(parts).toEqual([
+      { type: "preamble", start: 0, end: markdown.length },
+    ]);
   });
 
   it("splits preamble and multiple leaf H2 sections", () => {

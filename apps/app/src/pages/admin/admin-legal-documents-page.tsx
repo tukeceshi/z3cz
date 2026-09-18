@@ -46,11 +46,16 @@ export function AdminLegalDocumentsPage() {
   const { t } = useTranslation();
   const appToast = useAppToast();
   const setBreadcrumbs = useBreadcrumbsSetter();
-  const { legalDocuments, legalDocumentsError, isLegalDocumentsLoading, refreshLegalDocuments } =
-    useAdminLegalDocuments();
+  const {
+    legalDocuments,
+    legalDocumentsError,
+    isLegalDocumentsLoading,
+    refreshLegalDocuments,
+  } = useAdminLegalDocuments();
 
   const [form, setForm] = useState<LegalDocumentsConfig | null>(null);
-  const [activeDocument, setActiveDocument] = useState<LegalDocumentType>("terms");
+  const [activeDocument, setActiveDocument] =
+    useState<LegalDocumentType>("terms");
   const [activeLocale, setActiveLocale] = useState<AppLocale>("zh");
   const [isSaving, setIsSaving] = useState(false);
 
@@ -141,8 +146,12 @@ export function AdminLegalDocumentsPage() {
               onValueChange={(value) => setActiveLocale(value as AppLocale)}
             >
               <TabsList>
-                <TabsTrigger value="zh">{t("legalDocuments.locales.zh")}</TabsTrigger>
-                <TabsTrigger value="en">{t("legalDocuments.locales.en")}</TabsTrigger>
+                <TabsTrigger value="zh">
+                  {t("legalDocuments.locales.zh")}
+                </TabsTrigger>
+                <TabsTrigger value="en">
+                  {t("legalDocuments.locales.en")}
+                </TabsTrigger>
               </TabsList>
             </Tabs>
 

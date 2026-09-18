@@ -5,7 +5,10 @@ import {
   normalizeImageModelParameterRules,
   type ImageModelParameterRules,
 } from "@dafthunk/types";
-import type { Edge as ReactFlowEdge, Node as ReactFlowNode } from "@xyflow/react";
+import type {
+  Edge as ReactFlowEdge,
+  Node as ReactFlowNode,
+} from "@xyflow/react";
 
 import {
   AI_IMAGE_OUTPUT_ID,
@@ -57,8 +60,9 @@ export interface AiImageReferenceContext {
 }
 
 function readModelId(targetNodeData: WorkflowNodeType): string | undefined {
-  const value = targetNodeData.inputs?.find((input) => input.id === "model")
-    ?.value;
+  const value = targetNodeData.inputs?.find(
+    (input) => input.id === "model"
+  )?.value;
   return typeof value === "string" && value.length > 0 ? value : undefined;
 }
 

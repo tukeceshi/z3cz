@@ -101,9 +101,10 @@ function AiAudioWidget({
     (selectedHistoryItem.audios.length === 0 ||
       hasFailedResource(selectedHistoryItem.audios));
   const isGenerating =
-    (!selectedFailed && cardDisplay.isBusy) ||
-    progressPhase === "cancelled";
-  useGenerativeMediaWorkSession(uploading || (!selectedFailed && cardDisplay.isBusy));
+    (!selectedFailed && cardDisplay.isBusy) || progressPhase === "cancelled";
+  useGenerativeMediaWorkSession(
+    uploading || (!selectedFailed && cardDisplay.isBusy)
+  );
   useGenerativeRecordErrorDisplay({
     orgId,
     nodeId,
@@ -153,7 +154,15 @@ function AiAudioWidget({
 
   const handleUploadFiles = useCallback(
     async (files: FileList | null) => {
-      if (disabled || blocksGenerativeMedia || !files?.length || !updateNodeData || !orgId || !workflowId) return;
+      if (
+        disabled ||
+        blocksGenerativeMedia ||
+        !files?.length ||
+        !updateNodeData ||
+        !orgId ||
+        !workflowId
+      )
+        return;
 
       const normalized = normalizeGenerativeCardUploadFile(files[0]!, "audio");
       if (!normalized) {
@@ -251,11 +260,11 @@ function AiAudioWidget({
         }}
       />
       <div
-          className={cn(
-            "relative h-full w-full overflow-hidden cursor-grab select-none",
-            uploading && "opacity-70",
-            className
-          )}
+        className={cn(
+          "relative h-full w-full overflow-hidden cursor-grab select-none",
+          uploading && "opacity-70",
+          className
+        )}
         onDoubleClick={(event) => {
           if (generateError) {
             event.stopPropagation();
@@ -282,7 +291,9 @@ function AiAudioWidget({
           <CanvasAudioCover className="h-full w-full" />
         ) : null}
 
-        {generateError ? <GenerativeCardErrorBlock error={generateError} /> : null}
+        {generateError ? (
+          <GenerativeCardErrorBlock error={generateError} />
+        ) : null}
       </div>
 
       {generateError ? (

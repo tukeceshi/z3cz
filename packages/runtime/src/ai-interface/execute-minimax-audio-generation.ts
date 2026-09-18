@@ -55,9 +55,7 @@ function buildVoiceSetting(
     const leaf = field.apiName.slice("voice_setting.".length);
     const raw = params?.[field.name];
     const value =
-      raw === undefined || raw === null || raw === ""
-        ? field.default
-        : raw;
+      raw === undefined || raw === null || raw === "" ? field.default : raw;
 
     if (value === undefined || value === null || value === "") {
       continue;
@@ -68,7 +66,6 @@ function buildVoiceSetting(
 
   return voiceSetting;
 }
-
 
 function hexToUint8Array(hex: string): Uint8Array {
   const normalized = hex.trim();

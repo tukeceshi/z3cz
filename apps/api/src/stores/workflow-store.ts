@@ -1062,7 +1062,9 @@ export class WorkflowStore {
   /**
    * Read workflow data from R2
    */
-  private async readFromR2(workflowId: string): Promise<WorkflowType | undefined> {
+  private async readFromR2(
+    workflowId: string
+  ): Promise<WorkflowType | undefined> {
     try {
       if (!this.env.RESSOURCES) {
         throw new Error("R2 bucket is not initialized");

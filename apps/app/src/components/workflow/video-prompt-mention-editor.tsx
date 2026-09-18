@@ -30,8 +30,7 @@ import {
 
 const MENTION_PICKER_GAP_PX = 6;
 const MENTION_PICKER_MAX_HEIGHT_PX = 200;
-const VIDEO_PROMPT_EDITOR_TEXT_CLASS =
-  "text-sm leading-6" as const;
+const VIDEO_PROMPT_EDITOR_TEXT_CLASS = "text-sm leading-6" as const;
 
 interface MentionPickerState {
   readonly query: string;
@@ -121,7 +120,8 @@ function createChipElement(
   );
 
   const at = document.createElement("span");
-  at.className = "inline-flex shrink-0 items-center self-center text-[10px] leading-none text-muted-foreground";
+  at.className =
+    "inline-flex shrink-0 items-center self-center text-[10px] leading-none text-muted-foreground";
   at.textContent = "@";
   span.appendChild(at);
 
@@ -173,7 +173,9 @@ function updateChipThumbsInEditor(
   chipByEdgeId: ReadonlyMap<string, AiTextReferenceChip>,
   thumbUrls: ReadonlyMap<string, string | null> | undefined
 ): void {
-  for (const chipEl of root.querySelectorAll<HTMLElement>("[data-ref-edge-id]")) {
+  for (const chipEl of root.querySelectorAll<HTMLElement>(
+    "[data-ref-edge-id]"
+  )) {
     const edgeId = chipEl.dataset.refEdgeId;
     if (!edgeId) continue;
     const frame = chipEl.querySelector<HTMLElement>('[data-chip-frame="true"]');
@@ -320,9 +322,7 @@ export function VideoPromptMentionEditor({
 
   const filteredMentionChips = useMemo(
     () =>
-      mentionPicker
-        ? filterChipsByQuery(imageChips, mentionPicker.query)
-        : [],
+      mentionPicker ? filterChipsByQuery(imageChips, mentionPicker.query) : [],
     [imageChips, mentionPicker]
   );
 
@@ -338,9 +338,7 @@ export function VideoPromptMentionEditor({
     if (mentionActiveIndex < filteredMentionChips.length) {
       return;
     }
-    setMentionActiveIndex(
-      Math.max(0, filteredMentionChips.length - 1)
-    );
+    setMentionActiveIndex(Math.max(0, filteredMentionChips.length - 1));
   }, [filteredMentionChips.length, mentionActiveIndex]);
 
   const chipByEdgeId = useMemo(() => {

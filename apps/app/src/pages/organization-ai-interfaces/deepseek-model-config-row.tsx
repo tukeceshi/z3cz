@@ -32,8 +32,6 @@ interface DeepSeekModelConfigRowProps {
   readonly capabilitySettingsLabel?: string;
 }
 
-
-
 const MODEL_CONFIG_GRID =
   "grid grid-cols-1 gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,18rem)_auto] sm:items-center sm:gap-3";
 
@@ -77,10 +75,7 @@ export function DeepSeekModelConfigRow({
         />
         <ModelBrandIcon canonicalId={model.canonicalId} />
         <span className="truncate text-sm font-medium">
-          {resolveDeepSeekModelCardName(
-            model.canonicalId,
-            model.displayName
-          )}
+          {resolveDeepSeekModelCardName(model.canonicalId, model.displayName)}
         </span>
       </div>
 
@@ -125,10 +120,7 @@ export function DeepSeekModelConfigRow({
   );
 }
 
-
-
 interface DeepSeekModelIdEditRowProps {
-
   readonly canonicalId: string;
 
   readonly label: string;
@@ -146,13 +138,9 @@ interface DeepSeekModelIdEditRowProps {
   readonly capabilitySettingsLabel?: string;
 
   readonly isVideoModel?: boolean;
-
 }
 
-
-
 export function DeepSeekModelIdEditRow({
-
   canonicalId,
 
   label,
@@ -170,15 +158,11 @@ export function DeepSeekModelIdEditRow({
   capabilitySettingsLabel,
 
   isVideoModel = false,
-
 }: DeepSeekModelIdEditRowProps) {
-
   const modelIdInputId = `single-model-edit-id-${canonicalId}`;
   const gridClass = showCapabilitySettings
     ? MODEL_CONFIG_GRID
     : MODEL_CONFIG_GRID_WITHOUT_ACTIONS;
-
-
 
   return (
     <div className={cn("px-3 py-2.5", gridClass)}>
@@ -222,18 +206,13 @@ export function DeepSeekModelIdEditRow({
   );
 }
 
-
-
 interface DeepSeekModelIdEditListProps {
-
   readonly rows: readonly {
-
     readonly canonicalId: string;
 
     readonly label: string;
 
     readonly modelId: string;
-
   }[];
 
   readonly modelColumnLabel: string;
@@ -249,13 +228,9 @@ interface DeepSeekModelIdEditListProps {
   readonly onOpenCapabilitySettings?: (canonicalId: string) => void;
 
   readonly capabilitySettingsLabel?: string;
-
 }
 
-
-
 export function DeepSeekModelIdEditList({
-
   rows,
 
   modelColumnLabel,
@@ -271,17 +246,13 @@ export function DeepSeekModelIdEditList({
   onOpenCapabilitySettings,
 
   capabilitySettingsLabel,
-
 }: DeepSeekModelIdEditListProps) {
-
   const headerGridClass = showCapabilitySettings
     ? MODEL_CONFIG_GRID
     : MODEL_CONFIG_GRID_WITHOUT_ACTIONS;
 
   return (
-
     <div className="overflow-hidden rounded-lg border">
-
       <div
         className={cn(
           "text-muted-foreground border-b bg-muted/40 px-3 py-2 text-xs font-medium",
@@ -290,51 +261,34 @@ export function DeepSeekModelIdEditList({
       >
         <span>{modelColumnLabel}</span>
         <span className="pl-6 sm:pl-0">{modelIdLabel}</span>
-        {showCapabilitySettings ? <span className="sr-only">{capabilitySettingsLabel}</span> : null}
+        {showCapabilitySettings ? (
+          <span className="sr-only">{capabilitySettingsLabel}</span>
+        ) : null}
       </div>
 
       <div className="divide-y">
         {rows.map((row) => (
-
           <DeepSeekModelIdEditRow
-
             key={row.canonicalId}
-
             canonicalId={row.canonicalId}
-
             label={row.label}
-
             modelId={row.modelId}
-
             modelIdLabel={modelIdLabel}
-
             onModelIdChange={(value) => onModelIdChange(row.canonicalId, value)}
-
             showCapabilitySettings={showCapabilitySettings}
-
             isVideoModel={videoCanonicalIds?.has(row.canonicalId) ?? false}
-
             onOpenCapabilitySettings={
               onOpenCapabilitySettings
                 ? () => onOpenCapabilitySettings(row.canonicalId)
                 : undefined
             }
-
             capabilitySettingsLabel={capabilitySettingsLabel}
-
           />
-
         ))}
-
       </div>
-
     </div>
-
   );
-
 }
-
-
 
 interface DeepSeekModelConfigListProps {
   readonly models: readonly ProviderModelConfigOption[];
@@ -342,9 +296,7 @@ interface DeepSeekModelConfigListProps {
   readonly checkedCanonicalIds: readonly string[];
 
   readonly draftsByCanonicalId: Readonly<
-
     Map<string, { readonly modelId: string }>
-
   >;
 
   readonly modelColumnLabel: string;
@@ -362,13 +314,9 @@ interface DeepSeekModelConfigListProps {
   readonly onOpenCapabilitySettings?: (canonicalId: string) => void;
 
   readonly capabilitySettingsLabel?: string;
-
 }
 
-
-
 export function DeepSeekModelConfigList({
-
   models,
 
   checkedCanonicalIds,
@@ -390,16 +338,13 @@ export function DeepSeekModelConfigList({
   onOpenCapabilitySettings,
 
   capabilitySettingsLabel,
-
 }: DeepSeekModelConfigListProps) {
   const headerGridClass = showCapabilitySettings
     ? MODEL_CONFIG_GRID
     : MODEL_CONFIG_GRID_WITHOUT_ACTIONS;
 
   return (
-
     <div className="overflow-hidden rounded-lg border">
-
       <div
         className={cn(
           "text-muted-foreground border-b bg-muted/40 px-3 py-2 text-xs font-medium",
@@ -408,66 +353,44 @@ export function DeepSeekModelConfigList({
       >
         <span>{modelColumnLabel}</span>
         <span className="pl-6 sm:pl-0">{modelIdLabel}</span>
-        {showCapabilitySettings ? <span className="sr-only">{capabilitySettingsLabel}</span> : null}
+        {showCapabilitySettings ? (
+          <span className="sr-only">{capabilitySettingsLabel}</span>
+        ) : null}
       </div>
 
       <div className="divide-y">
         {models.map((model) => {
-
           const checked = checkedCanonicalIds.includes(model.canonicalId);
 
           const draft = draftsByCanonicalId.get(model.canonicalId);
 
           return (
-
             <DeepSeekModelConfigRow
-
               key={model.canonicalId}
-
               model={model}
-
               checked={checked}
-
               modelId={checked ? (draft?.modelId ?? "") : undefined}
-
               modelIdLabel={modelIdLabel}
-
               onCheckedChange={(nextChecked) =>
-
                 onCheckedChange(model.canonicalId, nextChecked)
-
               }
-
               onModelIdChange={(value) =>
-
                 onModelIdChange(model.canonicalId, value)
-
               }
-
               showCapabilitySettings={
                 showCapabilitySettings &&
                 (videoCanonicalIds?.has(model.canonicalId) ?? false)
               }
-
               onOpenCapabilitySettings={
                 onOpenCapabilitySettings
                   ? () => onOpenCapabilitySettings(model.canonicalId)
                   : undefined
               }
-
               capabilitySettingsLabel={capabilitySettingsLabel}
-
             />
-
           );
-
         })}
-
       </div>
-
     </div>
-
   );
-
 }
-

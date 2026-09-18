@@ -10,7 +10,9 @@ const peakCache = new Map<string, LibTvAudioPeaks>();
 const BAR_WIDTH_PX = 2;
 const BAR_GAP_PX = 3;
 
-async function decodeAudioArrayBuffer(arrayBuffer: ArrayBuffer): Promise<AudioBuffer> {
+async function decodeAudioArrayBuffer(
+  arrayBuffer: ArrayBuffer
+): Promise<AudioBuffer> {
   const audioContext = new AudioContext();
   try {
     if (audioContext.state === "suspended") {
@@ -81,7 +83,9 @@ async function loadAudioArrayBuffer(params: {
 
   if (isHttpUrl) {
     try {
-      const authedResponse = await fetch(params.src, { credentials: "include" });
+      const authedResponse = await fetch(params.src, {
+        credentials: "include",
+      });
       if (authedResponse.ok) {
         return authedResponse.arrayBuffer();
       }

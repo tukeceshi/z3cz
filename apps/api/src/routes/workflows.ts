@@ -163,7 +163,10 @@ workflowRoutes.post(
       assertRuntimeAllowedByScheme(scheme, data.runtime || "workflow");
     } catch (error) {
       return c.json(
-        { error: error instanceof Error ? error.message : "Invalid scheme selection" },
+        {
+          error:
+            error instanceof Error ? error.message : "Invalid scheme selection",
+        },
         400
       );
     }
@@ -415,7 +418,10 @@ workflowRoutes.put(
       assertRuntimeAllowedByScheme(scheme, nextRuntime);
     } catch (error) {
       return c.json(
-        { error: error instanceof Error ? error.message : "Invalid scheme selection" },
+        {
+          error:
+            error instanceof Error ? error.message : "Invalid scheme selection",
+        },
         400
       );
     }
@@ -488,7 +494,10 @@ workflowRoutes.put(
   }
 );
 
-function invalidateWorkflowLiveSession(env: Bindings, workflowId: string): void {
+function invalidateWorkflowLiveSession(
+  env: Bindings,
+  workflowId: string
+): void {
   if (env.RUNTIME === "node") {
     void import("../runtime/node-workflow-session-hub").then(
       ({ nodeWorkflowSessionHub }) => {
@@ -531,128 +540,125 @@ workflowRoutes.delete("/:id", async (c) => {
  * Prefers the node snapshot from the request body (unsaved editor values);
  * falls back to the persisted workflow node. Runs a 1-node worker workflow.
  */
-workflowRoutes.post(
-  "/:workflowId/nodes/:nodeId/execute",
-  async (c) => {
-    const workflowId = c.req.param("workflowId")!;
-    const nodeId = c.req.param("nodeId")!;
-    const { organizationId, userId } = getAuthContext(c);
+workflowRoutes.post("/:workflowId/nodes/:nodeId/execute", async (c) => {
+  const workflowId = c.req.param("workflowId")!;
+  const nodeId = c.req.param("nodeId")!;
+  const { organizationId, userId } = getAuthContext(c);
 
-    let bodyNode: Node | undefined;
-    let bodyNodes: Node[] | undefined;
-    let bodyEdges: Edge[] | undefined;
-    try {
-      const body = await c.req.json<{
-        node?: Node;
-        nodes?: Node[];
-        edges?: Edge[];
-      }>();
-      if (body?.node && body.node.id === nodeId) {
-        bodyNode = body.node;
-      }
-      if (Array.isArray(body?.nodes) && body.nodes.length > 0) {
-        bodyNodes = body.nodes;
-      }
-      if (Array.isArray(body?.edges)) {
-        bodyEdges = body.edges;
-      }
-    } catch {
-      // Body is optional — fall back to persisted workflow node.
+  let bodyNode: Node | undefined;
+  let bodyNodes: Node[] | undefined;
+  let bodyEdges: Edge[] | undefined;
+  try {
+    const body = await c.req.json<{
+      node?: Node;
+      nodes?: Node[];
+      edges?: Edge[];
+    }>();
+    if (body?.node && body.node.id === nodeId) {
+      bodyNode = body.node;
     }
-
-    const workflowStore = new WorkflowStore(c.env);
-    const db = createDatabase(c.env);
-
-    const workflowWithData = await workflowStore.getWithData(
-      workflowId,
-      organizationId
-    );
-
-    if (!workflowWithData?.data) {
-      return c.json({ error: "Workflow not found" }, 404);
+    if (Array.isArray(body?.nodes) && body.nodes.length > 0) {
+      bodyNodes = body.nodes;
     }
-
-    const persistedNode = workflowWithData.data.nodes.find(
-      (n) => n.id === nodeId
-    );
-    const node = bodyNode ?? persistedNode;
-    if (!node) {
-      return c.json({ error: "Node not found" }, 404);
+    if (Array.isArray(body?.edges)) {
+      bodyEdges = body.edges;
     }
-
-    const executionNodes =
-      bodyNodes && bodyNodes.some((entry) => entry.id === nodeId)
-        ? bodyNodes
-        : [node];
-    const executionEdges = bodyEdges ?? [];
-
-    const billingInfo = await getOrganizationBillingInfo(db, organizationId);
-    if (!billingInfo) {
-      return c.json({ error: "Organization not found" }, 404);
-    }
-
-    if (isCreditExhausted(billingInfo, c.env.CLOUDFLARE_ENV)) {
-      return c.json({ error: "Insufficient compute credits" }, 402 as const);
-    }
-
-    try {
-      await stampOnboardingStage(db, userId, "workflowExecuted");
-    } catch (error) {
-      console.error("Failed to stamp workflow_executed onboarding:", error);
-    }
-
-    try {
-      await validateWorkflowGraphAgainstCatalog(
-        c.env,
-        { nodes: executionNodes },
-        c.executionCtx
-      );
-    } catch (error) {
-      return c.json(
-        {
-          error:
-            error instanceof Error
-              ? error.message
-              : "Workflow contains archived node types",
-        },
-        400
-      );
-    }
-
-    const runtimeParams = WorkflowExecutor.buildRuntimeParams({
-      workflow: {
-        id: workflowWithData.id,
-        name: workflowWithData.name,
-        trigger: workflowWithData.data.trigger,
-        nodes: executionNodes,
-        edges: executionEdges,
-      },
-      userId,
-      organizationId,
-      ...resolveOrganizationBillingOptions(billingInfo, c.env.CLOUDFLARE_ENV),
-      env: c.env,
-    });
-
-    const execution = await executeSingleNodeWorkflow(c.env, runtimeParams);
-
-    if (execution.status === "completed") {
-      try {
-        await stampOnboardingStage(db, userId, "workflowExecutedOk");
-      } catch (error) {
-        console.error("Failed to stamp workflow_executed_ok onboarding:", error);
-      }
-    }
-
-    const response: ExecuteWorkflowResponse = {
-      id: execution.id,
-      workflowId: execution.workflowId,
-      status: execution.status,
-      nodeExecutions: execution.nodeExecutions,
-    };
-
-    return c.json(response, 201);
+  } catch {
+    // Body is optional — fall back to persisted workflow node.
   }
-);
+
+  const workflowStore = new WorkflowStore(c.env);
+  const db = createDatabase(c.env);
+
+  const workflowWithData = await workflowStore.getWithData(
+    workflowId,
+    organizationId
+  );
+
+  if (!workflowWithData?.data) {
+    return c.json({ error: "Workflow not found" }, 404);
+  }
+
+  const persistedNode = workflowWithData.data.nodes.find(
+    (n) => n.id === nodeId
+  );
+  const node = bodyNode ?? persistedNode;
+  if (!node) {
+    return c.json({ error: "Node not found" }, 404);
+  }
+
+  const executionNodes =
+    bodyNodes && bodyNodes.some((entry) => entry.id === nodeId)
+      ? bodyNodes
+      : [node];
+  const executionEdges = bodyEdges ?? [];
+
+  const billingInfo = await getOrganizationBillingInfo(db, organizationId);
+  if (!billingInfo) {
+    return c.json({ error: "Organization not found" }, 404);
+  }
+
+  if (isCreditExhausted(billingInfo, c.env.CLOUDFLARE_ENV)) {
+    return c.json({ error: "Insufficient compute credits" }, 402 as const);
+  }
+
+  try {
+    await stampOnboardingStage(db, userId, "workflowExecuted");
+  } catch (error) {
+    console.error("Failed to stamp workflow_executed onboarding:", error);
+  }
+
+  try {
+    await validateWorkflowGraphAgainstCatalog(
+      c.env,
+      { nodes: executionNodes },
+      c.executionCtx
+    );
+  } catch (error) {
+    return c.json(
+      {
+        error:
+          error instanceof Error
+            ? error.message
+            : "Workflow contains archived node types",
+      },
+      400
+    );
+  }
+
+  const runtimeParams = WorkflowExecutor.buildRuntimeParams({
+    workflow: {
+      id: workflowWithData.id,
+      name: workflowWithData.name,
+      trigger: workflowWithData.data.trigger,
+      nodes: executionNodes,
+      edges: executionEdges,
+    },
+    userId,
+    organizationId,
+    ...resolveOrganizationBillingOptions(billingInfo, c.env.CLOUDFLARE_ENV),
+    env: c.env,
+  });
+
+  const execution = await executeSingleNodeWorkflow(c.env, runtimeParams);
+
+  if (execution.status === "completed") {
+    try {
+      await stampOnboardingStage(db, userId, "workflowExecutedOk");
+    } catch (error) {
+      console.error("Failed to stamp workflow_executed_ok onboarding:", error);
+    }
+  }
+
+  const response: ExecuteWorkflowResponse = {
+    id: execution.id,
+    workflowId: execution.workflowId,
+    status: execution.status,
+    nodeExecutions: execution.nodeExecutions,
+  };
+
+  return c.json(response, 201);
+});
 
 /**
  * Get queue trigger for a workflow
@@ -757,38 +763,32 @@ workflowRoutes.put(
 /**
  * Delete a queue trigger for a workflow
  */
-workflowRoutes.delete(
-  "/:workflowId/queue-trigger",
-  async (c) => {
-    const workflowId = c.req.param("workflowId")!;
-    const organizationId = c.get("organizationId")!;
-    const workflowStore = new WorkflowStore(c.env);
-    const db = createDatabase(c.env);
+workflowRoutes.delete("/:workflowId/queue-trigger", async (c) => {
+  const workflowId = c.req.param("workflowId")!;
+  const organizationId = c.get("organizationId")!;
+  const workflowStore = new WorkflowStore(c.env);
+  const db = createDatabase(c.env);
 
-    const workflow = await workflowStore.get(workflowId, organizationId);
-    if (!workflow) {
-      return c.json({ error: "Workflow not found" }, 404);
-    }
-
-    const deletedTrigger = await deleteDbQueueTrigger(
-      db,
-      workflow.id,
-      organizationId
-    );
-
-    if (!deletedTrigger) {
-      return c.json(
-        { error: "Queue trigger not found for this workflow" },
-        404
-      );
-    }
-
-    const response: DeleteQueueTriggerResponse = {
-      workflowId: deletedTrigger.workflowId,
-    };
-    return c.json(response);
+  const workflow = await workflowStore.get(workflowId, organizationId);
+  if (!workflow) {
+    return c.json({ error: "Workflow not found" }, 404);
   }
-);
+
+  const deletedTrigger = await deleteDbQueueTrigger(
+    db,
+    workflow.id,
+    organizationId
+  );
+
+  if (!deletedTrigger) {
+    return c.json({ error: "Queue trigger not found for this workflow" }, 404);
+  }
+
+  const response: DeleteQueueTriggerResponse = {
+    workflowId: deletedTrigger.workflowId,
+  };
+  return c.json(response);
+});
 
 /**
  * Update list-page metadata (name, description, cover) without resubmitting the graph.
@@ -870,9 +870,8 @@ workflowRoutes.patch(
       await touchWorkflowFolderUpdatedAt(db, existing.folderId, organizationId);
     }
 
-    const response: UpdateWorkflowListMetadataResponse = toWorkflowListItem(
-      updated
-    );
+    const response: UpdateWorkflowListMetadataResponse =
+      toWorkflowListItem(updated);
     return c.json(response);
   }
 );

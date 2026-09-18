@@ -119,7 +119,9 @@ export async function readAgentChatBody(params: {
     return null;
   }
   try {
-    const object = await tos.client.getObject({ key: bodyKey(params.cloudPath) });
+    const object = await tos.client.getObject({
+      key: bodyKey(params.cloudPath),
+    });
     const text = new TextDecoder().decode(object.data);
     const parsed = JSON.parse(text) as AgentChatConversationBody;
     if (!parsed || !Array.isArray(parsed.messages)) {
@@ -372,7 +374,9 @@ export async function putHeldAgentChatBody(params: {
   readonly conversationId: string;
   readonly title: string;
   readonly body: AgentChatConversationBody;
-}): Promise<{ readonly ok: true } | { readonly ok: false; readonly error: string }> {
+}): Promise<
+  { readonly ok: true } | { readonly ok: false; readonly error: string }
+> {
   const row = await getAgentConversation(params.db, {
     organizationId: params.organizationId,
     conversationId: params.conversationId,

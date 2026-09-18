@@ -195,8 +195,12 @@ adminUsersRoutes.get("/:id", async (c) => {
       return c.json({ error: "User not found" }, 404);
     }
 
-    const { subscriptionStatus, currentPeriodEnd, organizationId, ...userFields } =
-      row;
+    const {
+      subscriptionStatus,
+      currentPeriodEnd,
+      organizationId,
+      ...userFields
+    } = row;
     const user = {
       ...userFields,
       organizationId,

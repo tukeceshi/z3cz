@@ -98,7 +98,9 @@ export function IntegrationDialog({
 
   if (isLoadingProviders) {
     content = (
-      <DialogDescription>{t("pages.integrations.dialog.loading")}</DialogDescription>
+      <DialogDescription>
+        {t("pages.integrations.dialog.loading")}
+      </DialogDescription>
     );
   } else if (providers.length === 0) {
     content = (
@@ -107,7 +109,9 @@ export function IntegrationDialog({
       </DialogDescription>
     );
     footer = (
-      <Button onClick={handleClose}>{t("pages.integrations.dialog.close")}</Button>
+      <Button onClick={handleClose}>
+        {t("pages.integrations.dialog.close")}
+      </Button>
     );
   } else {
     const isOAuth = currentProvider?.supportsOAuth;

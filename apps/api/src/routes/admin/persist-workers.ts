@@ -114,11 +114,7 @@ adminPersistWorkerRoutes.post(
         error instanceof Error ? error.message : "Failed to redeploy worker";
       console.error("Error redeploying persist worker:", error);
       const status =
-        message === "Persist worker not found"
-          ? 404
-          : worker
-            ? 502
-            : 400;
+        message === "Persist worker not found" ? 404 : worker ? 502 : 400;
       return c.json({ error: message, worker }, status);
     }
   }
@@ -157,7 +153,9 @@ adminPersistWorkerRoutes.put(
         body.enabled,
         jwtPayload.sub
       );
-      return c.json({ settings } satisfies { settings: PersistWorkerPoolSettings });
+      return c.json({ settings } satisfies {
+        settings: PersistWorkerPoolSettings;
+      });
     } catch (error) {
       console.error("Error updating persist worker pool settings:", error);
       return c.json({ error: "Failed to update pool settings" }, 500);
@@ -212,7 +210,9 @@ adminPersistWorkerRoutes.post(
       );
     } catch (error) {
       const message =
-        error instanceof Error ? error.message : "Failed to create persist worker";
+        error instanceof Error
+          ? error.message
+          : "Failed to create persist worker";
       console.error("Error creating persist worker:", error);
       return c.json({ error: message }, 400);
     }
@@ -261,7 +261,9 @@ adminPersistWorkerRoutes.patch(
       } satisfies UpdatePersistWorkerResponse);
     } catch (error) {
       const message =
-        error instanceof Error ? error.message : "Failed to update persist worker";
+        error instanceof Error
+          ? error.message
+          : "Failed to update persist worker";
       console.error("Error updating persist worker:", error);
       const status = message === "Persist worker not found" ? 404 : 400;
       return c.json({ error: message }, status);
@@ -278,7 +280,9 @@ adminPersistWorkerRoutes.delete("/:id", async (c) => {
     return c.json({ success: true });
   } catch (error) {
     const message =
-      error instanceof Error ? error.message : "Failed to delete persist worker";
+      error instanceof Error
+        ? error.message
+        : "Failed to delete persist worker";
     console.error("Error deleting persist worker:", error);
     const status = message === "Persist worker not found" ? 404 : 400;
     return c.json({ error: message }, status);

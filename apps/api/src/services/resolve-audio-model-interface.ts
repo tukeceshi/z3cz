@@ -17,9 +17,8 @@ import {
   type ResolvedOrgModelInterface,
 } from "./resolve-text-model-interface";
 
-export type ResolvedAudioModelInterface = ResolvedOrgModelInterface<
-  AudioModelParameterRules
->;
+export type ResolvedAudioModelInterface =
+  ResolvedOrgModelInterface<AudioModelParameterRules>;
 
 export async function listOrgAudioModelOptions(
   db: Database,
@@ -35,12 +34,11 @@ export async function listOrgAudioModelOptions(
     interfaces: collectOrgBindingInterfaces(interfaces),
   }).map((binding) => ({
     ...binding,
-    unavailableReason:
-      binding.unavailableReason as OrgAudioModelUnavailableReason | undefined,
+    unavailableReason: binding.unavailableReason as
+      | OrgAudioModelUnavailableReason
+      | undefined,
     parameterRules: getAudioParameterRules(
-      platformModels.find(
-        (model) => model.canonicalId === binding.canonicalId
-      )!
+      platformModels.find((model) => model.canonicalId === binding.canonicalId)!
     ),
   }));
 }

@@ -160,7 +160,9 @@ export function isCancellingResourceRef(
   return isResourceIdReference(value) && value.cancelling === true;
 }
 
-export function isFailedResourceRef(value: unknown): value is ResourceIdReference {
+export function isFailedResourceRef(
+  value: unknown
+): value is ResourceIdReference {
   return isResourceIdReference(value) && value.failed === true;
 }
 

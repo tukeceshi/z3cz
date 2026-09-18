@@ -50,7 +50,14 @@ describe("fitStudioDetailContentSize", () => {
 describe("fitStudioDetailSize", () => {
   it("expands outer size by border width", () => {
     const content = fitStudioDetailContentSize(800, 500, 16 / 9);
-    const bordered = fitStudioDetailSize(802, 502, 16 / 9, undefined, undefined, 1);
+    const bordered = fitStudioDetailSize(
+      802,
+      502,
+      16 / 9,
+      undefined,
+      undefined,
+      1
+    );
     expect(content).toEqual({ width: 800, height: 450 });
     expect(bordered).toEqual({ width: 802, height: 452 });
   });

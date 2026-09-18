@@ -220,7 +220,13 @@ function SecretsPageContent() {
     } finally {
       setIsProcessing(false);
     }
-  }, [newSecretName, newSecretValue, organization?.id, mutateSecrets, appToast]);
+  }, [
+    newSecretName,
+    newSecretValue,
+    organization?.id,
+    mutateSecrets,
+    appToast,
+  ]);
 
   const handleUpdateSecret = useCallback(async (): Promise<void> => {
     if (!editingSecret || !organization?.id) return;
@@ -266,7 +272,10 @@ function SecretsPageContent() {
     return <InsetLoading title={t("pages.secrets.title")} />;
   } else if (secretsError) {
     return (
-      <InsetError title={t("pages.secrets.title")} errorMessage={secretsError.message} />
+      <InsetError
+        title={t("pages.secrets.title")}
+        errorMessage={secretsError.message}
+      />
     );
   }
 
@@ -411,7 +420,9 @@ function SecretsPageContent() {
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>{t("pages.secrets.deleteSecret")}</AlertDialogTitle>
+            <AlertDialogTitle>
+              {t("pages.secrets.deleteSecret")}
+            </AlertDialogTitle>
             <AlertDialogDescription>
               {t("pages.secrets.deleteDescription")}
             </AlertDialogDescription>

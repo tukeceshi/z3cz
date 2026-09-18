@@ -1,6 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { AI_TEXT_OUTPUT_ID, AI_TEXT_RESULT_HISTORY_INPUT_ID, AI_TEXT_RESULT_INPUT_ID } from "./ai-text-node-utils";
+import {
+  AI_TEXT_OUTPUT_ID,
+  AI_TEXT_RESULT_HISTORY_INPUT_ID,
+  AI_TEXT_RESULT_INPUT_ID,
+} from "./ai-text-node-utils";
 import type { WorkflowNodeType } from "./workflow-types";
 import { testWorkflowNodeData } from "./workflow-test-fixtures";
 import {
@@ -23,7 +27,9 @@ vi.mock("@/utils/text-content-utils", () => ({
   sha256HexFromText: vi.fn(async () => "abc123"),
 }));
 
-function createTextNode(overrides?: Partial<WorkflowNodeType>): WorkflowNodeType {
+function createTextNode(
+  overrides?: Partial<WorkflowNodeType>
+): WorkflowNodeType {
   return testWorkflowNodeData({
     id: "node-1",
     type: "workflowNode",
@@ -31,7 +37,9 @@ function createTextNode(overrides?: Partial<WorkflowNodeType>): WorkflowNodeType
     nodeType: "ai-text",
     position: { x: 0, y: 0 },
     inputs: [],
-    outputs: [{ id: AI_TEXT_OUTPUT_ID, name: "text", type: "string", value: "" }],
+    outputs: [
+      { id: AI_TEXT_OUTPUT_ID, name: "text", type: "string", value: "" },
+    ],
     metadata: undefined,
     ...overrides,
   });
@@ -63,7 +71,9 @@ describe("migrate-inline-ai-text detection", () => {
           type: "json",
           hidden: true,
           value: {
-            items: [{ id: "gen-1", text: "history body", createdAt: "2026-01-01" }],
+            items: [
+              { id: "gen-1", text: "history body", createdAt: "2026-01-01" },
+            ],
             selectedId: "gen-1",
           },
         },

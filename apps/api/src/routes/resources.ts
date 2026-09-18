@@ -92,25 +92,31 @@ function normalizeRegisterRequest(
   return { resources: [body] };
 }
 
-resourceRoutes.post("/", zValidator("json", registerMediaResourcesBodySchema), async (c) => {
-  const organizationId = c.get("organizationId")!;
-  const body = c.req.valid("json");
-  const db = createDatabase(c.env);
+resourceRoutes.post(
+  "/",
+  zValidator("json", registerMediaResourcesBodySchema),
+  async (c) => {
+    const organizationId = c.get("organizationId")!;
+    const body = c.req.valid("json");
+    const db = createDatabase(c.env);
 
-  try {
-    const request = normalizeRegisterRequest(body);
-    const registered = await registerMediaResources(db, {
-      organizationId,
-      resources: request.resources,
-    });
-    const response: RegisterMediaResourcesResponse = { registered };
-    return c.json(response);
-  } catch (error) {
-    const message =
-      error instanceof Error ? error.message : "Failed to register media resources";
-    return c.json({ error: message }, 400);
+    try {
+      const request = normalizeRegisterRequest(body);
+      const registered = await registerMediaResources(db, {
+        organizationId,
+        resources: request.resources,
+      });
+      const response: RegisterMediaResourcesResponse = { registered };
+      return c.json(response);
+    } catch (error) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : "Failed to register media resources";
+      return c.json({ error: message }, 400);
+    }
   }
-});
+);
 
 resourceRoutes.post(
   "/resolve",
@@ -130,7 +136,9 @@ resourceRoutes.post(
       return c.json(result);
     } catch (error) {
       const message =
-        error instanceof Error ? error.message : "Failed to resolve media resources";
+        error instanceof Error
+          ? error.message
+          : "Failed to resolve media resources";
       return c.json({ error: message }, 400);
     }
   }
@@ -152,7 +160,9 @@ resourceRoutes.post(
       return c.json({ ok: true as const });
     } catch (error) {
       const message =
-        error instanceof Error ? error.message : "Failed to rekey media resource";
+        error instanceof Error
+          ? error.message
+          : "Failed to rekey media resource";
       return c.json({ error: message }, 400);
     }
   }

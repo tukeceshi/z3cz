@@ -40,11 +40,14 @@ describe("appendImageGeneratingContent", () => {
     });
     expect(patch).not.toBeNull();
 
-    const history = (patch!.inputs!.find((input) => input.name === "images_history")
-      ?.value ?? null) as { items: { images: { resourceId: string; generating?: boolean }[] }[] };
-    const result = patch!.inputs!.find((input) => input.name === "images_result")?.value as
-      | { resourceId: string; generating?: boolean }[]
-      | undefined;
+    const history = (patch!.inputs!.find(
+      (input) => input.name === "images_history"
+    )?.value ?? null) as {
+      items: { images: { resourceId: string; generating?: boolean }[] }[];
+    };
+    const result = patch!.inputs!.find(
+      (input) => input.name === "images_result"
+    )?.value as { resourceId: string; generating?: boolean }[] | undefined;
 
     expect(history.items[0]?.images[0]).toEqual({
       resourceId: "res-1",
@@ -89,8 +92,9 @@ describe("appendVideoGeneratingContent", () => {
       prompt: "run",
     });
     expect(patch).not.toBeNull();
-    const result = patch!.inputs!.find((input) => input.name === "videos_result")
-      ?.value as { resourceId: string; generating?: boolean }[];
+    const result = patch!.inputs!.find(
+      (input) => input.name === "videos_result"
+    )?.value as { resourceId: string; generating?: boolean }[];
     expect(result[0]).toEqual({
       resourceId: "vid-1",
       mimeType: "video/mp4",
@@ -103,7 +107,12 @@ describe("appendVideoGeneratingContent", () => {
 describe("buildGeneratingResourceRefs", () => {
   it("marks refs as generating", () => {
     expect(buildGeneratingResourceRefs(["a"], "image/png")).toEqual([
-      { resourceId: "a", mimeType: "image/png", generating: true, kind: "ephemeral" },
+      {
+        resourceId: "a",
+        mimeType: "image/png",
+        generating: true,
+        kind: "ephemeral",
+      },
     ]);
   });
 });
@@ -152,8 +161,9 @@ describe("patchNodeMediaResourceKinds", () => {
       new Map([["res-1", "cloud"]])
     );
     expect(patch).not.toBeNull();
-    const result = patch!.inputs!.find((input) => input.name === "images_result")
-      ?.value as { kind?: string }[];
+    const result = patch!.inputs!.find(
+      (input) => input.name === "images_result"
+    )?.value as { kind?: string }[];
     expect(result[0]?.kind).toBe("cloud");
     expect(result[0]).not.toHaveProperty("generating");
   });
@@ -204,8 +214,9 @@ describe("patchNodeMediaCloudAccelerationStatus", () => {
     });
 
     expect(patch).not.toBeNull();
-    const result = patch!.inputs!.find((input) => input.name === "images_result")
-      ?.value as {
+    const result = patch!.inputs!.find(
+      (input) => input.name === "images_result"
+    )?.value as {
       resourceId: string;
       generating?: boolean;
       cloudAccelerationStatus?: string;
@@ -264,8 +275,9 @@ describe("patchNodeMediaCancellingStatus", () => {
     });
 
     expect(patch).not.toBeNull();
-    const result = patch!.inputs!.find((input) => input.name === "images_result")
-      ?.value as {
+    const result = patch!.inputs!.find(
+      (input) => input.name === "images_result"
+    )?.value as {
       resourceId: string;
       generating?: boolean;
       cancelling?: boolean;
@@ -302,8 +314,9 @@ describe("patchNodeMediaCancellingStatus", () => {
     });
 
     expect(patch).not.toBeNull();
-    const result = patch!.inputs!.find((input) => input.name === "images_result")
-      ?.value as { cancelling?: boolean; generating?: boolean }[];
+    const result = patch!.inputs!.find(
+      (input) => input.name === "images_result"
+    )?.value as { cancelling?: boolean; generating?: boolean }[];
     expect(result[0]?.generating).toBe(true);
     expect(result[0]).not.toHaveProperty("cancelling");
   });
@@ -363,10 +376,16 @@ describe("finalizeImageGeneratingContent", () => {
     });
 
     expect(patch).not.toBeNull();
-    const history = patch!.inputs!.find((input) => input.name === "images_history")
-      ?.value as {
+    const history = patch!.inputs!.find(
+      (input) => input.name === "images_history"
+    )?.value as {
       items: {
-        images: { resourceId: string; kind?: string; generating?: boolean; cloudAccelerationStatus?: string }[];
+        images: {
+          resourceId: string;
+          kind?: string;
+          generating?: boolean;
+          cloudAccelerationStatus?: string;
+        }[];
         jobId?: string;
       }[];
     };
@@ -385,7 +404,9 @@ describe("mergeGenerativeNodeContentOnSave", () => {
       {
         name: "images_result",
         type: "json",
-        value: [{ resourceId: "res-1", mimeType: "image/png", generating: true }],
+        value: [
+          { resourceId: "res-1", mimeType: "image/png", generating: true },
+        ],
       },
       {
         name: "images_history",
@@ -418,8 +439,9 @@ describe("mergeGenerativeNodeContentOnSave", () => {
     ]);
 
     const merged = mergeGenerativeNodeContentOnSave(persisted, incoming);
-    const history = merged.inputs.find((input) => input.name === "images_history")
-      ?.value as { items: { id: string }[]; selectedId: string | null };
+    const history = merged.inputs.find(
+      (input) => input.name === "images_history"
+    )?.value as { items: { id: string }[]; selectedId: string | null };
     expect(history.items.some((item) => item.id === "gen-server")).toBe(true);
     expect(history.selectedId).toBe("gen-server");
     const result = merged.inputs.find((input) => input.name === "images_result")
@@ -445,13 +467,13 @@ describe("appendTextGeneratingContent", () => {
     });
     expect(patch).not.toBeNull();
 
-    const history = (patch!.inputs!.find((input) => input.name === "result_history")
-      ?.value ?? null) as {
+    const history = (patch!.inputs!.find(
+      (input) => input.name === "result_history"
+    )?.value ?? null) as {
       items: { resourceId?: string; invocationId?: string }[];
     };
-    const result = patch!.inputs!.find((input) => input.name === "result")?.value as
-      | { resourceId: string; generating?: boolean }
-      | undefined;
+    const result = patch!.inputs!.find((input) => input.name === "result")
+      ?.value as { resourceId: string; generating?: boolean } | undefined;
 
     expect(history.items[0]?.resourceId).toBe("text-res-1");
     expect(history.items[0]?.invocationId).toBe("inv-1");

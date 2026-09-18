@@ -83,7 +83,11 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-type OpenParamSelect = "modelVersion" | "eraseScope" | "outputEncodeMode" | null;
+type OpenParamSelect =
+  | "modelVersion"
+  | "eraseScope"
+  | "outputEncodeMode"
+  | null;
 
 function InlineParamSelect({
   open,
@@ -140,10 +144,8 @@ export function AiVideoSubtitleEraseConfigPanel({
   const subtitleErase = useSubtitleEraseSession();
   const { createSubtitleEraseSiblingNodeShell } =
     useVideoSubtitleEraseToSiblingNode(nodeId);
-  const {
-    interfaceId: mediaKitInterfaceId,
-    config: mediaKitConfig,
-  } = useOrgVolcanoMediaKitConfig(orgId);
+  const { interfaceId: mediaKitInterfaceId, config: mediaKitConfig } =
+    useOrgVolcanoMediaKitConfig(orgId);
 
   const [isStarting, setIsStarting] = useState(false);
   const [openSelect, setOpenSelect] = useState<OpenParamSelect>(null);
@@ -219,7 +221,9 @@ export function AiVideoSubtitleEraseConfigPanel({
       return;
     }
 
-    const effectiveConfig = withVideoSubtitleEraseRefinedDefaults(session.draftConfig);
+    const effectiveConfig = withVideoSubtitleEraseRefinedDefaults(
+      session.draftConfig
+    );
     setIsStarting(true);
     let targetNodeId: string | null = null;
     try {
@@ -270,7 +274,10 @@ export function AiVideoSubtitleEraseConfigPanel({
 
       if (response.workflowNodeContent && updateNodeData) {
         updateNodeData(shell.nodeId, (current) => ({
-          ...applyWorkflowNodeContentPatch(current, response.workflowNodeContent!),
+          ...applyWorkflowNodeContentPatch(
+            current,
+            response.workflowNodeContent!
+          ),
           metadata: withGenerativeProgress(
             withAiVideoGeneratingFlag(
               withGenerativeBottomPanelHidden(current.metadata),
@@ -465,7 +472,10 @@ export function AiVideoSubtitleEraseConfigPanel({
               if (!checked) {
                 subtitleErase.setRegionMode(false);
               }
-              applyConfig({ ...draftConfig, mode: checked ? "refined" : "standard" });
+              applyConfig({
+                ...draftConfig,
+                mode: checked ? "refined" : "standard",
+              });
             }}
           />
         </label>
@@ -493,7 +503,9 @@ export function AiVideoSubtitleEraseConfigPanel({
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1 px-3 py-2">
             <InlineParamSelect
               open={openSelect === "modelVersion"}
-              onOpenChange={(open) => setOpenSelect(open ? "modelVersion" : null)}
+              onOpenChange={(open) =>
+                setOpenSelect(open ? "modelVersion" : null)
+              }
               value={draftConfig.modelVersion ?? "v5"}
               options={[...VOLCANO_MEDIKIT_SUBTITLE_ERASE_MODEL_VERSIONS]}
               renderLabel={(version) =>
@@ -507,7 +519,8 @@ export function AiVideoSubtitleEraseConfigPanel({
               onChange={(modelVersion) =>
                 applyConfig({
                   ...draftConfig,
-                  modelVersion: modelVersion as VolcanoMediaKitSubtitleEraseModelVersion,
+                  modelVersion:
+                    modelVersion as VolcanoMediaKitSubtitleEraseModelVersion,
                 })
               }
             />

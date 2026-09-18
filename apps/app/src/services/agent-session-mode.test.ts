@@ -15,9 +15,9 @@ import {
 
 describe("parked draft fields", () => {
   it("still records draft after a talk, but request tests must not send it", () => {
-    expect(stateAfterRun({ runMode: "draft", talk: "先改片头" }).planDocument).toBe(
-      "先改片头"
-    );
+    expect(
+      stateAfterRun({ runMode: "draft", talk: "先改片头" }).planDocument
+    ).toBe("先改片头");
   });
 });
 
@@ -79,11 +79,7 @@ describe("make tools", () => {
 
   it("drops write approval and keeps other consents", () => {
     expect(
-      withoutWriteConsent([
-        "simple-animation",
-        "canvas-make",
-        "other",
-      ])
+      withoutWriteConsent(["simple-animation", "canvas-make", "other"])
     ).toEqual(["other"]);
     expect(withoutWriteConsent(undefined)).toEqual([]);
   });

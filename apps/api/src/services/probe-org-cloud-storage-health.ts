@@ -28,7 +28,9 @@ import {
 import { resolveOrgCloudStorage } from "./resolve-org-cloud-storage";
 
 function isHealthSnapshotStale(checkedAt: string): boolean {
-  return Date.parse(checkedAt) + CLOUD_STORAGE_HEALTH_CHECK_TTL_MS <= Date.now();
+  return (
+    Date.parse(checkedAt) + CLOUD_STORAGE_HEALTH_CHECK_TTL_MS <= Date.now()
+  );
 }
 
 export async function probeOrgCloudStorageHealth(
@@ -89,9 +91,7 @@ export async function probeOrgCloudStorageHealthWithDb(
             : null,
         message: probe.message ?? null,
         consecutiveFailureCount:
-          status === "blocked"
-            ? CLOUD_STORAGE_DEGRADED_FAILURE_THRESHOLD
-            : 0,
+          status === "blocked" ? CLOUD_STORAGE_DEGRADED_FAILURE_THRESHOLD : 0,
       };
       await upsertOrganizationCloudStorageHealth(db, {
         organizationId,
@@ -135,7 +135,10 @@ export async function probeOrgCloudStorageHealthWithDb(
       contentLength: 0,
     });
 
-    const corsOrigins = mergeDirectUploadCorsOrigins(env, options?.extraCorsOrigins);
+    const corsOrigins = mergeDirectUploadCorsOrigins(
+      env,
+      options?.extraCorsOrigins
+    );
     const bucketCredentials = {
       accessKeyId: cloud.accessKeyId,
       secretAccessKey,

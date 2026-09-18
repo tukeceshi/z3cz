@@ -19,10 +19,13 @@ export function formatVolcanoUsageAmount(
 
   if (Math.abs(value) >= MILLION) {
     const millions = value / MILLION;
-    const formatted = millions.toLocaleString(locale === "zh" ? "zh-CN" : "en-US", {
-      maximumFractionDigits: 2,
-      minimumFractionDigits: 0,
-    });
+    const formatted = millions.toLocaleString(
+      locale === "zh" ? "zh-CN" : "en-US",
+      {
+        maximumFractionDigits: 2,
+        minimumFractionDigits: 0,
+      }
+    );
     return locale === "zh"
       ? `${formatted} 百万 tokens`
       : `${formatted}M tokens`;

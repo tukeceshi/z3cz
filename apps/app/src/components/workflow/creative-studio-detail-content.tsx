@@ -30,9 +30,7 @@ import { stageGenerativeCardUpload } from "@/services/stage-generative-media";
 import { isMediaExpired } from "@/services/media-url-resolver";
 import { cn } from "@/utils/utils";
 
-import {
-  AiTextHistoryOverlay,
-} from "./ai-text-history-overlay";
+import { AiTextHistoryOverlay } from "./ai-text-history-overlay";
 import {
   commitAiTextHistorySelection,
   commitAiTextValue,
@@ -44,9 +42,7 @@ import {
   readAiTextResultHistory,
   readAiTextSessionBodySync,
 } from "./ai-text-node-utils";
-import {
-  AiImageHistoryOverlay,
-} from "./ai-image-history-overlay";
+import { AiImageHistoryOverlay } from "./ai-image-history-overlay";
 import { useExpandHistoryToSiblingNode } from "./use-expand-history-to-sibling-node";
 import {
   useGenerativeHistoryModels,
@@ -176,14 +172,12 @@ export function CreativeStudioDetailContent({
   );
 }
 
-function StudioToolbar({
-  children,
-}: {
-  readonly children: ReactNode;
-}) {
+function StudioToolbar({ children }: { readonly children: ReactNode }) {
   return (
     <div className="pointer-events-none absolute right-3 top-3 z-20 flex items-center gap-1.5">
-      <div className="pointer-events-auto flex items-center gap-1.5">{children}</div>
+      <div className="pointer-events-auto flex items-center gap-1.5">
+        {children}
+      </div>
     </div>
   );
 }
@@ -229,8 +223,7 @@ function StudioTextDetail({
       (previewText.state === "ready" && stagingBody.loading && !text.trim()));
   const historyItems = readAiTextResultHistory(node.data.inputs);
   const generateError = readGenerativeCardError(metadata);
-  const showGeneratingMask =
-    isAiTextAwaitingStream(metadata) && !generateError;
+  const showGeneratingMask = isAiTextAwaitingStream(metadata) && !generateError;
   const showHistoryIcon = shouldShowGenerativeHistoryIcon(
     historyItems.items.length,
     metadata
@@ -261,14 +254,7 @@ function StudioTextDetail({
         current: nodeDataRef.current,
       });
     },
-    [
-      cloudConfigured,
-      editLocked,
-      nodeId,
-      orgId,
-      updateNodeData,
-      workflowId,
-    ]
+    [cloudConfigured, editLocked, nodeId, orgId, updateNodeData, workflowId]
   );
 
   const textBuffer = useBufferedTextValue(text, commitText);
@@ -310,7 +296,11 @@ function StudioTextDetail({
     !generateError &&
     !uploading;
   const showEmptyBusy =
-    !hasOutput && !isTextEditing && !generateError && uploading && !contentLoading;
+    !hasOutput &&
+    !isTextEditing &&
+    !generateError &&
+    uploading &&
+    !contentLoading;
 
   const {
     scrollContainerRef,
@@ -522,7 +512,9 @@ function StudioTextDetail({
           </div>
         </div>
 
-        {generateError ? <GenerativeCardErrorBlock error={generateError} /> : null}
+        {generateError ? (
+          <GenerativeCardErrorBlock error={generateError} />
+        ) : null}
 
         {!generateError && (isGenerating || showHistoryIcon) ? (
           <StudioToolbar>
@@ -827,15 +819,20 @@ function StudioImageDetail({
       paused: true,
     });
 
-  const { uploading, canUpload, handleUploadClick, uploadConfirmDialog, fileInput } =
-    useStudioMediaUpload({
-      nodeId,
-      kind: "image",
-      prompt,
-      hasMedia: primaryImage != null,
-      isGenerating,
-      disabled,
-    });
+  const {
+    uploading,
+    canUpload,
+    handleUploadClick,
+    uploadConfirmDialog,
+    fileInput,
+  } = useStudioMediaUpload({
+    nodeId,
+    kind: "image",
+    prompt,
+    hasMedia: primaryImage != null,
+    isGenerating,
+    disabled,
+  });
 
   const canZoomImage =
     primaryImage != null &&
@@ -1024,15 +1021,20 @@ function StudioVideoDetail({
     dismissGenerativeCancelledNotice(nodeId);
   }, [nodeId]);
 
-  const { uploading, canUpload, handleUploadClick, uploadConfirmDialog, fileInput } =
-    useStudioMediaUpload({
-      nodeId,
-      kind: "video",
-      prompt,
-      hasMedia: primaryVideo != null,
-      isGenerating,
-      disabled,
-    });
+  const {
+    uploading,
+    canUpload,
+    handleUploadClick,
+    uploadConfirmDialog,
+    fileInput,
+  } = useStudioMediaUpload({
+    nodeId,
+    kind: "video",
+    prompt,
+    hasMedia: primaryVideo != null,
+    isGenerating,
+    disabled,
+  });
 
   const canViewVideo =
     primaryVideo != null &&
@@ -1224,15 +1226,20 @@ function StudioAudioDetail({
       paused: true,
     });
 
-  const { uploading, canUpload, handleUploadClick, uploadConfirmDialog, fileInput } =
-    useStudioMediaUpload({
-      nodeId,
-      kind: "audio",
-      prompt,
-      hasMedia: audios.length > 0,
-      isGenerating,
-      disabled,
-    });
+  const {
+    uploading,
+    canUpload,
+    handleUploadClick,
+    uploadConfirmDialog,
+    fileInput,
+  } = useStudioMediaUpload({
+    nodeId,
+    kind: "audio",
+    prompt,
+    hasMedia: audios.length > 0,
+    isGenerating,
+    disabled,
+  });
 
   const handleHistorySelect = useCallback(
     (id: string) => {
@@ -1322,7 +1329,9 @@ function StudioAudioDetail({
               : undefined
           }
         />
-        {generateError ? <GenerativeCardErrorBlock error={generateError} /> : null}
+        {generateError ? (
+          <GenerativeCardErrorBlock error={generateError} />
+        ) : null}
         {!generateError ? (
           <StudioToolbar>
             <StudioPrimaryDownload

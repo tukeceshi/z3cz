@@ -141,8 +141,6 @@ export function useCanvasMaintenance(): CanvasMaintenanceContextValue {
   return value;
 }
 
-export function useOptionalCanvasMaintenance():
-  | CanvasMaintenanceContextValue
-  | null {
+export function useOptionalCanvasMaintenance(): CanvasMaintenanceContextValue | null {
   return useContext(CanvasMaintenanceContext);
 }

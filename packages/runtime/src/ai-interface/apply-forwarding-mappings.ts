@@ -121,8 +121,8 @@ export function applyForwardingMappings(params: {
       source: params.sourceBody,
       sourcePath: mapping.sourcePath,
       collectMode: isTransformCollectAllValueType(upstreamParam.valueType)
-          ? (mapping.collectMode ?? "all")
-          : (mapping.collectMode ?? "first"),
+        ? (mapping.collectMode ?? "all")
+        : (mapping.collectMode ?? "first"),
     });
 
     const coerced = coerceForwardingValue(raw, upstreamParam.valueType);

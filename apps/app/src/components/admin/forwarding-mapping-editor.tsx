@@ -250,13 +250,14 @@ export function ForwardingMappingEditor(props: ForwardingMappingEditorProps) {
                   key={param.id}
                   className="grid grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)_minmax(0,1.4fr)_auto] items-center gap-2 border-b px-3 py-2 last:border-b-0"
                 >
-                  <span className="truncate font-mono text-sm">{param.name}</span>
+                  <span className="truncate font-mono text-sm">
+                    {param.name}
+                  </span>
                   <Badge variant="outline" className="w-fit">
                     {param.valueType}
                   </Badge>
                   <span className="text-muted-foreground truncate text-sm">
-                    {mappingLabel ??
-                      t("adminApiForwarding.mapping.unmapped")}
+                    {mappingLabel ?? t("adminApiForwarding.mapping.unmapped")}
                   </span>
                   <Button
                     type="button"

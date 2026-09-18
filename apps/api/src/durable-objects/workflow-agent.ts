@@ -55,9 +55,7 @@ import {
 } from "../services/workflow-public-broadcast";
 import type { SaveWorkflowRecord } from "../stores/workflow-store";
 import { WorkflowStore } from "../stores/workflow-store";
-import {
-  canEditWorkflows,
-} from "../utils/sub-account-permissions";
+import { canEditWorkflows } from "../utils/sub-account-permissions";
 import type { OrgMembershipContext } from "../middleware/org-permissions";
 import { readWsMembershipFromHeaders } from "../middleware/org-permissions";
 
@@ -116,7 +114,8 @@ function mergeConnectionState(
   connection: Connection,
   patch: ConnectionMembershipState
 ): void {
-  const current = (connection.state as ConnectionMembershipState | undefined) ?? {};
+  const current =
+    (connection.state as ConnectionMembershipState | undefined) ?? {};
   connection.setState({ ...current, ...patch });
 }
 
@@ -732,14 +731,10 @@ export class WorkflowAgent extends Agent<Bindings, WorkflowAgentState> {
     try {
       const instance = await this.env.EXECUTE.get(executionId);
       await instance.sendEvent(
-        buildMultiplexWorkflowSendEvent(
-          executionId,
-          `form-response-${token}`,
-          {
-            outputs: { response },
-            usage: 0,
-          }
-        )
+        buildMultiplexWorkflowSendEvent(executionId, `form-response-${token}`, {
+          outputs: { response },
+          usage: 0,
+        })
       );
       return { success: true };
     } catch (error) {

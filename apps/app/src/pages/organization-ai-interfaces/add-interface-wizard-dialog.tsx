@@ -135,7 +135,10 @@ export function AddInterfaceWizardDialog({
           <DialogTitle>
             {t("pages.aiInterfaces.addWizard.step0Title")}
             <span className="text-muted-foreground ml-2 text-sm font-normal">
-              {t("pages.aiInterfaces.addWizard.progress", { step: 1, total: 1 })}
+              {t("pages.aiInterfaces.addWizard.progress", {
+                step: 1,
+                total: 1,
+              })}
             </span>
           </DialogTitle>
         </DialogHeader>

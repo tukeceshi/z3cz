@@ -1,5 +1,8 @@
 import { useTranslation } from "@/components/locale-provider";
-import { CredentialPlainInput, CredentialSecretInput } from "@/components/credential-secret-input";
+import {
+  CredentialPlainInput,
+  CredentialSecretInput,
+} from "@/components/credential-secret-input";
 import { Label } from "@/components/ui/label";
 
 interface VolcanoCredentialFieldsProps {

@@ -86,14 +86,10 @@ class NodeFormStore {
 
     nodeWorkflowEventHub.sendEvent(
       executionId,
-      buildMultiplexWorkflowSendEvent(
-        executionId,
-        `form-response-${token}`,
-        {
-          outputs: { response },
-          usage: 0,
-        }
-      )
+      buildMultiplexWorkflowSendEvent(executionId, `form-response-${token}`, {
+        outputs: { response },
+        usage: 0,
+      })
     );
 
     return { success: true };

@@ -103,10 +103,7 @@ function AudioListSection({
 }) {
   return (
     <section className={cn(STUDIO_PANEL, "min-h-0 flex-1", className)}>
-      <SectionHeader
-        labelKey="workflow.canvas.aiAudio"
-        count={nodes.length}
-      />
+      <SectionHeader labelKey="workflow.canvas.aiAudio" count={nodes.length} />
       <div
         className={cn(STUDIO_LIST_BODY, STUDIO_SCROLL)}
         data-studio-list-scroll="audio"
@@ -263,7 +260,13 @@ export function CreativeStudioBoard({
   }
 
   return (
-    <div className={cn("flex h-full min-h-0", STUDIO_BOARD_GAP, STUDIO_BOARD_INSET)}>
+    <div
+      className={cn(
+        "flex h-full min-h-0",
+        STUDIO_BOARD_GAP,
+        STUDIO_BOARD_INSET
+      )}
+    >
       <AudioListSection
         nodes={nodesByType.audio}
         primaryNodeId={primaryNodeId}

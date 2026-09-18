@@ -10,9 +10,7 @@ import {
 
 describe("buildOpenAiMultimodalUserContent", () => {
   it("returns plain string when no media", () => {
-    expect(
-      buildOpenAiMultimodalUserContent({ prompt: "hello" })
-    ).toBe("hello");
+    expect(buildOpenAiMultimodalUserContent({ prompt: "hello" })).toBe("hello");
   });
 
   it("builds content parts with image and video urls", () => {

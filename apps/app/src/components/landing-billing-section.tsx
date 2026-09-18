@@ -33,13 +33,7 @@ import {
 } from "@dafthunk/types";
 import ChevronDown from "lucide-react/icons/chevron-down";
 import TriangleAlert from "lucide-react/icons/triangle-alert";
-import {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   landingMenuContentClass,
   landingMenuItemClass,

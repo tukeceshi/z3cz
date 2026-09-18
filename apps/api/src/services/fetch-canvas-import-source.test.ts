@@ -12,9 +12,11 @@ afterEach(() => {
 
 describe("parseCanvasImportSourceUrl", () => {
   it("accepts http and https", () => {
-    expect(parseCanvasImportSourceUrl("https://xj.quantv.com/api/canvas/public/featured/abc")).toEqual(
-      new URL("https://xj.quantv.com/api/canvas/public/featured/abc")
-    );
+    expect(
+      parseCanvasImportSourceUrl(
+        "https://xj.quantv.com/api/canvas/public/featured/abc"
+      )
+    ).toEqual(new URL("https://xj.quantv.com/api/canvas/public/featured/abc"));
     expect(parseCanvasImportSourceUrl("file:///etc/passwd")).toEqual({
       error: "只支持 http 或 https",
     });
@@ -28,10 +30,11 @@ describe("fetchCanvasImportSource", () => {
   it("returns parsed JSON", async () => {
     vi.stubGlobal(
       "fetch",
-      vi.fn(async () =>
-        new Response(JSON.stringify({ title: "色卡", graph: "{}" }), {
-          status: 200,
-        })
+      vi.fn(
+        async () =>
+          new Response(JSON.stringify({ title: "色卡", graph: "{}" }), {
+            status: 200,
+          })
       )
     );
     await expect(
@@ -45,7 +48,12 @@ describe("fetchCanvasImportSource", () => {
   it("rejects oversized payloads", async () => {
     vi.stubGlobal(
       "fetch",
-      vi.fn(async () => new Response("x".repeat(CANVAS_IMPORT_SOURCE_MAX_CHARS + 1), { status: 200 }))
+      vi.fn(
+        async () =>
+          new Response("x".repeat(CANVAS_IMPORT_SOURCE_MAX_CHARS + 1), {
+            status: 200,
+          })
+      )
     );
     await expect(
       fetchCanvasImportSource("https://example.com/canvas.json")

@@ -1,7 +1,11 @@
 import { validateJwtSecret } from "../auth/jwt-config";
 
 const INSECURE_SECRET_PREFIX = "dev-insecure-";
-const PLACEHOLDER_SECRETS = new Set(["CHANGE_ME", "your-secret-key", "development"]);
+const PLACEHOLDER_SECRETS = new Set([
+  "CHANGE_ME",
+  "your-secret-key",
+  "development",
+]);
 
 export function isRunningInDocker(): boolean {
   return process.env.CI === "true" || process.env.RUNTIME === "docker";
@@ -59,10 +63,14 @@ export function resolveSecret(
   const value = env[key];
   if (isStrictSecretsMode(env)) {
     if (isInsecureSecret(value)) {
-      throw new Error(`${key} is missing or insecure in Docker/production mode`);
+      throw new Error(
+        `${key} is missing or insecure in Docker/production mode`
+      );
     }
     return value ?? "";
   }
 
-  return isInsecureSecret(value) ? insecureFallback : (value ?? insecureFallback);
+  return isInsecureSecret(value)
+    ? insecureFallback
+    : (value ?? insecureFallback);
 }

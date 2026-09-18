@@ -21,7 +21,9 @@ const GENERATION_RESOLUTION_ORDER: readonly VideoResolutionOption[] = [
   "4k",
 ];
 
-function normalizeGenerationResolution(value: string): VideoResolutionOption | null {
+function normalizeGenerationResolution(
+  value: string
+): VideoResolutionOption | null {
   const normalized = value.trim().toLowerCase();
   if (normalized === "2k") {
     return "2k";
@@ -152,7 +154,9 @@ export function resolveRetakeAutoResolution(params: {
   if (fromSource) {
     return fromSource;
   }
-  const fallbackTier = normalizeGenerationResolution(params.modelFallback.trim());
+  const fallbackTier = normalizeGenerationResolution(
+    params.modelFallback.trim()
+  );
   return fallbackTier ?? "720p";
 }
 
@@ -195,7 +199,9 @@ export function isVideoRetakeResolutionMismatch(params: {
     return true;
   }
 
-  const selectedResolution = normalizeGenerationResolution(params.selected.trim());
+  const selectedResolution = normalizeGenerationResolution(
+    params.selected.trim()
+  );
   if (!selectedResolution) {
     return true;
   }

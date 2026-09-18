@@ -100,9 +100,8 @@ export function withGenerativeCardGenerateError(
   for (const key of LEGACY_GENERATE_ERROR_META_KEYS) {
     delete next[key];
   }
-  next[GENERATIVE_CARD_GENERATE_ERROR_META_KEY] = serializeGenerateErrorInput(
-    error
-  );
+  next[GENERATIVE_CARD_GENERATE_ERROR_META_KEY] =
+    serializeGenerateErrorInput(error);
   return next;
 }
 

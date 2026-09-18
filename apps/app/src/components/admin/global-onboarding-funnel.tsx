@@ -1,4 +1,7 @@
-import type { AdminStatsFunnel, OnboardingStage } from "@/services/admin-service";
+import type {
+  AdminStatsFunnel,
+  OnboardingStage,
+} from "@/services/admin-service";
 import { ONBOARDING_STAGES } from "@/services/admin-service";
 
 import { useTranslation } from "@/components/locale-provider";

@@ -88,7 +88,8 @@ export function AiNodeConfigPanel({ nodeId, data }: AiNodeConfigPanelProps) {
     isTextNode && !isInterfacesLoading && interfaces.length === 0;
   const hasAiInterfaces =
     isTextNode && !isInterfacesLoading && interfaces.length > 0;
-  const selectedInterfaceId = getInput("ai_interface_id") || DEFAULT_AI_INTERFACE;
+  const selectedInterfaceId =
+    getInput("ai_interface_id") || DEFAULT_AI_INTERFACE;
 
   return (
     <div
@@ -124,7 +125,9 @@ export function AiNodeConfigPanel({ nodeId, data }: AiNodeConfigPanelProps) {
 
         {hasAiInterfaces && (
           <div className="flex flex-col gap-1">
-            <Label className="text-xs text-muted-foreground">{t("workflow.aiPanel.aiInterface")}</Label>
+            <Label className="text-xs text-muted-foreground">
+              {t("workflow.aiPanel.aiInterface")}
+            </Label>
             <Select
               value={selectedInterfaceId}
               onValueChange={(value) =>
@@ -136,7 +139,9 @@ export function AiNodeConfigPanel({ nodeId, data }: AiNodeConfigPanelProps) {
               disabled={disabled}
             >
               <SelectTrigger className="h-7 text-xs">
-                <SelectValue placeholder={t("workflow.aiPanel.orgDefaultPlaceholder")} />
+                <SelectValue
+                  placeholder={t("workflow.aiPanel.orgDefaultPlaceholder")}
+                />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value={DEFAULT_AI_INTERFACE}>
@@ -156,7 +161,9 @@ export function AiNodeConfigPanel({ nodeId, data }: AiNodeConfigPanelProps) {
         {(hasAiInterfaces || !isTextNode) && (
           <div className="flex flex-col gap-1">
             <Label className="text-xs text-muted-foreground">
-              {isTextNode ? t("workflow.aiPanel.modelOverride") : t("workflow.aiPanel.model")}
+              {isTextNode
+                ? t("workflow.aiPanel.modelOverride")
+                : t("workflow.aiPanel.model")}
             </Label>
             <Input
               className="h-7 text-xs"
@@ -175,7 +182,9 @@ export function AiNodeConfigPanel({ nodeId, data }: AiNodeConfigPanelProps) {
         )}
 
         <div className="flex flex-col gap-1">
-          <Label className="text-xs text-muted-foreground">{t("workflow.aiPanel.prompt")}</Label>
+          <Label className="text-xs text-muted-foreground">
+            {t("workflow.aiPanel.prompt")}
+          </Label>
           <Textarea
             className="text-xs min-h-[60px] resize-none"
             placeholder={t("workflow.aiPanel.promptPlaceholder")}
@@ -187,7 +196,9 @@ export function AiNodeConfigPanel({ nodeId, data }: AiNodeConfigPanelProps) {
 
         {isImageNode && (
           <div className="flex flex-col gap-1">
-            <Label className="text-xs text-muted-foreground">{t("workflow.aiPanel.count")}</Label>
+            <Label className="text-xs text-muted-foreground">
+              {t("workflow.aiPanel.count")}
+            </Label>
             <Input
               type="number"
               className="h-7 text-xs w-20"
@@ -227,7 +238,9 @@ export function AiNodeConfigPanel({ nodeId, data }: AiNodeConfigPanelProps) {
               disabled={isRunning || disabled}
             >
               <PlayIcon className="h-3 w-3" />
-              {isRunning ? t("workflow.aiPanel.running") : t("workflow.aiPanel.run")}
+              {isRunning
+                ? t("workflow.aiPanel.running")
+                : t("workflow.aiPanel.run")}
             </Button>
           </div>
         )}

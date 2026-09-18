@@ -58,8 +58,7 @@ export function normalizeOrgModelInstanceConfig(
     ...(readTrimmedString(record.alias)
       ? { alias: readTrimmedString(record.alias) }
       : {}),
-    ...(record.capabilityLimits &&
-    typeof record.capabilityLimits === "object"
+    ...(record.capabilityLimits && typeof record.capabilityLimits === "object"
       ? {
           capabilityLimits:
             record.capabilityLimits as SingleModelCapabilityLimits,

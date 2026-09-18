@@ -73,9 +73,12 @@ describe("fetchWithUpstreamLog", () => {
   it("invokes sink with redacted request body", async () => {
     const sink = vi.fn();
     const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(
-      new Response(JSON.stringify({ id: "task-1", error: { message: "boom" } }), {
-        status: 400,
-      })
+      new Response(
+        JSON.stringify({ id: "task-1", error: { message: "boom" } }),
+        {
+          status: 400,
+        }
+      )
     );
 
     const response = await fetchWithUpstreamLog(

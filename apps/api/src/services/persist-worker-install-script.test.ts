@@ -73,8 +73,8 @@ describe("isLoopbackPersistWorkerApiBaseUrl", () => {
     expect(isLoopbackPersistWorkerApiBaseUrl("http://localhost:3101/api")).toBe(
       true
     );
-    expect(isLoopbackPersistWorkerApiBaseUrl("https://app.example.com/api")).toBe(
-      false
-    );
+    expect(
+      isLoopbackPersistWorkerApiBaseUrl("https://app.example.com/api")
+    ).toBe(false);
   });
 });

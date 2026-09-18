@@ -509,18 +509,17 @@ export abstract class Runtime<Env = unknown> {
         // ======================================================================
         // STEP 4: Execute workflow nodes via heartbeat or legacy graph scheduling
         // ======================================================================
-        const { state: finalState, record: finalRecord } =
-          this.supportsAsync
-            ? await this.executeWorkflowWithHeartbeat(
-                executionContext,
-                executionState,
-                executionRecord
-              )
-            : await this.executeWorkflowGraphLegacy(
-                executionContext,
-                executionState,
-                executionRecord
-              );
+        const { state: finalState, record: finalRecord } = this.supportsAsync
+          ? await this.executeWorkflowWithHeartbeat(
+              executionContext,
+              executionState,
+              executionRecord
+            )
+          : await this.executeWorkflowGraphLegacy(
+              executionContext,
+              executionState,
+              executionRecord
+            );
 
         executionState = finalState;
         executionRecord = finalRecord;
@@ -1396,7 +1395,10 @@ export abstract class Runtime<Env = unknown> {
       const result = await executable.execute(nodeContext);
 
       // Node signalled async work — return pending for the heartbeat to track
-      if (result.status === "pending" && (result.pendingEvent || result.pendingContinuation)) {
+      if (
+        result.status === "pending" &&
+        (result.pendingEvent || result.pendingContinuation)
+      ) {
         const eventType =
           result.pendingContinuation?.kind === "external_event"
             ? result.pendingContinuation.eventType

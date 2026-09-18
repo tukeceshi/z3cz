@@ -1,7 +1,4 @@
-﻿import type {
-  WorkflowTrigger,
-  WorkflowWithMetadata,
-} from "@dafthunk/types";
+﻿import type { WorkflowTrigger, WorkflowWithMetadata } from "@dafthunk/types";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router";
 
@@ -15,7 +12,10 @@ import { WorkflowBuilder } from "@/components/workflow/workflow-builder";
 import { CanvasThemeTip } from "@/components/workflow/canvas-theme-tip";
 import { readInitialViewportOneToOne } from "@/components/workflow/workflow-editor-navigation";
 import { WorkflowError } from "@/components/workflow/workflow-error";
-import { CanvasMaintenanceProvider, useCanvasMaintenance } from "@/contexts/canvas-maintenance-context";
+import {
+  CanvasMaintenanceProvider,
+  useCanvasMaintenance,
+} from "@/contexts/canvas-maintenance-context";
 import { getCanvasMaintenanceFrozen } from "@/lib/canvas-maintenance-freeze";
 import { useWorkflowMediaAddressCatalogInit } from "@/hooks/use-workflow-media-address-catalog-init";
 import { useEditableWorkflow } from "@/hooks/use-editable-workflow";
@@ -67,7 +67,10 @@ function EditorPageCanvas() {
   const appToast = useAppToast();
   const orgId = organization?.id || "";
   const { getOrgUrl } = useOrgUrl();
-  const mediaAddressCatalogReady = useWorkflowMediaAddressCatalogInit(orgId, id);
+  const mediaAddressCatalogReady = useWorkflowMediaAddressCatalogInit(
+    orgId,
+    id
+  );
   useOrganizationAiInterfaces(orgId || undefined);
 
   const [httpWorkflowMetadata, setHttpWorkflowMetadata] =

@@ -71,7 +71,9 @@ export function buildTextModelInvocationErrorParts(params: {
   const lines: string[] = [];
 
   if (interpretation) {
-    lines.push(locale === "zh" ? `解读：${interpretation}` : `Hint: ${interpretation}`);
+    lines.push(
+      locale === "zh" ? `解读：${interpretation}` : `Hint: ${interpretation}`
+    );
   }
   lines.push(raw);
   return lines;

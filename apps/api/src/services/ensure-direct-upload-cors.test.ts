@@ -1,9 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { TosCorsRule } from "../integrations/volcengine/tos-sdk-cors";
-import {
-  corsRulesAllowDirectUpload,
-} from "./ensure-direct-upload-cors";
+import { corsRulesAllowDirectUpload } from "./ensure-direct-upload-cors";
 
 describe("ensure-direct-upload-cors", () => {
   it("detects missing browser upload origins", () => {
@@ -17,9 +15,9 @@ describe("ensure-direct-upload-cors", () => {
       },
     ];
 
-    expect(
-      corsRulesAllowDirectUpload(rules, ["http://localhost:3101"])
-    ).toBe(false);
+    expect(corsRulesAllowDirectUpload(rules, ["http://localhost:3101"])).toBe(
+      false
+    );
   });
 
   it("accepts wildcard origins for direct upload", () => {
@@ -33,9 +31,9 @@ describe("ensure-direct-upload-cors", () => {
       },
     ];
 
-    expect(
-      corsRulesAllowDirectUpload(rules, ["http://localhost:3101"])
-    ).toBe(true);
+    expect(corsRulesAllowDirectUpload(rules, ["http://localhost:3101"])).toBe(
+      true
+    );
   });
 
   it("rejects rules missing GET for browser download", () => {
@@ -49,8 +47,8 @@ describe("ensure-direct-upload-cors", () => {
       },
     ];
 
-    expect(
-      corsRulesAllowDirectUpload(rules, ["http://localhost:3101"])
-    ).toBe(false);
+    expect(corsRulesAllowDirectUpload(rules, ["http://localhost:3101"])).toBe(
+      false
+    );
   });
 });

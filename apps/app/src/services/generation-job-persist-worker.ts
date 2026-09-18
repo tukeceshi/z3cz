@@ -177,7 +177,8 @@ async function downloadToAiStaging(params: {
         ? "audio/mpeg"
         : "image/png");
 
-  const resourceId = params.item.resourceId?.trim() || allocateGenerativeMediaResourceId();
+  const resourceId =
+    params.item.resourceId?.trim() || allocateGenerativeMediaResourceId();
   await writeGenerativeStagingWithResourceId({
     organizationId: params.organizationId,
     workflowId: params.workflowId ?? "uploads",
@@ -254,7 +255,10 @@ async function waitForJobReadyToPersist(params: {
   readonly shouldAbortJobPoll?: () => boolean;
 }): Promise<Awaited<ReturnType<typeof getGenerationJob>>> {
   while (true) {
-    const response = await getGenerationJob(params.organizationId, params.jobId);
+    const response = await getGenerationJob(
+      params.organizationId,
+      params.jobId
+    );
     throwIfTerminal(response.job);
 
     if (response.job.status === "succeeded") {
@@ -293,7 +297,10 @@ async function pollUntilJobSucceeded(params: {
   readonly onProgressPhase?: (phase: GenerativeProgressPhase) => void;
 }): Promise<Awaited<ReturnType<typeof getGenerationJob>>> {
   while (true) {
-    const response = await getGenerationJob(params.organizationId, params.jobId);
+    const response = await getGenerationJob(
+      params.organizationId,
+      params.jobId
+    );
     throwIfTerminal(response.job);
 
     if (response.job.status === "succeeded") {
@@ -436,9 +443,7 @@ export async function runGenerationJobPersistWorker(params: {
   }
 
   const onDownloadSlow =
-    ready.cloudAccelerationEnabled === true
-      ? params.onDownloadSlow
-      : undefined;
+    ready.cloudAccelerationEnabled === true ? params.onDownloadSlow : undefined;
 
   const stagedRefs: (ResourceIdReference | undefined)[] = [];
   const pendingResourceIds = pendingMediaResourceIds(pendingMedia);
@@ -467,7 +472,10 @@ export async function runGenerationJobPersistWorker(params: {
   let retryIntervalMs = MIN_RETRY_INTERVAL_MS;
 
   while (true) {
-    const response = await getGenerationJob(params.organizationId, params.jobId);
+    const response = await getGenerationJob(
+      params.organizationId,
+      params.jobId
+    );
     throwIfTerminal(response.job);
 
     if (response.job.status === "succeeded") {
@@ -481,10 +489,7 @@ export async function runGenerationJobPersistWorker(params: {
     }
 
     if (
-      shouldYieldClientPersistToServer(
-        response.job,
-        params.shouldAbortDownload
-      )
+      shouldYieldClientPersistToServer(response.job, params.shouldAbortDownload)
     ) {
       const serverMedia = await pollServerPersistUntilDone({
         organizationId: params.organizationId,
@@ -553,7 +558,10 @@ export async function runGenerationJobPersistWorker(params: {
       });
     }
 
-    if (downloadFailed || !allStagedRefsReady(stagedRefs, pendingMedia.length)) {
+    if (
+      downloadFailed ||
+      !allStagedRefsReady(stagedRefs, pendingMedia.length)
+    ) {
       await sleep(retryIntervalMs);
       retryIntervalMs = Math.min(
         Math.round(retryIntervalMs * 1.5),
@@ -680,8 +688,6 @@ export function workflowMediaWithCloudAccelerationStatus(
     return media;
   }
   return media.map((item) =>
-    "resourceId" in item
-      ? { ...item, cloudAccelerationStatus: status }
-      : item
+    "resourceId" in item ? { ...item, cloudAccelerationStatus: status } : item
   );
 }

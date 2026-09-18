@@ -37,7 +37,9 @@ export class CloudCatalogRegisterFailedError extends Error {
   }
 }
 
-export function requireStagingWorkflowId(workflowId: string | undefined): string {
+export function requireStagingWorkflowId(
+  workflowId: string | undefined
+): string {
   const trimmed = workflowId?.trim();
   if (!trimmed) {
     throw new Error("workflowId is required for media staging");
@@ -97,7 +99,8 @@ export async function uploadBlobToCloudStorage(params: {
   readonly resourceId?: string;
 }): Promise<CloudUploadResult> {
   const workflowId = requireStagingWorkflowId(params.workflowId);
-  const resourceId = params.resourceId?.trim() || allocateGenerativeMediaResourceId();
+  const resourceId =
+    params.resourceId?.trim() || allocateGenerativeMediaResourceId();
 
   await stageBlobForUpload({
     organizationId: params.organizationId,
@@ -158,7 +161,9 @@ export async function uploadBlobToCloudStorage(params: {
       throw error;
     }
     const message =
-      error instanceof Error ? error.message : "Failed to register cloud media resource";
+      error instanceof Error
+        ? error.message
+        : "Failed to register cloud media resource";
     throw new CloudCatalogRegisterFailedError(message);
   }
 
@@ -178,7 +183,8 @@ export async function uploadBlobToCloudWorkflow(params: {
   readonly resourceId?: string;
 }): Promise<WorkflowMediaValue> {
   requireStagingWorkflowId(params.workflowId);
-  const resourceId = params.resourceId?.trim() || allocateGenerativeMediaResourceId();
+  const resourceId =
+    params.resourceId?.trim() || allocateGenerativeMediaResourceId();
 
   try {
     const result = await uploadBlobToCloudStorage({

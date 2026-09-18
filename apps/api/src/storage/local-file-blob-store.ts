@@ -47,7 +47,10 @@ async function walkFiles(
   const targetDir = path.join(rootDir, prefix);
   const objects: BlobListResult["objects"][number][] = [];
 
-  async function walk(currentDir: string, relativePrefix: string): Promise<void> {
+  async function walk(
+    currentDir: string,
+    relativePrefix: string
+  ): Promise<void> {
     let entries: string[];
     try {
       entries = await fs.readdir(currentDir);

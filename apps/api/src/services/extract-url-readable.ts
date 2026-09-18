@@ -19,7 +19,7 @@ function decodeEntities(text: string): string {
     .replace(/&amp;/gi, "&")
     .replace(/&lt;/gi, "<")
     .replace(/&gt;/gi, ">")
-    .replace(/&quot;/gi, "\"")
+    .replace(/&quot;/gi, '"')
     .replace(/&#39;/g, "'")
     .replace(/&#(\d+);/g, (_, code: string) =>
       String.fromCharCode(Number(code))

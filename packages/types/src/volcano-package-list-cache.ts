@@ -1,4 +1,7 @@
-import type { VolcanoInterfaceMetadata, VolcanoPackageListCache } from "./volcano-snapshot";
+import type {
+  VolcanoInterfaceMetadata,
+  VolcanoPackageListCache,
+} from "./volcano-snapshot";
 
 export const VOLCANO_PACKAGE_LIST_CACHE_TTL_MS = 10 * 60 * 1000;
 /** Auto-fetch package list on panel expand when cache is older than this. */
@@ -43,7 +46,10 @@ export function shouldAutoRefreshPackageListOnExpand(
 export function readPackageListCache(
   metadata: VolcanoInterfaceMetadata | null | undefined
 ): VolcanoPackageListCache | null {
-  if (!metadata?.packageListCache || !Array.isArray(metadata.packageListCache.rows)) {
+  if (
+    !metadata?.packageListCache ||
+    !Array.isArray(metadata.packageListCache.rows)
+  ) {
     return null;
   }
   return metadata.packageListCache;
@@ -123,7 +129,9 @@ export function appendPackageListRefreshLog(
   metadata: VolcanoInterfaceMetadata,
   refreshedAt: string = new Date().toISOString()
 ): VolcanoInterfaceMetadata {
-  const pruned = prunePackageListRefreshLog(readPackageListRefreshLog(metadata));
+  const pruned = prunePackageListRefreshLog(
+    readPackageListRefreshLog(metadata)
+  );
   return {
     ...metadata,
     packageListRefreshLog: [...pruned, refreshedAt],
@@ -135,7 +143,9 @@ export function getPackageListNextRefreshAt(
 ): string {
   const fetchedAt = Date.parse(cache.fetchedAt);
   if (Number.isNaN(fetchedAt)) {
-    return new Date(Date.now() + VOLCANO_PACKAGE_LIST_CACHE_TTL_MS).toISOString();
+    return new Date(
+      Date.now() + VOLCANO_PACKAGE_LIST_CACHE_TTL_MS
+    ).toISOString();
   }
   return new Date(fetchedAt + VOLCANO_PACKAGE_LIST_CACHE_TTL_MS).toISOString();
 }

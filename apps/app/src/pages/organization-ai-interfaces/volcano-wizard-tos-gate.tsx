@@ -9,10 +9,7 @@ import {
   VolcanoTosNotOpenedGuide,
 } from "./volcano-tos-not-opened-guide";
 
-export type VolcanoWizardTosGateMode =
-  | "probing"
-  | "not_opened"
-  | "auth_error";
+export type VolcanoWizardTosGateMode = "probing" | "not_opened" | "auth_error";
 
 interface VolcanoWizardTosGateProps {
   readonly mode: VolcanoWizardTosGateMode;

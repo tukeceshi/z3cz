@@ -2,7 +2,11 @@ import { parseTosErrorResponse } from "./parse-tos-error";
 import { sha256Hex, signTosRequest } from "./tos-sign";
 import { TosRequestError } from "./tos-errors";
 
-function throwTosRequestError(httpStatus: number, body: string, action: string): never {
+function throwTosRequestError(
+  httpStatus: number,
+  body: string,
+  action: string
+): never {
   const parsed = parseTosErrorResponse(httpStatus, body);
   const detail = parsed.message ?? body.slice(0, 300);
   throw new TosRequestError({
@@ -94,9 +98,7 @@ export class VolcengineTosClient {
   private readonly endpoint: string;
   private readonly bucket: string | undefined;
 
-  constructor(
-    config: VolcengineTosCredentials & { readonly bucket?: string }
-  ) {
+  constructor(config: VolcengineTosCredentials & { readonly bucket?: string }) {
     this.credentials = {
       accessKeyId: config.accessKeyId,
       secretAccessKey: config.secretAccessKey,
@@ -119,9 +121,7 @@ export class VolcengineTosClient {
     readonly queryEntries?: readonly (readonly [string, string])[];
   }): Promise<Response> {
     const endpoint = params.endpoint ?? this.endpoint;
-    const payloadHash = params.body
-      ? await sha256Hex(params.body)
-      : undefined;
+    const payloadHash = params.body ? await sha256Hex(params.body) : undefined;
     const signed = await signTosRequest({
       method: params.method,
       endpoint,
@@ -333,7 +333,10 @@ export class VolcengineTosClient {
     readonly key: string;
     readonly mimeType: string;
     readonly contentLength: number;
-  }): Promise<{ readonly url: string; readonly headers: Record<string, string> }> {
+  }): Promise<{
+    readonly url: string;
+    readonly headers: Record<string, string>;
+  }> {
     const bucket = this.requireBucket();
     const { endpoint, path } = buildBucketObjectRequestPath(
       this.credentials.region,

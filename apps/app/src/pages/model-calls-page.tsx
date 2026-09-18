@@ -57,7 +57,9 @@ function ModelCallsPageContent() {
   const workflowsUrl = getOrgUrl("/workflows");
   const setBreadcrumbs = useBreadcrumbsSetter();
   const [page, setPage] = useState(1);
-  const [draftRange, setDraftRange] = useState<DateRange | undefined>(undefined);
+  const [draftRange, setDraftRange] = useState<DateRange | undefined>(
+    undefined
+  );
   const [appliedRange, setAppliedRange] = useState<DateRange | undefined>(
     undefined
   );
@@ -129,7 +131,9 @@ function ModelCallsPageContent() {
       {isLoading ? (
         <p className="text-sm text-muted-foreground">{t("common.loading")}</p>
       ) : invocations.length === 0 ? (
-        <p className="text-sm text-muted-foreground">{t("pages.modelCalls.empty")}</p>
+        <p className="text-sm text-muted-foreground">
+          {t("pages.modelCalls.empty")}
+        </p>
       ) : (
         <>
           <div className="space-y-2">
@@ -150,7 +154,9 @@ function ModelCallsPageContent() {
                   </p>
                 </div>
                 <div className="flex items-center gap-2">
-                  <Badge variant={invocationStatusBadgeVariant(invocation.status)}>
+                  <Badge
+                    variant={invocationStatusBadgeVariant(invocation.status)}
+                  >
                     {t(invocationStatusLabelKey(invocation.status))}
                   </Badge>
                   <Button

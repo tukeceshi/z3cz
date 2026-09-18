@@ -18,9 +18,7 @@ export async function startWorkflowExecution(
   params: RuntimeParams
 ): Promise<StartWorkflowExecutionResult> {
   if (params.workflow.runtime === "worker") {
-    const { createWorkerRuntime } = await import(
-      "./cloudflare-worker-runtime"
-    );
+    const { createWorkerRuntime } = await import("./cloudflare-worker-runtime");
     const execution = await (await createWorkerRuntime(env)).execute(params);
     return {
       executionId: execution.id,

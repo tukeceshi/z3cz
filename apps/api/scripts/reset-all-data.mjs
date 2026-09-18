@@ -79,9 +79,7 @@ function resolveDatabaseUrl() {
     return devVars.DATABASE_URL;
   }
 
-  throw new Error(
-    "DATABASE_URL is required (env var or apps/api/.dev.vars)"
-  );
+  throw new Error("DATABASE_URL is required (env var or apps/api/.dev.vars)");
 }
 
 async function main() {
@@ -91,7 +89,9 @@ async function main() {
   try {
     const tableList = TABLES.map((table) => `"${table}"`).join(", ");
     await sql.unsafe(`TRUNCATE TABLE ${tableList} RESTART IDENTITY CASCADE`);
-    console.log(`Truncated ${TABLES.length} tables. All users and data removed.`);
+    console.log(
+      `Truncated ${TABLES.length} tables. All users and data removed.`
+    );
   } finally {
     await sql.end({ timeout: 5 });
   }

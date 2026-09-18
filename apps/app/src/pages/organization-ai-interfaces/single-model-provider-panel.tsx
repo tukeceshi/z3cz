@@ -10,12 +10,12 @@ import { useMemo, useState } from "react";
 
 import { useTranslation } from "@/components/locale-provider";
 import { useAppToast } from "@/hooks/use-app-toast";
-import { updateSingleModelModelEnabled, updateSingleModelModelAlias } from "@/services/organization-ai-interface-service";
-
 import {
-  ApiChannelBadge,
-  InterfaceCardShell,
-} from "./interface-card-shell";
+  updateSingleModelModelEnabled,
+  updateSingleModelModelAlias,
+} from "@/services/organization-ai-interface-service";
+
+import { ApiChannelBadge, InterfaceCardShell } from "./interface-card-shell";
 import {
   SingleModelConfigDialog,
   SingleModelConnectionSummary,
@@ -112,23 +112,23 @@ export function SingleModelProviderPanel({
             onEdit={() => setConfigDialogOpen(true)}
           />
           <div className="columns-1 gap-3 md:columns-2">
-          {snapshot.models.map((row) => (
-            <div key={row.instanceId} className="mb-3 break-inside-avoid">
-              <SingleModelModelRow
-                row={row}
-                disabled={
-                  togglingId === row.instanceId ||
-                  aliasSavingId === row.instanceId
-                }
-                onEnabledChange={(enabled) =>
-                  void handleToggle(row.instanceId, enabled)
-                }
-                onAliasChange={(alias) =>
-                  void handleAliasChange(row.instanceId, alias)
-                }
-              />
-            </div>
-          ))}
+            {snapshot.models.map((row) => (
+              <div key={row.instanceId} className="mb-3 break-inside-avoid">
+                <SingleModelModelRow
+                  row={row}
+                  disabled={
+                    togglingId === row.instanceId ||
+                    aliasSavingId === row.instanceId
+                  }
+                  onEnabledChange={(enabled) =>
+                    void handleToggle(row.instanceId, enabled)
+                  }
+                  onAliasChange={(alias) =>
+                    void handleAliasChange(row.instanceId, alias)
+                  }
+                />
+              </div>
+            ))}
           </div>
         </div>
       </InterfaceCardShell>

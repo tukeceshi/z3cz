@@ -46,7 +46,8 @@ const featuredGraph = {
       x: 120,
       y: 20,
       meta: {
-        prompt: "@视频1 是原视频，@文本1 是文本提示词，@图片1 是第一套，@图片2 是第二套。",
+        prompt:
+          "@视频1 是原视频，@文本1 是文本提示词，@图片1 是第一套，@图片2 是第二套。",
         mediaUrl: "https://cdn.example/out.mp4",
         settings: { modelId: "cmqw6sb6a09dax5s3y8s6vxgo" },
       },
@@ -123,17 +124,20 @@ describe("adaptCanvasImportDocument", () => {
     expect(plan.nodes[1]?.prompt).toContain("模特@图片1");
     expect(plan.nodes[3]?.url).toBe("https://cdn.example/out.mp4");
     expect(plan.connections).toHaveLength(4);
-    expect(plan.skipped).toEqual([
-      "跳过 2 条便签",
-      "跳过分组",
-      "跳过对方模型",
-    ]);
+    expect(plan.skipped).toEqual(["跳过 2 条便签", "跳过分组", "跳过对方模型"]);
   });
 
   it("maps local nodes and connections", () => {
     const plan = adaptCanvasImportDocument({
       nodes: [
-        { id: "a", mode: "image", prompt: "猫", url: "https://cdn/a.png", x: 1, y: 2 },
+        {
+          id: "a",
+          mode: "image",
+          prompt: "猫",
+          url: "https://cdn/a.png",
+          x: 1,
+          y: 2,
+        },
         { id: "b", mode: "text", prompt: "文案" },
       ],
       connections: [{ from: "a", to: "b" }],
@@ -291,7 +295,10 @@ describe("rewritePromptImageMentions", () => {
   it("binds @图片N to connected image edges", () => {
     const map = imageMentionIndexMap(["edge-a", "edge-b"]);
     expect(
-      rewritePromptImageMentions("@图片1 是第一套，@图片2 是第二套，@图片9 仍保留", map)
+      rewritePromptImageMentions(
+        "@图片1 是第一套，@图片2 是第二套，@图片9 仍保留",
+        map
+      )
     ).toBe("{{ref:edge-a}} 是第一套，{{ref:edge-b}} 是第二套，@图片9 仍保留");
   });
 });

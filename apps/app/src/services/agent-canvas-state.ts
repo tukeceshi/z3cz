@@ -158,9 +158,7 @@ export interface AgentCapabilityHandlers {
     sourceUrl: string,
     mimeType: string
   ) => Promise<{ readonly ok: boolean; readonly error?: string }>;
-  readonly createGenerationFlow?: (
-    input: AgentGenerationFlowInput
-  ) => Promise<{
+  readonly createGenerationFlow?: (input: AgentGenerationFlowInput) => Promise<{
     readonly ok: boolean;
     readonly nodeId?: string;
     readonly error?: string;
@@ -168,9 +166,7 @@ export interface AgentCapabilityHandlers {
   readonly connectNodes?: (
     connections: readonly AgentConnectInput[]
   ) => Promise<{ readonly ok: boolean; readonly error?: string }>;
-  readonly writeNodes?: (
-    input: AgentWriteNodesInput
-  ) => Promise<{
+  readonly writeNodes?: (input: AgentWriteNodesInput) => Promise<{
     readonly ok: boolean;
     readonly nodes?: readonly AgentWriteNodesCreated[];
     readonly connected?: number;
@@ -402,10 +398,7 @@ export function toolCallFromFunctionArgs(
 }
 
 export function parseAgentToolCall(body: string): AgentToolCall {
-  const normalized = body
-    .replace(/\r\n/g, "\n")
-    .replace(/^\n+/, "")
-    .trimEnd();
+  const normalized = body.replace(/\r\n/g, "\n").replace(/^\n+/, "").trimEnd();
   const newlineAt = normalized.indexOf("\n");
   const rawName = (
     newlineAt < 0 ? normalized : normalized.slice(0, newlineAt)
@@ -445,7 +438,9 @@ function stringListFromUnknown(value: unknown): readonly string[] {
   if (!Array.isArray(value)) {
     return [];
   }
-  return value.filter((item): item is string => typeof item === "string" && item.trim().length > 0);
+  return value.filter(
+    (item): item is string => typeof item === "string" && item.trim().length > 0
+  );
 }
 
 function parseGenerationFlowInput(
@@ -608,7 +603,9 @@ function stageUrlFromCall(call: AgentToolCall): {
 } {
   const record = readJsonRecord(call.payload);
   const url =
-    typeof record?.url === "string" ? record.url.trim() : labeledOnly(call.payload, "url");
+    typeof record?.url === "string"
+      ? record.url.trim()
+      : labeledOnly(call.payload, "url");
   const mimeType =
     typeof record?.mimeType === "string"
       ? record.mimeType.trim()
@@ -621,7 +618,9 @@ function parseReadUrlInput(
 ): { readonly url: string } | { readonly error: string } {
   const record = readJsonRecord(payload);
   const url =
-    typeof record?.url === "string" ? record.url.trim() : labeledOnly(payload, "url");
+    typeof record?.url === "string"
+      ? record.url.trim()
+      : labeledOnly(payload, "url");
   if (!url) {
     return { error: "缺少 url" };
   }
@@ -647,7 +646,9 @@ function RemotionRoot() {
   );
 }`;
 
-function actionFromLegacyRemotionName(name: string): SimpleAnimationAction | undefined {
+function actionFromLegacyRemotionName(
+  name: string
+): SimpleAnimationAction | undefined {
   if (name === REMOTION_GET_TOOL) {
     return "get";
   }
@@ -663,10 +664,12 @@ function actionFromLegacyRemotionName(name: string): SimpleAnimationAction | und
   return undefined;
 }
 
-function simpleAnimationCall(call: AgentToolCall): {
-  readonly action: SimpleAnimationAction;
-  readonly source: string;
-} | undefined {
+function simpleAnimationCall(call: AgentToolCall):
+  | {
+      readonly action: SimpleAnimationAction;
+      readonly source: string;
+    }
+  | undefined {
   const legacy = actionFromLegacyRemotionName(call.name);
   if (legacy) {
     return { action: legacy, source: call.payload };

@@ -35,7 +35,11 @@ export interface ModelResolution<T extends OrgModelBindingRef> {
 export type ModelCardState<T extends OrgModelBindingRef> =
   | { readonly status: "loading" }
   | { readonly status: "pick" }
-  | { readonly status: "ready"; readonly model: T; readonly source: ModelResolutionSource };
+  | {
+      readonly status: "ready";
+      readonly model: T;
+      readonly source: ModelResolutionSource;
+    };
 
 export function readModelSelectionRecord(params: {
   readonly modelId: string;
@@ -107,13 +111,13 @@ export function pickFirstSelectableModelBinding<T extends OrgModelBindingRef>(
 export const pickPreviewModelBinding = pickFirstSelectableModelBinding;
 
 /** Layer A: resolve effective model from node, workflow default, or list order. */
-export function resolveEffectiveGenerativeModel<T extends OrgModelBindingRef>(
-  params: {
-    readonly nodeBinding: ModelSelectionRecord | undefined;
-    readonly workflowDefault: ModelBindingRef | undefined;
-    readonly models: readonly T[];
-  }
-): ModelResolution<T> | undefined {
+export function resolveEffectiveGenerativeModel<
+  T extends OrgModelBindingRef,
+>(params: {
+  readonly nodeBinding: ModelSelectionRecord | undefined;
+  readonly workflowDefault: ModelBindingRef | undefined;
+  readonly models: readonly T[];
+}): ModelResolution<T> | undefined {
   const { nodeBinding, workflowDefault, models } = params;
 
   if (nodeBinding) {

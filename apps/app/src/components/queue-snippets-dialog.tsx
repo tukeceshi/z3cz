@@ -32,9 +32,7 @@ export function QueueSnippetsDialog({
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-2xl overflow-hidden">
         <DialogHeader>
-          <DialogTitle>
-            {queueName || t("pages.queues.untitled")}
-          </DialogTitle>
+          <DialogTitle>{queueName || t("pages.queues.untitled")}</DialogTitle>
           <DialogDescription>
             {t("pages.queues.snippets.description")}
           </DialogDescription>

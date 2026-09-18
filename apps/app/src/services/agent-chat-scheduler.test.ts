@@ -171,7 +171,7 @@ describe("parseAskQuestionArgs", () => {
     });
     expect(
       parseAskQuestionArgs(
-        "您希望动画使用哪些素材？\n选项: [\"视频1+图片1\", \"仅视频1\", \"仅图片1\"]"
+        '您希望动画使用哪些素材？\n选项: ["视频1+图片1", "仅视频1", "仅图片1"]'
       )
     ).toEqual({
       prompt: "您希望动画使用哪些素材？",
@@ -262,10 +262,7 @@ describe("parseAskQuestionArgs", () => {
 
   it("falls back to talk then a prompt with no options", () => {
     expect(
-      pendingAskFromTool(
-        "",
-        "你想做哪种？\n- 文字动画\n- 图片转动画"
-      )
+      pendingAskFromTool("", "你想做哪种？\n- 文字动画\n- 图片转动画")
     ).toEqual({
       prompt: "你想做哪种？",
       options: [
@@ -401,33 +398,37 @@ describe("buildMainSchedulerMessages", () => {
       EVENT_JUDGMENT_REMINDER,
       "<user_query>\n制作简易动画\n</user_query>",
     ]);
-    expect(messages.some((message) => message.content === AGENT_CANVAS_IDENTITY)).toBe(
-      false
-    );
-    expect(messages.some((message) => message.content === "画布清单：\n- n1")).toBe(
-      false
-    );
+    expect(
+      messages.some((message) => message.content === AGENT_CANVAS_IDENTITY)
+    ).toBe(false);
+    expect(
+      messages.some((message) => message.content === "画布清单：\n- n1")
+    ).toBe(false);
     expect(messages[0]?.content).toBe(buildAgentMainInstruction("ask"));
     expect(messages[0]?.content).toBe(buildAgentMainInstruction("real"));
     expect(AGENT_IDENTITY).toContain("不要在正文里写调用");
     expect(AGENT_CANVAS_IDENTITY).toContain("没改过别反复取");
-    expect(messages.some((message) => message.content.includes("<<<THINK>>>"))).toBe(
-      false
-    );
+    expect(
+      messages.some((message) => message.content.includes("<<<THINK>>>"))
+    ).toBe(false);
     expect(messages.some((message) => message.content.includes("from:"))).toBe(
       false
     );
-    expect(messages.some((message) => message.content.includes("<canvas_skill>"))).toBe(
-      false
-    );
-    expect(messages.some((message) => message.content.includes("startLine:endLine"))).toBe(
-      false
-    );
+    expect(
+      messages.some((message) => message.content.includes("<canvas_skill>"))
+    ).toBe(false);
+    expect(
+      messages.some((message) => message.content.includes("startLine:endLine"))
+    ).toBe(false);
     expect(messages[0]?.content).not.toContain("enter_draft");
     expect(buildModeSystemReminder("ask")).not.toContain("enter_draft");
     expect(buildModeSystemReminder("ask")).not.toContain("草案");
-    expect(buildModeSystemReminder("draft")).toBe(buildModeSystemReminder("ask"));
-    expect(buildModeSystemReminder("real")).toBe(buildModeSystemReminder("ask"));
+    expect(buildModeSystemReminder("draft")).toBe(
+      buildModeSystemReminder("ask")
+    );
+    expect(buildModeSystemReminder("real")).toBe(
+      buildModeSystemReminder("ask")
+    );
     expect(buildModeSystemReminder("ask")).not.toContain("SIDE");
     expect(buildModeSystemReminder("ask")).toContain("先说清楚做什么");
     expect(buildModeSystemReminder("ask")).toContain("再调工具");
@@ -505,9 +506,9 @@ describe("buildMainSchedulerMessages", () => {
         lastRound: true,
       }
     );
-    expect(messages.some((message) => message.content === LAST_ROUND_REMINDER)).toBe(
-      true
-    );
+    expect(
+      messages.some((message) => message.content === LAST_ROUND_REMINDER)
+    ).toBe(true);
     expect(
       messages.some((message) => message.content === EVENT_JUDGMENT_REMINDER)
     ).toBe(false);
@@ -524,9 +525,9 @@ describe("buildMainSchedulerMessages", () => {
         previousEvent: previous,
       }
     );
-    expect(messages.some((message) => message.content === EVENT_JUDGMENT_REMINDER)).toBe(
-      false
-    );
+    expect(
+      messages.some((message) => message.content === EVENT_JUDGMENT_REMINDER)
+    ).toBe(false);
     expect(
       messages.some(
         (message) => message.content === buildEventFollowupReminder(previous)
@@ -545,25 +546,23 @@ describe("buildMainSchedulerMessages", () => {
         planDocument: "先改片头",
       }
     );
-    expect(messages.some((message) => message.content.includes("<canvas_draft>"))).toBe(
-      false
-    );
-    expect(messages.some((message) => message.content.includes("先改片头"))).toBe(
-      false
-    );
+    expect(
+      messages.some((message) => message.content.includes("<canvas_draft>"))
+    ).toBe(false);
+    expect(
+      messages.some((message) => message.content.includes("先改片头"))
+    ).toBe(false);
     expect(messages.at(-2)).toEqual({
       role: "assistant",
       content: "",
-      toolCalls: [
-        { id: "prior-1", name: "tool-1", arguments: "" },
-      ],
+      toolCalls: [{ id: "prior-1", name: "tool-1", arguments: "" }],
     });
     expect(messages.at(-1)?.role).toBe("tool");
     expect(messages.at(-1)?.content).toBe("画布是空的");
     expect(messages.at(-1)?.toolCallId).toBe("prior-1");
-    expect(messages.some((message) => message.content.includes("<user_query>"))).toBe(
-      true
-    );
+    expect(
+      messages.some((message) => message.content.includes("<user_query>"))
+    ).toBe(true);
   });
 
   it("pairs tool results with the matching assistant call", () => {
@@ -600,9 +599,7 @@ describe("buildMainSchedulerMessages", () => {
 
 describe("parseEventJudgment", () => {
   it("reads title and ended, and drops those lines from talk", () => {
-    expect(
-      parseEventJudgment("先改字号\n事件：片头\n结束：否")
-    ).toEqual({
+    expect(parseEventJudgment("先改字号\n事件：片头\n结束：否")).toEqual({
       title: "片头",
       ended: false,
       judged: true,
@@ -650,12 +647,16 @@ describe("toolsForRequest", () => {
     expect(ask).not.toContain(ENTER_DRAFT_TOOL);
     const draft = toolsForRequest("draft").map((tool) => tool.function.name);
     expect(draft).toEqual(ask);
-    expect(toolsForRequest("real").map((tool) => tool.function.name)).toEqual(ask);
+    expect(toolsForRequest("real").map((tool) => tool.function.name)).toEqual(
+      ask
+    );
     expect(
       toolsForRequest("ask", { canvas: true }).map((tool) => tool.function.name)
     ).toContain("canvas_get_state");
     expect(
-      toolsForRequest("ask", { animation: true }).map((tool) => tool.function.name)
+      toolsForRequest("ask", { animation: true }).map(
+        (tool) => tool.function.name
+      )
     ).toContain(SIMPLE_ANIMATION_TOOL);
   });
 });
@@ -807,7 +808,11 @@ describe("runAgentScheduler", () => {
       )
     ).toBe(true);
     expect(toolNames).toEqual([CANVAS_GET_STATE_TOOL]);
-    expect(toolLists[0]).toEqual([READ_URL_TOOL, SCHEDULE_ROLE_TOOL, ASK_QUESTION_TOOL]);
+    expect(toolLists[0]).toEqual([
+      READ_URL_TOOL,
+      SCHEDULE_ROLE_TOOL,
+      ASK_QUESTION_TOOL,
+    ]);
   });
 
   it("stores tool output on the saved answer", async () => {
@@ -984,7 +989,11 @@ describe("runAgentScheduler", () => {
         return {
           text: `第${toolSteps}步`,
           toolCalls: [
-            { id: `call-${toolSteps}`, name: CANVAS_GET_STATE_TOOL, arguments: "" },
+            {
+              id: `call-${toolSteps}`,
+              name: CANVAS_GET_STATE_TOOL,
+              arguments: "",
+            },
           ],
           stopped: false,
         };
@@ -1031,7 +1040,11 @@ describe("runAgentScheduler", () => {
         return {
           text: "做",
           toolCalls: [
-            { id: `call-${streamCalls}`, name: CANVAS_GET_STATE_TOOL, arguments: "" },
+            {
+              id: `call-${streamCalls}`,
+              name: CANVAS_GET_STATE_TOOL,
+              arguments: "",
+            },
           ],
           stopped: false,
         };
@@ -1045,7 +1058,9 @@ describe("runAgentScheduler", () => {
     expect(toolCalls).toBe(3);
     expect(streamCalls).toBe(4);
     expect(lastRoundTools).toBe(0);
-    expect(splitSavedAssistantContent(result.content).talk).toBe("做\n做\n做\n做完了");
+    expect(splitSavedAssistantContent(result.content).talk).toBe(
+      "做\n做\n做\n做完了"
+    );
   });
 
   it("strips event lines from a natural stop", async () => {
@@ -1105,7 +1120,9 @@ describe("runAgentScheduler", () => {
       initialToolResults: ['{"nodes":[]}'],
       stream: async (messages) => {
         lastRoles.push(messages.at(-1)?.role ?? "");
-        lastContents.push(messages.map((message) => message.content).join("\n"));
+        lastContents.push(
+          messages.map((message) => message.content).join("\n")
+        );
         return {
           text: "画布是空的",
           stopped: false,
@@ -1179,8 +1196,9 @@ describe("runAgentScheduler", () => {
         { role: "assistant", content: saved },
       ],
       stream: async (messages) => {
-        toolMessages = messages.filter((message) => message.role === "tool")
-          .length;
+        toolMessages = messages.filter(
+          (message) => message.role === "tool"
+        ).length;
         return { text: "好", stopped: false };
       },
       runTool: async () => {
@@ -1238,7 +1256,11 @@ describe("runAgentScheduler", () => {
     expect(seen[0]).toBe("");
     expect(seen[1]).toBe("画布清单：空");
     expect(seen[2]).toContain("新的");
-    expect(toolLists[0]).toEqual([READ_URL_TOOL, SCHEDULE_ROLE_TOOL, ASK_QUESTION_TOOL]);
+    expect(toolLists[0]).toEqual([
+      READ_URL_TOOL,
+      SCHEDULE_ROLE_TOOL,
+      ASK_QUESTION_TOOL,
+    ]);
     expect(toolLists[1]).toContain("canvas_get_state");
     expect(toolLists[1]).not.toContain(SIMPLE_ANIMATION_TOOL);
   });
@@ -1335,15 +1357,19 @@ describe("runAgentScheduler", () => {
       },
       onAssistantContent: () => undefined,
     });
-    expect(toolLists[0]).toEqual([READ_URL_TOOL, SCHEDULE_ROLE_TOOL, ASK_QUESTION_TOOL]);
+    expect(toolLists[0]).toEqual([
+      READ_URL_TOOL,
+      SCHEDULE_ROLE_TOOL,
+      ASK_QUESTION_TOOL,
+    ]);
     expect(toolLists[1]).toContain(SIMPLE_ANIMATION_TOOL);
     expect(toolLists[1]).not.toContain("canvas_get_state");
-    expect(identities[0]?.some((text) => text === AGENT_ANIMATION_IDENTITY)).toBe(
-      false
-    );
-    expect(identities[1]?.some((text) => text === AGENT_ANIMATION_IDENTITY)).toBe(
-      true
-    );
+    expect(
+      identities[0]?.some((text) => text === AGENT_ANIMATION_IDENTITY)
+    ).toBe(false);
+    expect(
+      identities[1]?.some((text) => text === AGENT_ANIMATION_IDENTITY)
+    ).toBe(true);
     expect(identities[1]?.some((text) => text.includes("<canvas_skill>"))).toBe(
       true
     );

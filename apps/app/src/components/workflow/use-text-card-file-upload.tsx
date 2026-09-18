@@ -18,7 +18,10 @@ import {
   withGenerativePromptCleared,
 } from "./generative-card-upload-utils";
 import { readTextCardUploadFile } from "./read-text-card-upload-file";
-import { canTextCardUpload, TEXT_CARD_UPLOAD_ACCEPT } from "./text-card-upload-utils";
+import {
+  canTextCardUpload,
+  TEXT_CARD_UPLOAD_ACCEPT,
+} from "./text-card-upload-utils";
 import type { WorkflowNodeType } from "./workflow-types";
 
 interface UseTextCardFileUploadParams {

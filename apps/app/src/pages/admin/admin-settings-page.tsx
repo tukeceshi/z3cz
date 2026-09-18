@@ -114,7 +114,9 @@ export function AdminSettingsPage() {
             <p className="text-xs font-medium text-muted-foreground">
               {t("siteSettings.preview")}
             </p>
-            <p className="mt-1 text-lg font-semibold">{siteName || siteSettings.siteName}</p>
+            <p className="mt-1 text-lg font-semibold">
+              {siteName || siteSettings.siteName}
+            </p>
             <p className="text-sm text-muted-foreground">
               {siteTagline || siteSettings.siteTagline}
             </p>
@@ -137,7 +139,9 @@ export function AdminSettingsPage() {
             </div>
 
             <div className="grid gap-2">
-              <Label htmlFor="siteTagline">{t("siteSettings.siteTagline")}</Label>
+              <Label htmlFor="siteTagline">
+                {t("siteSettings.siteTagline")}
+              </Label>
               <Input
                 id="siteTagline"
                 value={siteTagline}
@@ -217,7 +221,9 @@ export function AdminSettingsPage() {
                 <Textarea
                   id="maintenanceMessage"
                   value={maintenanceMessage}
-                  onChange={(event) => setMaintenanceMessage(event.target.value)}
+                  onChange={(event) =>
+                    setMaintenanceMessage(event.target.value)
+                  }
                   placeholder={t("siteSettings.maintenanceMessagePlaceholder")}
                   rows={4}
                 />

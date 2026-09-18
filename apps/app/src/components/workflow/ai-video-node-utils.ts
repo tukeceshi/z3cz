@@ -20,9 +20,16 @@ import {
   type MediaResourceKind,
   type WorkflowMediaValue,
 } from "@dafthunk/types";
-import type { Edge as ReactFlowEdge, Node as ReactFlowNode } from "@xyflow/react";
+import type {
+  Edge as ReactFlowEdge,
+  Node as ReactFlowNode,
+} from "@xyflow/react";
 
-import type { NodeType, WorkflowNodeType, WorkflowParameter } from "./workflow-types";
+import type {
+  NodeType,
+  WorkflowNodeType,
+  WorkflowParameter,
+} from "./workflow-types";
 import {
   AI_GENERATIVE_PANEL_HEIGHT_PX,
   AI_GENERATIVE_PANEL_PROMPT_MIN_HEIGHT_PX,
@@ -56,9 +63,7 @@ import {
 import { resolveRetakePrimaryVideoRef } from "./ai-video-retake-primary-ref";
 import type { WorkflowEdgeType } from "./workflow-types";
 
-import {
-  AI_VIDEO_EMPTY_CARD_SIZE,
-} from "./media-card-size";
+import { AI_VIDEO_EMPTY_CARD_SIZE } from "./media-card-size";
 
 export const AI_VIDEO_REFERENCE_HANDLE_ID = "reference_images" as const;
 export const AI_VIDEO_PROMPT_HANDLE_ID = "prompt_reference" as const;
@@ -233,7 +238,9 @@ export function readAiVideoResult(
     return fromInputVideos;
   }
 
-  const fromOutput = outputs?.find((output) => output.id === AI_VIDEO_OUTPUT_ID);
+  const fromOutput = outputs?.find(
+    (output) => output.id === AI_VIDEO_OUTPUT_ID
+  );
   return parseWorkflowMediaValues(fromOutput?.value);
 }
 
@@ -252,21 +259,22 @@ export function readAiVideoResultHistory(
     selectedId?: unknown;
   };
   const rawItems = Array.isArray(record.items)
-    ? record.items.filter(
-        (entry): entry is AiVideoResultHistoryItem =>
-          !!entry &&
-          typeof entry === "object" &&
-          typeof (entry as AiVideoResultHistoryItem).id === "string" &&
-          Array.isArray((entry as AiVideoResultHistoryItem).videos) &&
-          typeof (entry as AiVideoResultHistoryItem).createdAt === "string"
-      )
-      .map((entry) => {
-        const item = entry as AiVideoResultHistoryItem & { prompt?: string };
-        return {
-          ...item,
-          prompt: typeof item.prompt === "string" ? item.prompt : "",
-        };
-      })
+    ? record.items
+        .filter(
+          (entry): entry is AiVideoResultHistoryItem =>
+            !!entry &&
+            typeof entry === "object" &&
+            typeof (entry as AiVideoResultHistoryItem).id === "string" &&
+            Array.isArray((entry as AiVideoResultHistoryItem).videos) &&
+            typeof (entry as AiVideoResultHistoryItem).createdAt === "string"
+        )
+        .map((entry) => {
+          const item = entry as AiVideoResultHistoryItem & { prompt?: string };
+          return {
+            ...item,
+            prompt: typeof item.prompt === "string" ? item.prompt : "",
+          };
+        })
     : [];
 
   const items = splitHistoryMediaRows({
@@ -379,10 +387,14 @@ function readRetakePanelCardDisplay(params: {
   if (showGenerated) {
     const history = readAiVideoResultHistory(params.inputs);
     if (history.selectedId) {
-      return readGenerativeCardCoverFromHistory(history, (item) => item.videos, {
-        metadata: params.metadata,
-        isModalityGenerating: isAiVideoGenerating(params.metadata),
-      });
+      return readGenerativeCardCoverFromHistory(
+        history,
+        (item) => item.videos,
+        {
+          metadata: params.metadata,
+          isModalityGenerating: isAiVideoGenerating(params.metadata),
+        }
+      );
     }
     const fallback = readAiVideoResult(params.inputs, params.outputs);
     const cardPhase = resolveGenerativeCardPhase(
@@ -402,9 +414,7 @@ function readRetakePanelCardDisplay(params: {
   }
 
   const sourceMedia =
-    params.context?.nodeId &&
-    params.context.edges &&
-    params.context.nodes
+    params.context?.nodeId && params.context.edges && params.context.nodes
       ? resolveRetakePrimaryVideoRef({
           targetNodeId: params.context.nodeId,
           edges: params.context.edges,
@@ -448,7 +458,11 @@ export function readAiVideoCardDisplay(
     if (manual.length > 0) {
       const generating = isAiVideoGenerating(metadata);
       const progressPhase = readGenerativeProgressPhase(metadata);
-      const cardPhase = resolveGenerativeCardPhase(metadata, manual, generating);
+      const cardPhase = resolveGenerativeCardPhase(
+        metadata,
+        manual,
+        generating
+      );
       return {
         coverMedia: manual,
         isBusy:
@@ -515,7 +529,8 @@ export function readAiVideoCardPrimaryVideo(
   metadata?: Record<string, string>,
   context?: ReadAiVideoCardDisplayContext
 ): WorkflowMediaValue | undefined {
-  return readAiVideoCardDisplay(inputs, outputs, metadata, context).coverMedia[0];
+  return readAiVideoCardDisplay(inputs, outputs, metadata, context)
+    .coverMedia[0];
 }
 
 export function withAiVideoManualUpload(
@@ -528,7 +543,12 @@ export function withAiVideoManualUpload(
     [...videos],
     "json"
   );
-  inputs = upsertInputValue(inputs, AI_VIDEO_RESULT_INPUT_ID, [...videos], "json");
+  inputs = upsertInputValue(
+    inputs,
+    AI_VIDEO_RESULT_INPUT_ID,
+    [...videos],
+    "json"
+  );
 
   const outputs = current.outputs.map((output) =>
     output.id === AI_VIDEO_OUTPUT_ID
@@ -617,17 +637,19 @@ export function appendAiVideoGeneratedHistoryItems(
 
   const createdAt = new Date().toISOString();
   const batchId = Date.now();
-  const newItems: AiVideoResultHistoryItem[] = storedVideos.map((video, index) => ({
-    id: `gen-${batchId}-${index}-${Math.random().toString(36).slice(2, 8)}`,
-    videos: [video],
-    prompt: meta?.prompt ?? "",
-    params: meta?.params,
-    platformModelId: meta?.platformModelId,
-    aiInterfaceId: meta?.aiInterfaceId,
-    providerModelId: meta?.providerModelId,
-    modelDisplayName: meta?.modelDisplayName,
-    createdAt,
-  }));
+  const newItems: AiVideoResultHistoryItem[] = storedVideos.map(
+    (video, index) => ({
+      id: `gen-${batchId}-${index}-${Math.random().toString(36).slice(2, 8)}`,
+      videos: [video],
+      prompt: meta?.prompt ?? "",
+      params: meta?.params,
+      platformModelId: meta?.platformModelId,
+      aiInterfaceId: meta?.aiInterfaceId,
+      providerModelId: meta?.providerModelId,
+      modelDisplayName: meta?.modelDisplayName,
+      createdAt,
+    })
+  );
   const primary = newItems[0]!;
   const nextHistory: AiVideoResultHistory = {
     items: [...newItems, ...history.items].slice(0, AI_VIDEO_MAX_HISTORY_ITEMS),
@@ -770,10 +792,11 @@ export function withAiVideoResourcesMarkedFailed(
     nextHistory,
     "json"
   );
-  const resultVideos = readAiVideoResult(inputs, current.outputs).map((video) =>
-    isResourceIdReference(video) && ids.has(video.resourceId)
-      ? markResourceRefFailed(video)
-      : video
+  const resultVideos = readAiVideoResult(inputs, current.outputs).map(
+    (video) =>
+      isResourceIdReference(video) && ids.has(video.resourceId)
+        ? markResourceRefFailed(video)
+        : video
   );
   return withAiVideoResult(current, resultVideos, { inputs });
 }
@@ -811,16 +834,18 @@ export function withAiVideoResourceGeneratingCleared(
     nextHistory,
     "json"
   );
-  const resultVideos = readAiVideoResult(inputs, current.outputs).map((video) => {
-    if (
-      isResourceIdReference(video) &&
-      video.generating &&
-      ids.has(video.resourceId)
-    ) {
-      return stripGeneratingFlag(video);
+  const resultVideos = readAiVideoResult(inputs, current.outputs).map(
+    (video) => {
+      if (
+        isResourceIdReference(video) &&
+        video.generating &&
+        ids.has(video.resourceId)
+      ) {
+        return stripGeneratingFlag(video);
+      }
+      return video;
     }
-    return video;
-  });
+  );
   return withAiVideoResult(current, resultVideos, { inputs });
 }
 
@@ -979,7 +1004,10 @@ export function countAiVideoReferenceCountsForNode(
   targetNodeData?: Pick<WorkflowNodeType, "metadata">
 ): SubmitAiVideoMediaReferenceCounts {
   const counts = countAiVideoReferenceCounts(targetNodeId, edges, nodes);
-  if (!isAiVideoRetakePanel(targetNodeData?.metadata) || counts.videoCount > 0) {
+  if (
+    !isAiVideoRetakePanel(targetNodeData?.metadata) ||
+    counts.videoCount > 0
+  ) {
     return counts;
   }
   // Empty retake still occupies the primary source slot for model-limit checks.
@@ -1057,8 +1085,7 @@ export function isAiVideoReferenceTarget(
   handleId: string | null | undefined
 ): boolean {
   return (
-    nodeType === AI_VIDEO_NODE_TYPE &&
-    handleId === AI_VIDEO_REFERENCE_HANDLE_ID
+    nodeType === AI_VIDEO_NODE_TYPE && handleId === AI_VIDEO_REFERENCE_HANDLE_ID
   );
 }
 

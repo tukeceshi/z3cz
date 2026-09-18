@@ -2,10 +2,7 @@ import type { AppLocale, NodeType } from "@dafthunk/types";
 
 import { nodeLabelsZh } from "@/i18n/locales/zh/nodes";
 
-export function localizeNodeType(
-  node: NodeType,
-  locale: AppLocale
-): NodeType {
+export function localizeNodeType(node: NodeType, locale: AppLocale): NodeType {
   if (locale !== "zh") return node;
 
   const labels = nodeLabelsZh[node.type];
@@ -17,13 +14,11 @@ export function localizeNodeType(
     description: labels.description ?? node.description,
     inputs: node.inputs?.map((input) => ({
       ...input,
-      description:
-        labels.inputs?.[input.name] ?? input.description,
+      description: labels.inputs?.[input.name] ?? input.description,
     })),
     outputs: node.outputs?.map((output) => ({
       ...output,
-      description:
-        labels.outputs?.[output.name] ?? output.description,
+      description: labels.outputs?.[output.name] ?? output.description,
     })),
   };
 }

@@ -118,7 +118,10 @@ export function getWorkflowMediaUrlSet(
   if (!isActiveScope(scope)) {
     return EMPTY_WORKFLOW_MEDIA_ADDRESS;
   }
-  return activeCatalog!.entries.get(mediaKey(scope, mediaId)) ?? EMPTY_WORKFLOW_MEDIA_ADDRESS;
+  return (
+    activeCatalog!.entries.get(mediaKey(scope, mediaId)) ??
+    EMPTY_WORKFLOW_MEDIA_ADDRESS
+  );
 }
 
 function registerBlobUrl(params: {
@@ -270,9 +273,7 @@ export function populateWorkflowMediaThumbBlobs(params: {
 
 export async function initWorkflowMediaAddressCatalog(
   scope: WorkflowMediaAddressScope,
-  loadThumbBlobs: (
-    scope: WorkflowMediaAddressScope
-  ) => Promise<
+  loadThumbBlobs: (scope: WorkflowMediaAddressScope) => Promise<
     readonly {
       readonly mediaId: string;
       readonly thumbs: {
@@ -321,10 +322,7 @@ export async function initWorkflowMediaAddressCatalog(
     } catch {
       // Keep an empty catalog — init must still complete.
     } finally {
-      if (
-        initGeneration === catalogInitGeneration &&
-        isActiveScope(scope)
-      ) {
+      if (initGeneration === catalogInitGeneration && isActiveScope(scope)) {
         activeCatalog!.ready = true;
       }
     }

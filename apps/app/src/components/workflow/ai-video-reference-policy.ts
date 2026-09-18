@@ -9,7 +9,10 @@ import {
   type SubmitAiVideoMediaReferenceCounts,
   type VideoModelParameterRules,
 } from "@dafthunk/types";
-import type { Edge as ReactFlowEdge, Node as ReactFlowNode } from "@xyflow/react";
+import type {
+  Edge as ReactFlowEdge,
+  Node as ReactFlowNode,
+} from "@xyflow/react";
 
 import { AI_AUDIO_OUTPUT_ID } from "./ai-audio-node-utils";
 import { AI_IMAGE_OUTPUT_ID } from "./ai-image-node-utils";
@@ -68,8 +71,9 @@ export interface AiVideoReferenceContext {
 }
 
 function readModelId(targetNodeData: WorkflowNodeType): string | undefined {
-  const value = targetNodeData.inputs?.find((input) => input.id === "model")
-    ?.value;
+  const value = targetNodeData.inputs?.find(
+    (input) => input.id === "model"
+  )?.value;
   return typeof value === "string" && value.length > 0 ? value : undefined;
 }
 
@@ -103,7 +107,9 @@ export function resolveAiVideoReferenceRules(params: {
         return normalizeVideoModelParameterRules(selected.parameterRules);
       }
     }
-    return normalizeVideoModelParameterRules(VIDEO_ENHANCE_MODEL_PARAMETER_RULES);
+    return normalizeVideoModelParameterRules(
+      VIDEO_ENHANCE_MODEL_PARAMETER_RULES
+    );
   }
 
   const modelId = readModelId(params.targetNodeData);
@@ -346,7 +352,9 @@ export function buildAiVideoReferenceConnectionFromCardDrop(params: {
     if (targetNode?.data.nodeType !== AI_VIDEO_NODE_TYPE) return null;
     if (sourceNode?.data.nodeType === AI_TEXT_NODE_TYPE) return null;
 
-    const kind = classifyAiVideoReferenceFromNodeType(sourceNode?.data.nodeType);
+    const kind = classifyAiVideoReferenceFromNodeType(
+      sourceNode?.data.nodeType
+    );
     if (!kind) return null;
 
     return {

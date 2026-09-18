@@ -54,7 +54,9 @@ function assertVideoConcatEnabled(metadataRaw: string | null): void {
     readVolcanoMetadata(metadataRaw)
   );
   if (!isVolcanoMediaKitVideoTrimEnabled(mediaKit)) {
-    throw new Error("AI MediaKit video concat is not enabled on this interface");
+    throw new Error(
+      "AI MediaKit video concat is not enabled on this interface"
+    );
   }
 }
 
@@ -94,9 +96,7 @@ export async function submitVideoConcatTask(
     metadataRaw: row.metadata,
   });
   if (!apiKey) {
-    throw new Error(
-      "AI MediaKit API key is not configured on this interface"
-    );
+    throw new Error("AI MediaKit API key is not configured on this interface");
   }
 
   const jobId = crypto.randomUUID();
@@ -219,9 +219,7 @@ export async function pollVideoConcatGenerationJob(
   job: GenerationJobRecord
 ): Promise<GenerationJobRecord> {
   const upstreamTaskId =
-    job.upstreamTaskId?.trim() ||
-    job.resultJson?.upstreamTaskId?.trim() ||
-    "";
+    job.upstreamTaskId?.trim() || job.resultJson?.upstreamTaskId?.trim() || "";
 
   if (job.resultJson?.jobKind !== VIDEO_CONCAT_JOB_KIND || !upstreamTaskId) {
     return job;

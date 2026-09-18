@@ -8,7 +8,10 @@ function workflowMetadataKey(orgId: string, workflowId: string): string {
 }
 
 const workflowMetadataCache = new Map<string, WorkflowWithMetadata>();
-const workflowMetadataInflight = new Map<string, Promise<WorkflowWithMetadata>>();
+const workflowMetadataInflight = new Map<
+  string,
+  Promise<WorkflowWithMetadata>
+>();
 
 export function prefetchWorkflowEditorSession(
   workflowId: string,

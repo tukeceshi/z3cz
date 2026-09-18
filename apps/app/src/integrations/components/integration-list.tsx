@@ -42,7 +42,10 @@ export function IntegrationList({
         id: "actions",
         cell: ({ row }) => (
           <div className="text-right">
-            <IntegrationActions integration={row.original} onDelete={onDelete} />
+            <IntegrationActions
+              integration={row.original}
+              onDelete={onDelete}
+            />
           </div>
         ),
       },

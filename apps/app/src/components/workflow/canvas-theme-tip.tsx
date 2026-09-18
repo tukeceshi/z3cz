@@ -64,58 +64,58 @@ export function CanvasThemeTip() {
       role="dialog"
       aria-labelledby="canvas-theme-tip-title"
     >
-        <h3
-          id="canvas-theme-tip-title"
-          className="text-sm font-semibold leading-snug"
-        >
-          {t("workflow.canvas.themeTipTitle")}
-        </h3>
-        <p className="mt-2 text-sm text-muted-foreground leading-relaxed">
-          {t("workflow.canvas.themeTipBody")}
-        </p>
-        <div className="mt-3 grid grid-cols-3 gap-2">
-          {(
-            [
-              { id: "light", icon: Sun, label: t("theme.light") },
-              { id: "dark", icon: Moon, label: t("theme.dark") },
-              { id: "system", icon: Monitor, label: t("theme.system") },
-            ] as const
-          ).map((option) => {
-            const Icon = option.icon;
-            const selected = theme === option.id;
-            return (
-              <button
-                key={option.id}
-                type="button"
-                onClick={() => handleSelectTheme(option.id)}
-                className={cn(
-                  "flex flex-col items-center gap-1.5 rounded-md border px-2 py-3 text-xs transition-colors",
-                  selected
-                    ? "border-primary bg-primary/10 text-foreground"
-                    : "border-border hover:bg-muted/60 text-muted-foreground hover:text-foreground"
-                )}
-              >
-                <Icon className="h-4 w-4" />
-                <span>{option.label}</span>
-              </button>
-            );
-          })}
-        </div>
-        <div className="mt-4 flex items-center justify-between gap-2">
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            className="text-muted-foreground"
-            onClick={closeAndDismiss}
-          >
-            {t("workflow.canvas.themeTipDontShow")}
-          </Button>
-          <Button type="button" size="sm" onClick={closeAndDismiss}>
-            {t("tour.finish")}
-          </Button>
-        </div>
+      <h3
+        id="canvas-theme-tip-title"
+        className="text-sm font-semibold leading-snug"
+      >
+        {t("workflow.canvas.themeTipTitle")}
+      </h3>
+      <p className="mt-2 text-sm text-muted-foreground leading-relaxed">
+        {t("workflow.canvas.themeTipBody")}
+      </p>
+      <div className="mt-3 grid grid-cols-3 gap-2">
+        {(
+          [
+            { id: "light", icon: Sun, label: t("theme.light") },
+            { id: "dark", icon: Moon, label: t("theme.dark") },
+            { id: "system", icon: Monitor, label: t("theme.system") },
+          ] as const
+        ).map((option) => {
+          const Icon = option.icon;
+          const selected = theme === option.id;
+          return (
+            <button
+              key={option.id}
+              type="button"
+              onClick={() => handleSelectTheme(option.id)}
+              className={cn(
+                "flex flex-col items-center gap-1.5 rounded-md border px-2 py-3 text-xs transition-colors",
+                selected
+                  ? "border-primary bg-primary/10 text-foreground"
+                  : "border-border hover:bg-muted/60 text-muted-foreground hover:text-foreground"
+              )}
+            >
+              <Icon className="h-4 w-4" />
+              <span>{option.label}</span>
+            </button>
+          );
+        })}
       </div>
+      <div className="mt-4 flex items-center justify-between gap-2">
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          className="text-muted-foreground"
+          onClick={closeAndDismiss}
+        >
+          {t("workflow.canvas.themeTipDontShow")}
+        </Button>
+        <Button type="button" size="sm" onClick={closeAndDismiss}>
+          {t("tour.finish")}
+        </Button>
+      </div>
+    </div>
   );
 
   if (!document.querySelector(THEME_TOGGLE_SELECTOR)) {

@@ -33,7 +33,10 @@ const SEEDANCE_25_RESOLUTION_PIXELS: Readonly<
   "4k": [],
 };
 
-function buildSeedance25PixelLookup(): ReadonlyMap<string, VideoResolutionOption> {
+function buildSeedance25PixelLookup(): ReadonlyMap<
+  string,
+  VideoResolutionOption
+> {
   const lookup = new Map<string, VideoResolutionOption>();
   for (const tier of ["480p", "720p", "1080p"] as const) {
     for (const [width, height] of SEEDANCE_25_RESOLUTION_PIXELS[tier]) {

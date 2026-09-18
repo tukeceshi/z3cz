@@ -89,7 +89,14 @@ export function useRetakePrimaryVideoSync(
       edgeId: primary.edgeId,
       media: primary.media,
     });
-  }, [data.inputs, edges, isRetakePanel, nodeId, primaryVideoEdgeId, typedNodes]);
+  }, [
+    data.inputs,
+    edges,
+    isRetakePanel,
+    nodeId,
+    primaryVideoEdgeId,
+    typedNodes,
+  ]);
 
   useEffect(() => {
     if (
@@ -138,7 +145,9 @@ export function useRetakePrimaryVideoSync(
         return;
       }
 
-      updateNodeData(nodeId, (current) => withAiVideoRetakeDraft(current, patch));
+      updateNodeData(nodeId, (current) =>
+        withAiVideoRetakeDraft(current, patch)
+      );
 
       const nextMediaKey = patch.primaryVideoMediaKey ?? syncTriggerKey;
       const prevKey = prevMediaKeyRef.current;

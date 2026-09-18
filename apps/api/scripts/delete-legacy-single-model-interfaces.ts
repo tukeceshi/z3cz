@@ -25,7 +25,9 @@ function parseInterfaceMetadata(raw: string | null): unknown {
 
 async function main(): Promise<void> {
   const organizationId = process.env.ORGANIZATION_ID?.trim();
-  const db = createDatabase(process.env as import("../src/context").DatabaseEnv);
+  const db = createDatabase(
+    process.env as import("../src/context").DatabaseEnv
+  );
 
   const rows = organizationId
     ? await db
@@ -45,7 +47,9 @@ async function main(): Promise<void> {
       continue;
     }
 
-    console.log(`[delete] org=${row.organizationId} id=${row.id} name=${row.name}`);
+    console.log(
+      `[delete] org=${row.organizationId} id=${row.id} name=${row.name}`
+    );
     await deleteOrganizationAiInterface(db, row.organizationId, row.id);
     deleted += 1;
   }

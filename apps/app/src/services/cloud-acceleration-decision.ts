@@ -55,9 +55,7 @@ export async function areResourcesCloudStored(params: {
   return true;
 }
 
-function toCloudAccelerationSnapshot(
-  entry: ResolvedMediaResourceEntry
-): {
+function toCloudAccelerationSnapshot(entry: ResolvedMediaResourceEntry): {
   readonly kind: string;
   readonly upstreamUrl?: string;
   readonly generating?: boolean;

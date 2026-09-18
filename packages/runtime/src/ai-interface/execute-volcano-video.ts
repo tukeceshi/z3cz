@@ -154,10 +154,7 @@ export async function submitVolcanoVideoTask(params: {
     return { status: "failed", error: referenceValidation.error };
   }
 
-  if (
-    trimmedPrompt.length > 0 &&
-    trimmedPrompt.length > rules.promptMaxChars
-  ) {
+  if (trimmedPrompt.length > 0 && trimmedPrompt.length > rules.promptMaxChars) {
     return {
       status: "failed",
       error: `Prompt exceeds maximum length of ${rules.promptMaxChars} characters`,
@@ -307,7 +304,10 @@ export async function cancelVolcanoVideoTask(params: {
     params.upstreamLog
   );
 
-  if (response.status === 204 || (response.status >= 200 && response.status < 300)) {
+  if (
+    response.status === 204 ||
+    (response.status >= 200 && response.status < 300)
+  ) {
     return { status: "cancelled" };
   }
 

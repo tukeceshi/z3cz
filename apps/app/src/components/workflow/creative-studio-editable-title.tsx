@@ -31,16 +31,15 @@ export function CreativeStudioEditableTitle({
   const [editing, setEditing] = useState(false);
   const [inputWidthPx, setInputWidthPx] = useState(TITLE_INPUT_MIN_WIDTH_PX);
   const measureRef = useRef<HTMLSpanElement>(null);
-  const { draft, setDraft, inputRef, commit, handleKeyDown } = useStudioNodeRename(
-    {
+  const { draft, setDraft, inputRef, commit, handleKeyDown } =
+    useStudioNodeRename({
       nodeId: node.id,
       label,
       editing,
       onFinishEditing: () => setEditing(false),
       updateNodeData,
       disabled,
-    }
-  );
+    });
 
   useLayoutEffect(() => {
     if (!editing) return;

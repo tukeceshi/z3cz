@@ -13,10 +13,7 @@ import { useTranslation } from "@/components/locale-provider";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/utils/utils";
 
-import {
-  CanvasAudioCover,
-  LazyCanvasMediaCover,
-} from "./canvas-media-cover";
+import { CanvasAudioCover, LazyCanvasMediaCover } from "./canvas-media-cover";
 import {
   collectImageHistoryParamParts,
   formatHistoryCreatedAt,
@@ -33,7 +30,9 @@ export interface AiImageHistoryOverlayProps {
   readonly history: AiImageResultHistory;
   readonly currentImages: readonly MediaReference[];
   readonly mediaKind?: GenerativeHistoryMediaKind;
-  readonly createObjectUrl?: (objectReference: import("@dafthunk/types").ObjectReference) => string;
+  readonly createObjectUrl?: (
+    objectReference: import("@dafthunk/types").ObjectReference
+  ) => string;
   readonly onSelect: (id: string) => void;
   /** Create a sibling node from the previewed history item. */
   readonly onExpandToNode?: (id: string) => void;
@@ -72,12 +71,14 @@ export function AiImageHistoryOverlay({
       : history.selectedId &&
           matchingCurrent.some((item) => item.id === history.selectedId)
         ? history.selectedId
-        : matchingCurrent[0]?.id ?? history.selectedId;
+        : (matchingCurrent[0]?.id ?? history.selectedId);
 
   const [previewId, setPreviewId] = useState<string | null>(null);
   const [mediaLightboxOpen, setMediaLightboxOpen] = useState(false);
   const listScrollRef = useRef<HTMLDivElement>(null);
-  const [listScrollRoot, setListScrollRoot] = useState<HTMLElement | null>(null);
+  const [listScrollRoot, setListScrollRoot] = useState<HTMLElement | null>(
+    null
+  );
 
   useEffect(() => {
     if (!open) {
@@ -116,9 +117,7 @@ export function AiImageHistoryOverlay({
     history.items.find((item) => item.id === previewId) ?? history.items[0];
   const total = history.items.length;
   const previewMedia = previewItem?.images[0];
-  const modelLabel = previewItem
-    ? resolveHistoryModelLabel(previewItem)
-    : null;
+  const modelLabel = previewItem ? resolveHistoryModelLabel(previewItem) : null;
   const paramParts = collectImageHistoryParamParts({
     params: previewItem?.params,
     requestSnapshot: previewItem?.requestSnapshot,
@@ -207,7 +206,10 @@ export function AiImageHistoryOverlay({
           </div>
           <div
             ref={listScrollRef}
-            className={cn("min-h-0 flex-1 space-y-1.5 overflow-y-auto p-2", STUDIO_SCROLL)}
+            className={cn(
+              "min-h-0 flex-1 space-y-1.5 overflow-y-auto p-2",
+              STUDIO_SCROLL
+            )}
           >
             {history.items.length === 0 ? (
               <p className="px-2 py-4 text-xs text-muted-foreground">
@@ -282,7 +284,9 @@ export function AiImageHistoryOverlay({
               <XIcon className="h-4 w-4" />
             </Button>
           </div>
-          <div className={cn("min-h-0 flex-1 overflow-y-auto p-4", STUDIO_SCROLL)}>
+          <div
+            className={cn("min-h-0 flex-1 overflow-y-auto p-4", STUDIO_SCROLL)}
+          >
             {previewMedia ? (
               <div className="mb-3">
                 <GenerativeHistoryMediaPreview
@@ -317,7 +321,9 @@ export function AiImageHistoryOverlay({
                     <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
                       {t("workflow.aiImagePanel.historyModel")}
                     </p>
-                    <p className="mt-0.5 text-xs text-foreground">{modelLabel}</p>
+                    <p className="mt-0.5 text-xs text-foreground">
+                      {modelLabel}
+                    </p>
                   </div>
                 ) : null}
                 {paramParts.length > 0 ? (
@@ -357,11 +363,7 @@ export function AiImageHistoryOverlay({
                 {t("workflow.aiImagePanel.historyExpandToNode")}
               </Button>
             ) : null}
-            <Button
-              type="button"
-              disabled={!previewItem}
-              onClick={handleApply}
-            >
+            <Button type="button" disabled={!previewItem} onClick={handleApply}>
               {t("workflow.aiImagePanel.historyApply")}
             </Button>
           </div>

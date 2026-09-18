@@ -45,9 +45,7 @@ export function isGenerationJobReadyAtExpired(
   if (!readyAt) {
     return false;
   }
-  return (
-    Date.parse(readyAt) + GENERATION_JOB_SERVER_PERSIST_AFTER_MS <= nowMs
-  );
+  return Date.parse(readyAt) + GENERATION_JOB_SERVER_PERSIST_AFTER_MS <= nowMs;
 }
 
 /** Server has claimed persist — client must stop uploading and poll job status. */
@@ -59,8 +57,7 @@ export function isServerPersistInProgress(job: {
     return true;
   }
   return (
-    job.status === "uploading" &&
-    job.resultJson?.persistOwner === "server"
+    job.status === "uploading" && job.resultJson?.persistOwner === "server"
   );
 }
 
@@ -99,7 +96,10 @@ export type GenerationJobPersistDispatch = "api" | "worker";
 export type GenerationJobUpstreamVideoStatus = "queued" | "running";
 
 export function isVideoUpstreamPollDue(
-  resultJson: Pick<GenerationJobResultJson, "nextUpstreamPollAt"> | null | undefined,
+  resultJson:
+    | Pick<GenerationJobResultJson, "nextUpstreamPollAt">
+    | null
+    | undefined,
   nowMs: number = Date.now()
 ): boolean {
   const next = resultJson?.nextUpstreamPollAt;
@@ -198,13 +198,20 @@ export interface CancelGenerationJobResponse extends GetGenerationJobResponse {
   readonly upstreamCancelFailed?: boolean;
 }
 
-export type VideoCancelUpstreamPhase = GenerationJobUpstreamVideoStatus | "none";
+export type VideoCancelUpstreamPhase =
+  | GenerationJobUpstreamVideoStatus
+  | "none";
 
 /** Classifies upstream video phase for cancel: none/running defer, queued deletes, other blocks. */
 export function resolveVideoCancelBranch(params: {
   readonly jobStatus: GenerationJobStatus;
   readonly upstreamVideoStatus: GenerationJobUpstreamVideoStatus | undefined;
-}): "delete_now" | "defer" | "blocked" | "already_cancelled" | "already_cancelling" {
+}):
+  | "delete_now"
+  | "defer"
+  | "blocked"
+  | "already_cancelled"
+  | "already_cancelling" {
   if (params.jobStatus === "cancelled") {
     return "already_cancelled";
   }

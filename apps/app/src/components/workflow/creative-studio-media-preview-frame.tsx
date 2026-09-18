@@ -1,7 +1,4 @@
-import {
-  isWorkflowMediaValue,
-  type MediaReference,
-} from "@dafthunk/types";
+import { isWorkflowMediaValue, type MediaReference } from "@dafthunk/types";
 import Image from "lucide-react/icons/image";
 import LoaderIcon from "lucide-react/icons/loader-circle";
 import Play from "lucide-react/icons/play";
@@ -77,7 +74,11 @@ function readPrimaryStudioMedia(
   isVideo: boolean
 ): MediaReference | undefined {
   if (isVideo) {
-    return readAiVideoCardPrimaryVideo(data.inputs, data.outputs, data.metadata);
+    return readAiVideoCardPrimaryVideo(
+      data.inputs,
+      data.outputs,
+      data.metadata
+    );
   }
   return readAiImageCardPrimaryImage(data.inputs, data.outputs, data.metadata);
 }
@@ -209,7 +210,10 @@ export function CreativeStudioMediaPreviewFrame({
   }
 
   return (
-    <CreativeStudioMediaPreviewSlot aspectRatio={aspectRatio} videoSurface={isVideo}>
+    <CreativeStudioMediaPreviewSlot
+      aspectRatio={aspectRatio}
+      videoSurface={isVideo}
+    >
       {isVideo ? (
         <>
           <video

@@ -33,9 +33,14 @@ import {
 import type { TranslateFn } from "@/i18n";
 
 export { applyAiImageRatioToPromptFromTypes as applyAiImageRatioToPrompt };
-export { mergeImageGenerationParams, resolveImageGenerateCount, sanitizeImageGenerationParams } from "@dafthunk/types";
+export {
+  mergeImageGenerationParams,
+  resolveImageGenerateCount,
+  sanitizeImageGenerationParams,
+} from "@dafthunk/types";
 
-export interface AiImageParamsPopoverProps extends GenerativeParamsPopoverUiProps {
+export interface AiImageParamsPopoverProps
+  extends GenerativeParamsPopoverUiProps {
   readonly fields: readonly UpstreamParamProfileField[];
   readonly disabled?: boolean;
   readonly triggerLabel: string;
@@ -79,9 +84,7 @@ const TAIL_FIELD_ORDER = [
   GENERATE_AUDIO_FIELD_NAME,
 ] as const;
 
-function partitionVisibleFields(
-  fields: readonly UpstreamParamProfileField[]
-): {
+function partitionVisibleFields(fields: readonly UpstreamParamProfileField[]): {
   readonly mainFields: readonly UpstreamParamProfileField[];
   readonly tailFields: readonly UpstreamParamProfileField[];
 } {
@@ -95,7 +98,9 @@ function partitionVisibleFields(
     const field = tailByName.get(name);
     return field ? [field] : [];
   });
-  const mainFields = visible.filter((field) => !TAIL_FIELD_NAMES.has(field.name));
+  const mainFields = visible.filter(
+    (field) => !TAIL_FIELD_NAMES.has(field.name)
+  );
   return { mainFields, tailFields };
 }
 
@@ -181,10 +186,15 @@ function formatOptimizePromptLabel(
     readonly fast: string;
   }>
 ): string {
-  return formatImageGenerationOptionLabel("optimize_prompt_mode", option, smartLabel, {
-    optimizePromptStandard: labels.standard,
-    optimizePromptFast: labels.fast,
-  });
+  return formatImageGenerationOptionLabel(
+    "optimize_prompt_mode",
+    option,
+    smartLabel,
+    {
+      optimizePromptStandard: labels.standard,
+      optimizePromptFast: labels.fast,
+    }
+  );
 }
 
 function formatParamSummary(
@@ -308,9 +318,7 @@ function readCommittedDuration(
   max: number
 ): number {
   const numeric =
-    typeof value === "number"
-      ? value
-      : Number(value ?? field.default ?? min);
+    typeof value === "number" ? value : Number(value ?? field.default ?? min);
   return clampDuration(Number.isFinite(numeric) ? numeric : min, min, max);
 }
 
@@ -335,7 +343,8 @@ function DurationFieldSection({
   disabled = false,
   onChange,
 }: DurationFieldSectionProps) {
-  const { min: durationMin, max: durationMax } = resolveNumericEnumBounds(field);
+  const { min: durationMin, max: durationMax } =
+    resolveNumericEnumBounds(field);
   const committed = readCommittedDuration(
     value,
     field,
@@ -725,7 +734,9 @@ function TailFieldSection({
           options={field.enumValues}
           value={selected}
           disabled={disabled}
-          formatOption={(option) => formatTailOptionLabel(field, option, smartLabel, t)}
+          formatOption={(option) =>
+            formatTailOptionLabel(field, option, smartLabel, t)
+          }
           onSelect={(option) => onChange(option)}
         />
       </div>
@@ -805,7 +816,8 @@ export function AiImageParamsPopover({
       ? summary.text
       : "";
   const showAudioOnTrigger = triggerSummaryFieldNames
-    ? triggerSummaryFieldNames.has(GENERATE_AUDIO_FIELD_NAME) && summary.showAudio
+    ? triggerSummaryFieldNames.has(GENERATE_AUDIO_FIELD_NAME) &&
+      summary.showAudio
     : showSummaryOnTrigger && summary.showAudio;
   const triggerDisplayText = triggerSummaryFieldNames
     ? summaryText

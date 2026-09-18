@@ -16,9 +16,7 @@ function resolveStoredCardSize(
   kind: "image" | "video",
   initialLayout: MediaCardSize | null
 ): MediaCardSize {
-  return initialLayout
-    ? snapMediaCardSize(initialLayout)
-    : emptyCardSize(kind);
+  return initialLayout ? snapMediaCardSize(initialLayout) : emptyCardSize(kind);
 }
 
 function sameSize(left: MediaCardSize, right: MediaCardSize): boolean {

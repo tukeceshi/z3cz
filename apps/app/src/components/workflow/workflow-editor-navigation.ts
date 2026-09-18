@@ -7,9 +7,7 @@ export function createWorkflowEditorLocationState(): WorkflowEditorLocationState
   return { initialViewportOneToOne: true };
 }
 
-export function readInitialViewportOneToOne(
-  state: unknown
-): boolean {
+export function readInitialViewportOneToOne(state: unknown): boolean {
   if (!state || typeof state !== "object") {
     return false;
   }

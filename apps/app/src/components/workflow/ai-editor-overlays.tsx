@@ -15,13 +15,8 @@ interface AiEditorOverlaysProps {
 }
 
 export function AiEditorOverlays({ nodes }: AiEditorOverlaysProps) {
-  const {
-    configured,
-    blocksGenerativeMedia,
-    health,
-    isLoading,
-    autoFixState,
-  } = useCloudStorageCanvasContext();
+  const { configured, blocksGenerativeMedia, health, isLoading, autoFixState } =
+    useCloudStorageCanvasContext();
   const [notConfiguredDismissed, setNotConfiguredDismissed] = useState(false);
   const [degradedDismissed, setDegradedDismissed] = useState(false);
   const [unhealthyDismissed, setUnhealthyDismissed] = useState(false);

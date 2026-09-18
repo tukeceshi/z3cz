@@ -14,14 +14,10 @@ if (!("localStorage" in globalThis)) {
   });
 }
 
-const {
-  AI_TEXT_RESULT_HISTORY_INPUT_ID,
-  AI_TEXT_RESULT_INPUT_ID,
-} = await import("./ai-text-node-utils");
-const {
-  readAiTextGeneratingResourceId,
-  withAiTextStagedGeneratedResult,
-} = await import("./ai-text-persist-utils");
+const { AI_TEXT_RESULT_HISTORY_INPUT_ID, AI_TEXT_RESULT_INPUT_ID } =
+  await import("./ai-text-node-utils");
+const { readAiTextGeneratingResourceId, withAiTextStagedGeneratedResult } =
+  await import("./ai-text-persist-utils");
 
 function createTextNode(history: unknown, result?: unknown): WorkflowNodeType {
   return {
@@ -107,10 +103,11 @@ describe("text generate resource id", () => {
       },
       { platformModelId: "model-1" }
     );
-    const history = (
-      next.inputs?.find((input) => input.id === AI_TEXT_RESULT_HISTORY_INPUT_ID)
-        ?.value ?? { items: [] }
-    ) as { items: { resourceId?: string; contentSha256?: string }[] };
+    const history = (next.inputs?.find(
+      (input) => input.id === AI_TEXT_RESULT_HISTORY_INPUT_ID
+    )?.value ?? { items: [] }) as {
+      items: { resourceId?: string; contentSha256?: string }[];
+    };
     const result = next.inputs?.find(
       (input) => input.id === AI_TEXT_RESULT_INPUT_ID
     )?.value;

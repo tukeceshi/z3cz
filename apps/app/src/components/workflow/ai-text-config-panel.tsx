@@ -33,9 +33,7 @@ import { resolveMediaReferencesForTextGenerate } from "@/services/resolve-refere
 
 import { AiGenerateButton } from "./ai-generate-button";
 import { StudioDockPromptCharCount } from "./studio-dock-prompt-char-count";
-import {
-  AiTextExpandButton,
-} from "./ai-text-expand-overlay";
+import { AiTextExpandButton } from "./ai-text-expand-overlay";
 import { AiTextModelPicker } from "./ai-text-model-picker";
 import { useGenerativeModelCard } from "./use-generative-model-card";
 import {
@@ -58,10 +56,16 @@ import {
   withAiTextStreamingPreview,
 } from "./ai-text-node-utils";
 import { applyWorkflowNodeContentPatch } from "./apply-workflow-node-content-patch";
-import { generateAiTextStream, useOrgTextModels } from "@/services/platform-ai-model-service";
+import {
+  generateAiTextStream,
+  useOrgTextModels,
+} from "@/services/platform-ai-model-service";
 import { sha256HexFromText } from "@/utils/text-content-utils";
 import { withAiTextStagedGeneratedResult } from "./ai-text-persist-utils";
-import { buildResourceIdReference, readAiTextGeneratingResourceId } from "./ai-text-persist-utils";
+import {
+  buildResourceIdReference,
+  readAiTextGeneratingResourceId,
+} from "./ai-text-persist-utils";
 import { prepareGenerativeCardError } from "./prepare-generative-card-error";
 import { createPatchNodeLayoutMetadata } from "./patch-node-layout-metadata";
 import { withAiTextStagingDisplayState } from "./ai-text-staging-display-state";
@@ -94,12 +98,7 @@ export function AiTextConfigPanel({
   layout = "attached",
   detailRole,
 }: AiTextConfigPanelProps) {
-  const {
-    updateNodeData,
-    disabled,
-    edges = [],
-    deleteEdge,
-  } = useWorkflow();
+  const { updateNodeData, disabled, edges = [], deleteEdge } = useWorkflow();
   const nodes = useNodes();
   const { zoom } = useViewport();
   const { organization } = useAuth();
@@ -122,7 +121,8 @@ export function AiTextConfigPanel({
 
   const promptValue = getInputString(data, "prompt");
 
-  const typedNodes = nodes as unknown as readonly ReactFlowNode<WorkflowNodeType>[];
+  const typedNodes =
+    nodes as unknown as readonly ReactFlowNode<WorkflowNodeType>[];
 
   const referenceChips = useMemo(
     () =>
@@ -258,8 +258,11 @@ export function AiTextConfigPanel({
 
   const promptBuffer = useBufferedTextValue(promptValue, commitPrompt);
 
-  const { canConnectReference, buildReferenceConnection, appendReferenceConnection } =
-    useGenerativeReferenceConnection();
+  const {
+    canConnectReference,
+    buildReferenceConnection,
+    appendReferenceConnection,
+  } = useGenerativeReferenceConnection();
 
   const canAcceptStudioReference = useCallback(
     (sourceNodeId: string, sourceHandle: string) =>
@@ -434,8 +437,7 @@ export function AiTextConfigPanel({
           modelCanonicalId: effectiveModel.canonicalId,
           aiInterfaceId: effectiveModel.interfaceId,
           prompt: question,
-          references:
-            textReferences.length > 0 ? textReferences : undefined,
+          references: textReferences.length > 0 ? textReferences : undefined,
           referenceImageUrls,
           referenceImageInline,
           referenceVideoUrls,
@@ -453,8 +455,9 @@ export function AiTextConfigPanel({
                 current,
                 workflowNodeContent
               );
-              generatingResourceIdRef.current =
-                readAiTextGeneratingResourceId(patched.inputs ?? current.inputs);
+              generatingResourceIdRef.current = readAiTextGeneratingResourceId(
+                patched.inputs ?? current.inputs
+              );
               return {
                 ...patched,
                 metadata: withAiTextGeneratingFlag(
@@ -499,8 +502,7 @@ export function AiTextConfigPanel({
       const mimeType = inferAiTextMimeType(response.text);
       const contentSha256 =
         response.contentSha256 ?? (await sha256HexFromText(response.text));
-      const resourceId =
-        response.resourceId ?? generatingResourceIdRef.current;
+      const resourceId = response.resourceId ?? generatingResourceIdRef.current;
 
       const reference = resourceId
         ? buildResourceIdReference({

@@ -471,7 +471,9 @@ export function SchemaDialog({
               id="schema-description"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              placeholder={t("pages.schemas.schemaDialog.descriptionPlaceholder")}
+              placeholder={t(
+                "pages.schemas.schemaDialog.descriptionPlaceholder"
+              )}
               className="mt-2"
               rows={2}
             />

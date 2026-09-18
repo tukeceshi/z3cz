@@ -9,7 +9,10 @@ describe("ensureVolcanoTosBucketCreated", () => {
 
   it("returns the bucket name on first successful create", async () => {
     const createBucket = vi.fn().mockResolvedValue(undefined);
-    const client = { createBucket, listBuckets: vi.fn() } as unknown as VolcengineTosClient;
+    const client = {
+      createBucket,
+      listBuckets: vi.fn(),
+    } as unknown as VolcengineTosClient;
 
     const bucket = await ensureVolcanoTosBucketCreated({
       client,
@@ -34,7 +37,10 @@ describe("ensureVolcanoTosBucketCreated", () => {
       )
       .mockResolvedValueOnce(undefined);
     const listBuckets = vi.fn().mockResolvedValue(["other-bucket"]);
-    const client = { createBucket, listBuckets } as unknown as VolcengineTosClient;
+    const client = {
+      createBucket,
+      listBuckets,
+    } as unknown as VolcengineTosClient;
 
     const bucket = await ensureVolcanoTosBucketCreated({
       client,
@@ -56,7 +62,10 @@ describe("ensureVolcanoTosBucketCreated", () => {
         tosCode: "BucketAlreadyOwnedByYou",
       })
     );
-    const client = { createBucket, listBuckets: vi.fn() } as unknown as VolcengineTosClient;
+    const client = {
+      createBucket,
+      listBuckets: vi.fn(),
+    } as unknown as VolcengineTosClient;
 
     const bucket = await ensureVolcanoTosBucketCreated({
       client,

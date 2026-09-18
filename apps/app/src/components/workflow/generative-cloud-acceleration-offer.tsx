@@ -50,7 +50,9 @@ export function GenerativeCloudAccelerationOffer({
       <Dialog open={dialogOpen} onOpenChange={onDialogOpenChange}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>{t("workflow.cloudAcceleration.dialogTitle")}</DialogTitle>
+            <DialogTitle>
+              {t("workflow.cloudAcceleration.dialogTitle")}
+            </DialogTitle>
             <DialogDescription>
               {t("workflow.cloudAcceleration.dialogDescription")}
             </DialogDescription>
@@ -59,7 +61,11 @@ export function GenerativeCloudAccelerationOffer({
             <Button type="button" onClick={onSingleAccelerate}>
               {t("workflow.cloudAcceleration.single")}
             </Button>
-            <Button type="button" variant="secondary" onClick={onAlwaysAccelerate}>
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={onAlwaysAccelerate}
+            >
               {t("workflow.cloudAcceleration.alwaysForInterface")}
             </Button>
             <Button

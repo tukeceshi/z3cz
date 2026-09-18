@@ -17,7 +17,12 @@ function createImageNode(): WorkflowNodeType {
     nodeType: "ai-image",
     inputs: [],
     outputs: [
-      testWorkflowParam({ id: "images", name: "images", type: "image", value: [] }),
+      testWorkflowParam({
+        id: "images",
+        name: "images",
+        type: "image",
+        value: [],
+      }),
     ],
     executionState: "idle",
   };
@@ -70,7 +75,9 @@ describe("withAiImageGeneratedResult", () => {
       [{ resourceId: "done-2", mimeType: "image/jpeg" }],
       { prompt: "second", jobId: "job-2" }
     );
-    const history = readAiImageResultHistory(completed.inputs ?? working.inputs);
+    const history = readAiImageResultHistory(
+      completed.inputs ?? working.inputs
+    );
 
     expect(history.items).toHaveLength(1);
     expect(history.selectedId).toBe(pendingId);

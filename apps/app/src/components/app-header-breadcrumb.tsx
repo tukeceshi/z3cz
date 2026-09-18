@@ -53,9 +53,7 @@ export function AppHeaderBreadcrumb() {
                   </BreadcrumbLink>
                 )}
               </BreadcrumbItem>
-              {!isLast && (
-                <BreadcrumbSeparator className="hidden sm:block" />
-              )}
+              {!isLast && <BreadcrumbSeparator className="hidden sm:block" />}
             </React.Fragment>
           );
         })}

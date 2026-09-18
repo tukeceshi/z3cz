@@ -204,7 +204,9 @@ export async function commitAiTextHistorySelection(
   params: CommitAiTextHistorySelectionParams
 ): Promise<AiTextHistorySelectionCommit> {
   const history = readAiTextResultHistory(params.current.inputs);
-  const selected = history.items.find((entry) => entry.id === params.selectedId);
+  const selected = history.items.find(
+    (entry) => entry.id === params.selectedId
+  );
   if (!selected?.resourceId) {
     return { resolvedText: "", modelUnavailable: false };
   }

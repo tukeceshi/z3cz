@@ -12,10 +12,16 @@ export interface DetectedMention {
 }
 
 export function storedToFlatText(stored: string): string {
-  return stored.replace(VIDEO_PROMPT_REF_TOKEN_PATTERN, PROMPT_REF_FLAT_PLACEHOLDER);
+  return stored.replace(
+    VIDEO_PROMPT_REF_TOKEN_PATTERN,
+    PROMPT_REF_FLAT_PLACEHOLDER
+  );
 }
 
-export function flatIndexToStoredIndex(stored: string, flatIndex: number): number {
+export function flatIndexToStoredIndex(
+  stored: string,
+  flatIndex: number
+): number {
   const pattern = new RegExp(VIDEO_PROMPT_REF_TOKEN_PATTERN.source, "g");
   let flatPos = 0;
   let lastIndex = 0;
@@ -67,7 +73,10 @@ export function detectMention(
   caretIndexFlat: number
 ): DetectedMention | null {
   const flatText = storedToFlatText(stored);
-  const effectiveCaret = resolveEffectiveFlatCaretIndex(flatText, caretIndexFlat);
+  const effectiveCaret = resolveEffectiveFlatCaretIndex(
+    flatText,
+    caretIndexFlat
+  );
   const before = flatText.slice(0, effectiveCaret);
   const match = before.match(MENTION_TAIL_PATTERN);
   if (!match) {
@@ -172,7 +181,10 @@ export function resolveMentionPickerAnchor(
     return flatRect;
   }
 
-  const flatStartRect = flatIndexToCaretRect(root, Math.max(0, mentionEndFlat - 1));
+  const flatStartRect = flatIndexToCaretRect(
+    root,
+    Math.max(0, mentionEndFlat - 1)
+  );
   if (flatStartRect) {
     return flatStartRect;
   }
@@ -181,7 +193,10 @@ export function resolveMentionPickerAnchor(
   return new DOMRect(rootRect.left + 8, rootRect.top + 8, 0, 0);
 }
 
-function flatIndexToDomRange(root: HTMLElement, flatIndex: number): Range | null {
+function flatIndexToDomRange(
+  root: HTMLElement,
+  flatIndex: number
+): Range | null {
   let charIndex = 0;
 
   const visit = (node: Node): Range | null => {

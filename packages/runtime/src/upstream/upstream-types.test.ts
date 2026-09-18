@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 
-import { resolvePollTimeout, upstreamPollContinuation } from "../upstream/upstream-types";
+import {
+  resolvePollTimeout,
+  upstreamPollContinuation,
+} from "../upstream/upstream-types";
 
 describe("upstream poll helpers", () => {
   it("creates upstream poll continuations with next poll time", () => {

@@ -25,7 +25,11 @@ export function CreativeStudioListItemFooter({
     <div className={STUDIO_MEDIA_CARD_FOOTER}>
       <CreativeStudioListItemLabel node={node} onOpenDetail={onOpenDetail} />
       {metaTags.length > 0 ? (
-        <button type="button" className="w-full text-left" onClick={onOpenDetail}>
+        <button
+          type="button"
+          className="w-full text-left"
+          onClick={onOpenDetail}
+        >
           <div className={STUDIO_META_ROW}>
             {metaTags.map((tag, index) => (
               <span

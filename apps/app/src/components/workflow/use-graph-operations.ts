@@ -1,4 +1,18 @@
-import { AI_AUDIO_NODE_TYPE, AI_GENERATIVE_NODE_TYPES, AI_IMAGE_NODE_TYPE, AI_TEXT_NODE_TYPE, AI_VIDEO_NODE_TYPE, generativeModelKindFromNodeType, nodeLayoutMetadataEntries, type AiGenerativeNodeType, type NodeLayoutSize, type ObjectReference, type WorkflowEditorViewport, type WorkflowGenerativeDefaults, type WorkflowTrigger } from "@dafthunk/types";
+import {
+  AI_AUDIO_NODE_TYPE,
+  AI_GENERATIVE_NODE_TYPES,
+  AI_IMAGE_NODE_TYPE,
+  AI_TEXT_NODE_TYPE,
+  AI_VIDEO_NODE_TYPE,
+  generativeModelKindFromNodeType,
+  nodeLayoutMetadataEntries,
+  type AiGenerativeNodeType,
+  type NodeLayoutSize,
+  type ObjectReference,
+  type WorkflowEditorViewport,
+  type WorkflowGenerativeDefaults,
+  type WorkflowTrigger,
+} from "@dafthunk/types";
 import type {
   Connection,
   IsValidConnection,
@@ -12,11 +26,7 @@ import type {
   ReactFlowInstance,
   Node as ReactFlowNode,
 } from "@xyflow/react";
-import {
-  getConnectedEdges,
-  useEdgesState,
-  useNodesState,
-} from "@xyflow/react";
+import { getConnectedEdges, useEdgesState, useNodesState } from "@xyflow/react";
 import type { RefObject, MouseEvent } from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
@@ -44,27 +54,20 @@ import { collectAiVideoFirstDegreeEdgeIds } from "./ai-video-edge-selection";
 import { isRetakePrimaryVideoEdge } from "./ai-video-retake-primary-ref";
 import { shouldSuppressGenerativePanelDeselect } from "./generative-panel-pointer-guard";
 import { buildGenerativeReferenceConnectionFromCardDrop } from "./generative-reference-connection";
-import {
-  mergeAiTextNodeCatalogInputs,
-} from "./ai-text-node-utils";
-import {
-  mergeAiImageNodeCatalogInputs,
-} from "./ai-image-node-utils";
-import {
-  mergeAiAudioNodeCatalogInputs,
-} from "./ai-audio-node-utils";
-import {
-  mergeAiVideoNodeCatalogInputs,
-} from "./ai-video-node-utils";
-import {
-  validateWorkflowConnection,
-} from "./workflow-connection-validation";
+import { mergeAiTextNodeCatalogInputs } from "./ai-text-node-utils";
+import { mergeAiImageNodeCatalogInputs } from "./ai-image-node-utils";
+import { mergeAiAudioNodeCatalogInputs } from "./ai-audio-node-utils";
+import { mergeAiVideoNodeCatalogInputs } from "./ai-video-node-utils";
+import { validateWorkflowConnection } from "./workflow-connection-validation";
 import { buildReferenceConnectionToNewNode } from "./workflow-add-node-connection";
 import { withGenerativeCardGenerateError } from "./generative-card-error-utils";
 import { withGenerativeManualContentMode } from "./generative-card-mode-utils";
 import { prepareGenerativeCardError } from "./prepare-generative-card-error";
 import { applyGenerativeNodeStudioReference } from "./create-generative-node-from-studio-reference";
-import { resolveGenerativeNodeDefaultBaseName, resolveGenerativeNodeDisplayName } from "./generative-node-naming";
+import {
+  resolveGenerativeNodeDefaultBaseName,
+  resolveGenerativeNodeDisplayName,
+} from "./generative-node-naming";
 import {
   generativeModalityForNodeType,
   readWorkflowGenerativeDefault,
@@ -84,9 +87,7 @@ import {
   mergePreparedWorkflowEdge,
   prepareWorkflowConnectionAppend,
 } from "./workflow-connection-commit";
-import {
-  resolveAddNodeReferenceModel,
-} from "./workflow-add-node-model";
+import { resolveAddNodeReferenceModel } from "./workflow-add-node-model";
 import type { WorkflowAddNodeMenuState } from "./workflow-add-node-menu";
 import {
   findOpenNodePosition,
@@ -457,9 +458,7 @@ export interface UseGraphOperationsReturn {
   addNodeMenu: WorkflowAddNodeMenuState | null;
   closeAddNodeMenu: () => void;
   handlePaneClick: () => void;
-  handlePaneContextMenu: (
-    event: globalThis.MouseEvent | MouseEvent
-  ) => void;
+  handlePaneContextMenu: (event: globalThis.MouseEvent | MouseEvent) => void;
   handleAddNodeMenuSelect: (
     nodeType: AiGenerativeNodeType,
     menu: WorkflowAddNodeMenuState
@@ -607,7 +606,14 @@ export function useGraphOperations({
       }
       setNodes((nds) => nds.filter((node) => !idSet.has(node.id)));
     },
-    [edgesRef, filterRemovableNodeIds, graphHistory, nodesRef, setEdges, setNodes]
+    [
+      edgesRef,
+      filterRemovableNodeIds,
+      graphHistory,
+      nodesRef,
+      setEdges,
+      setNodes,
+    ]
   );
 
   const commitRemoveNodes = useCallback(
@@ -685,11 +691,14 @@ export function useGraphOperations({
     const flowEdgeIds =
       selectedNode?.data.nodeType === AI_TEXT_NODE_TYPE && soleSelectedNodeId
         ? collectAiTextFirstDegreeEdgeIds(soleSelectedNodeId, edges)
-        : selectedNode?.data.nodeType === AI_IMAGE_NODE_TYPE && soleSelectedNodeId
+        : selectedNode?.data.nodeType === AI_IMAGE_NODE_TYPE &&
+            soleSelectedNodeId
           ? collectAiImageFirstDegreeEdgeIds(soleSelectedNodeId, edges)
-          : selectedNode?.data.nodeType === AI_VIDEO_NODE_TYPE && soleSelectedNodeId
+          : selectedNode?.data.nodeType === AI_VIDEO_NODE_TYPE &&
+              soleSelectedNodeId
             ? collectAiVideoFirstDegreeEdgeIds(soleSelectedNodeId, edges)
-            : selectedNode?.data.nodeType === AI_AUDIO_NODE_TYPE && soleSelectedNodeId
+            : selectedNode?.data.nodeType === AI_AUDIO_NODE_TYPE &&
+                soleSelectedNodeId
               ? collectAiAudioFirstDegreeEdgeIds(soleSelectedNodeId, edges)
               : new Set<string>();
 
@@ -706,7 +715,13 @@ export function useGraphOperations({
       });
       return changed ? next : current;
     });
-  }, [edgeTopologyFingerprint, nodes, selectionFingerprint, soleSelectedNodeId, setEdges]);
+  }, [
+    edgeTopologyFingerprint,
+    nodes,
+    selectionFingerprint,
+    soleSelectedNodeId,
+    setEdges,
+  ]);
 
   // Sync initialNodes prop
   useEffect(() => {
@@ -715,7 +730,9 @@ export function useGraphOperations({
     }
 
     const newNodesWithCreateObjectUrl = initialNodes.map((node) => {
-      const catalog = nodeTypes.find((entry) => entry.type === node.data.nodeType);
+      const catalog = nodeTypes.find(
+        (entry) => entry.type === node.data.nodeType
+      );
       const inputs = mergeGenerativeNodeCatalogInputs(
         node.data.nodeType,
         node.data.inputs,
@@ -732,7 +749,11 @@ export function useGraphOperations({
       };
     });
 
-    if (!graphEditBlocked && initialNodes.length === 0 && nodesRef.current.length > 0) {
+    if (
+      !graphEditBlocked &&
+      initialNodes.length === 0 &&
+      nodesRef.current.length > 0
+    ) {
       return;
     }
 
@@ -786,7 +807,11 @@ export function useGraphOperations({
 
   // Sync initialEdges prop
   useEffect(() => {
-    if (!graphEditBlocked && initialEdges.length === 0 && edgesRef.current.length > 0) {
+    if (
+      !graphEditBlocked &&
+      initialEdges.length === 0 &&
+      edgesRef.current.length > 0
+    ) {
       return;
     }
     if (JSON.stringify(edgesRef.current) !== JSON.stringify(initialEdges)) {
@@ -904,7 +929,13 @@ export function useGraphOperations({
       });
       return true;
     },
-    [createObjectUrl, generativeReferenceCatalogs, graphEditBlocked, setEdges, validateConnection]
+    [
+      createObjectUrl,
+      generativeReferenceCatalogs,
+      graphEditBlocked,
+      setEdges,
+      validateConnection,
+    ]
   );
 
   const commitNodesAndConnection = useCallback(
@@ -941,7 +972,11 @@ export function useGraphOperations({
         return;
       }
 
-      if (!connectionState.isValid && connectionState.fromNode && "clientX" in event) {
+      if (
+        !connectionState.isValid &&
+        connectionState.fromNode &&
+        "clientX" in event
+      ) {
         const topEl = document.elementFromPoint(event.clientX, event.clientY);
         const nodeEl = topEl?.closest(
           ".react-flow__node"
@@ -1002,7 +1037,15 @@ export function useGraphOperations({
         }
       }
     },
-    [generativeReferenceCatalogs, graphEditBlocked, onConnect, edgesRef, nodesRef, openAddNodeMenu, reactFlowInstance]
+    [
+      generativeReferenceCatalogs,
+      graphEditBlocked,
+      onConnect,
+      edgesRef,
+      nodesRef,
+      openAddNodeMenu,
+      reactFlowInstance,
+    ]
   );
 
   const handlePaneClick = useCallback(() => {
@@ -1164,10 +1207,7 @@ export function useGraphOperations({
             return;
           }
 
-          commitNodesAndConnection(
-            deselectAndAppend(finalNode),
-            connection
-          );
+          commitNodesAndConnection(deselectAndAppend(finalNode), connection);
         } catch {
           toast.error("workflow.canvas.referenceConnectModelError");
         }
@@ -1259,7 +1299,10 @@ export function useGraphOperations({
       newNode.selected = shouldSelect;
 
       const nextNodes = shouldSelect
-        ? [...nodesRef.current.map((node) => ({ ...node, selected: false })), newNode]
+        ? [
+            ...nodesRef.current.map((node) => ({ ...node, selected: false })),
+            newNode,
+          ]
         : [...nodesRef.current, newNode];
       nodesRef.current = nextNodes;
       setNodes(nextNodes);
@@ -1524,7 +1567,9 @@ export function useGraphOperations({
       if (graphEditBlocked) return;
       const edge = edgesRef.current.find((entry) => entry.id === edgeId);
       if (edge?.target) {
-        const targetNode = nodesRef.current.find((node) => node.id === edge.target);
+        const targetNode = nodesRef.current.find(
+          (node) => node.id === edge.target
+        );
         if (
           targetNode &&
           isRetakePrimaryVideoEdge({
@@ -1558,7 +1603,9 @@ export function useGraphOperations({
         if (!edge.target) {
           return false;
         }
-        const targetNode = nodesRef.current.find((node) => node.id === edge.target);
+        const targetNode = nodesRef.current.find(
+          (node) => node.id === edge.target
+        );
         if (!targetNode) {
           return false;
         }
@@ -1673,7 +1720,16 @@ export function useGraphOperations({
         setNodes((nds) => [...nds, ...newNodes]);
       }
     },
-    [nodeTypes, setNodes, createObjectUrl, t, orgId, generativeDefaults, paramCatalog, graphHistory]
+    [
+      nodeTypes,
+      setNodes,
+      createObjectUrl,
+      t,
+      orgId,
+      generativeDefaults,
+      paramCatalog,
+      graphHistory,
+    ]
   );
 
   return {
@@ -1717,7 +1773,9 @@ export function useGraphOperations({
     isDraggingRef,
     isValidConnection,
     handleNodeSelect,
-    addGenerativeNodesBatch: graphEditBlocked ? NOOP_ARRAY : addGenerativeNodesBatch,
+    addGenerativeNodesBatch: graphEditBlocked
+      ? NOOP_ARRAY
+      : addGenerativeNodesBatch,
     updateNodeExecution,
     batchUpdateNodeExecutions,
     updateNodeData,
@@ -1743,6 +1801,8 @@ export function useGraphOperations({
     clearHistory: graphHistory.clearHistory,
     captureHistory: graphHistory.captureHistory,
     commitRemoveNodes: readOnlyDisabled ? NOOP : commitRemoveNodes,
-    removeNodesWithoutConfirm: readOnlyDisabled ? NOOP : removeNodesWithoutConfirm,
+    removeNodesWithoutConfirm: readOnlyDisabled
+      ? NOOP
+      : removeNodesWithoutConfirm,
   };
 }

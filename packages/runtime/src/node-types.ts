@@ -287,16 +287,12 @@ export interface NodeContext {
     interfaceId?: string;
     templateId?: string;
     modelCanonicalId?: string;
-  }) => Promise<
-    import("@dafthunk/types").ResolvedOrgAiInterface | undefined
-  >;
+  }) => Promise<import("@dafthunk/types").ResolvedOrgAiInterface | undefined>;
   /** Re-read volcano metadata after ensure to resolve chat `model` field. */
-  resolveTextModelInferenceId?: (
-    params: {
-      readonly interfaceId: string;
-      readonly canonicalId: string;
-    }
-  ) => Promise<string | undefined>;
+  resolveTextModelInferenceId?: (params: {
+    readonly interfaceId: string;
+    readonly canonicalId: string;
+  }) => Promise<string | undefined>;
   /** Execute a platform text model on the selected AI interface. */
   executeTextModel?: (params: {
     readonly canonicalId: string;

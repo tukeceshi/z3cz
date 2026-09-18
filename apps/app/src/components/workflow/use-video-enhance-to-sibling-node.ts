@@ -29,13 +29,20 @@ import {
   buildPanelReferenceConnection,
 } from "./generative-reference-connection";
 import { useWorkflow } from "./workflow-context";
-import type { NodeType, WorkflowEdgeType, WorkflowNodeType } from "./workflow-types";
+import type {
+  NodeType,
+  WorkflowEdgeType,
+  WorkflowNodeType,
+} from "./workflow-types";
 import {
   AI_VIDEO_OUTPUT_ID,
   mergeAiVideoNodeCatalogInputs,
 } from "./ai-video-node-utils";
 import { mergeAiTextNodeCatalogInputs } from "./ai-text-node-utils";
-import { findOpenNodePositionFromSource, resolveWorkflowNodeDimensions } from "./workflow-node-placement";
+import {
+  findOpenNodePositionFromSource,
+  resolveWorkflowNodeDimensions,
+} from "./workflow-node-placement";
 
 export interface CreateEnhanceSiblingNodeResult {
   readonly nodeId: string;
@@ -63,11 +70,15 @@ function resolveEnhanceNodeName(
 }
 
 export function useVideoEnhanceToSiblingNode(sourceNodeId: string) {
-  const { nodeTypes = [], disabled, generativeReferenceCatalogs } =
-    useWorkflow();
+  const {
+    nodeTypes = [],
+    disabled,
+    generativeReferenceCatalogs,
+  } = useWorkflow();
   const nodes = useNodes();
   const edges = useEdges<ReactFlowEdge<WorkflowEdgeType>>();
-  const { setNodes, setEdges, getNode, getViewport, setCenter } = useReactFlow();
+  const { setNodes, setEdges, getNode, getViewport, setCenter } =
+    useReactFlow();
   const { createObjectUrl } = useObjectService();
   const { id: workflowId } = useParams<{ id: string }>();
   const { organization } = useAuth();
@@ -109,7 +120,8 @@ export function useVideoEnhanceToSiblingNode(sourceNodeId: string) {
 
       const sourceData = sourceNode.data as WorkflowNodeType;
       const sourceName = sourceData.name?.trim() || catalog.name;
-      const typedNodes = nodes as unknown as readonly ReactFlowNode<WorkflowNodeType>[];
+      const typedNodes =
+        nodes as unknown as readonly ReactFlowNode<WorkflowNodeType>[];
       const nodeName = resolveEnhanceNodeName(sourceName, typedNodes);
       const nodeId = `${AI_VIDEO_NODE_TYPE}-enhance-${Date.now()}`;
       const position = findOpenNodePositionFromSource({
@@ -135,7 +147,10 @@ export function useVideoEnhanceToSiblingNode(sourceNodeId: string) {
         nodeType: catalog.type,
         icon: catalog.icon,
         inputs: catalogInputs,
-        outputs: catalog.outputs.map((output) => ({ ...output, id: output.name })),
+        outputs: catalog.outputs.map((output) => ({
+          ...output,
+          id: output.name,
+        })),
         executionState: "idle",
         createObjectUrl: sourceData.createObjectUrl,
         metadata: withAiVideoPanelKind(undefined, "enhance"),
@@ -197,14 +212,16 @@ export function useVideoEnhanceToSiblingNode(sourceNodeId: string) {
           })
         : false;
 
-      const { width, height } = resolveWorkflowNodeDimensions(AI_VIDEO_NODE_TYPE);
+      const { width, height } =
+        resolveWorkflowNodeDimensions(AI_VIDEO_NODE_TYPE);
       const centerX = position.x + width / 2;
       const centerY = position.y + height / 2;
       const { zoom } = getViewport();
       setCenter(centerX, centerY, { zoom, duration: 200 });
 
       return { nodeId, referenceLinked };
-    }, [
+    },
+    [
       createObjectUrl,
       disabled,
       edges,
@@ -220,7 +237,8 @@ export function useVideoEnhanceToSiblingNode(sourceNodeId: string) {
       setNodes,
       sourceNodeId,
       workflowId,
-    ]);
+    ]
+  );
 
   return {
     createEnhanceSiblingNode,

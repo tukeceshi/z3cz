@@ -7,10 +7,7 @@ import type {
 import { and, asc, eq } from "drizzle-orm";
 
 import type { Database } from "../db";
-import {
-  platformAiModelChannels,
-  platformAiModels,
-} from "../db/schema";
+import { platformAiModelChannels, platformAiModels } from "../db/schema";
 
 export interface ListPlatformAiModelChannelsParams {
   readonly channel?: PlatformAiModelChannelKind;
@@ -52,7 +49,10 @@ export async function listPlatformAiModelChannels(
       eq(platformAiModelChannels.canonicalId, platformAiModels.canonicalId)
     )
     .where(and(...conditions, eq(platformAiModelChannels.channelEnabled, true)))
-    .orderBy(asc(platformAiModels.sortOrder), asc(platformAiModels.displayName));
+    .orderBy(
+      asc(platformAiModels.sortOrder),
+      asc(platformAiModels.displayName)
+    );
 
   return rows.map((row) => ({
     canonicalId: row.canonicalId,

@@ -21,7 +21,11 @@ import {
   withGenerativeTrimmingProgress,
 } from "./generative-progress-utils";
 import { createDefaultAiVideoRetakeDraft } from "./ai-video-retake-node-utils";
-import type { NodeType, WorkflowNodeType, WorkflowParameter } from "./workflow-types";
+import type {
+  NodeType,
+  WorkflowNodeType,
+  WorkflowParameter,
+} from "./workflow-types";
 
 export type AiVideoSiblingBusyKind = "trimming" | "generating" | "none";
 

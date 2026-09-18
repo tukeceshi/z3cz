@@ -153,10 +153,9 @@ export function parseVolcanoInferenceUsageRaw(
     return readRow(row, fieldNames);
   });
 
-  const totals = parsedRows.reduce(
-    (sum, row) => addMetrics(sum, row.metrics),
-    { ...EMPTY_METRICS }
-  );
+  const totals = parsedRows.reduce((sum, row) => addMetrics(sum, row.metrics), {
+    ...EMPTY_METRICS,
+  });
 
   return {
     fieldNames,

@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { buildApiKeyHint, readApiKeyHint, withApiKeyHint } from "./api-key-hint";
+import {
+  buildApiKeyHint,
+  readApiKeyHint,
+  withApiKeyHint,
+} from "./api-key-hint";
 
 describe("api-key-hint", () => {
   it("builds head-tail hint for long keys", () => {

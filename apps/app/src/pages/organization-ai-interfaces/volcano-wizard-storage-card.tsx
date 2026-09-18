@@ -61,7 +61,9 @@ export function VolcanoWizardStorageCard({
   const [setupOpen, setSetupOpen] = useState(false);
 
   const regionLabel = useMemo(() => {
-    const match = VOLCANO_TOS_REGIONS.find((entry) => entry.code === config.region);
+    const match = VOLCANO_TOS_REGIONS.find(
+      (entry) => entry.code === config.region
+    );
     return match ? t(match.labelKey) : config.region;
   }, [config.region, t]);
 

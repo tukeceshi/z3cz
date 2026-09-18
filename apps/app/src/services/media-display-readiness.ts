@@ -1,4 +1,7 @@
-import { isResourceIdReference, type WorkflowMediaValue } from "@dafthunk/types";
+import {
+  isResourceIdReference,
+  type WorkflowMediaValue,
+} from "@dafthunk/types";
 
 import type { MediaDisplayUrlSet } from "@/services/ai-media-cache-service";
 import {

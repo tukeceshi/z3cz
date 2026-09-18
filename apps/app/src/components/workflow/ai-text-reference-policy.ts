@@ -4,7 +4,10 @@ import {
   normalizeTextModelParameterRules,
   type TextModelParameterRules,
 } from "@dafthunk/types";
-import type { Edge as ReactFlowEdge, Node as ReactFlowNode } from "@xyflow/react";
+import type {
+  Edge as ReactFlowEdge,
+  Node as ReactFlowNode,
+} from "@xyflow/react";
 
 import {
   AI_TEXT_KEYWORDS_HANDLE_ID,
@@ -63,8 +66,9 @@ interface FlowConnectionLike {
 }
 
 function readModelId(targetNodeData: WorkflowNodeType): string | undefined {
-  const value = targetNodeData.inputs?.find((input) => input.id === "model")
-    ?.value;
+  const value = targetNodeData.inputs?.find(
+    (input) => input.id === "model"
+  )?.value;
   return typeof value === "string" && value.length > 0 ? value : undefined;
 }
 
@@ -130,9 +134,7 @@ export function countAiTextReferences(
   return { text, image, video, audio };
 }
 
-export function preferredSourceHandle(
-  kind: AiTextReferenceKind
-): string {
+export function preferredSourceHandle(kind: AiTextReferenceKind): string {
   if (kind === "text") return "text";
   if (kind === "image") return "images";
   return "videos";
@@ -282,9 +284,7 @@ export function isIncomingAiTextReferenceConnection(
 
   const fromType = (connection.fromNode.data as WorkflowNodeType | undefined)
     ?.nodeType;
-  return (
-    fromType !== undefined && isAiTextAllowedReferenceNodeType(fromType)
-  );
+  return fromType !== undefined && isAiTextAllowedReferenceNodeType(fromType);
 }
 
 /** Dragging from AI text keywords handle to pick a reference source. */

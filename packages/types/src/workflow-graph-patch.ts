@@ -3,7 +3,11 @@ import type { Edge, Node, WorkflowState } from "./workflow";
 export type WorkflowNodePatch =
   | { readonly type: "add"; readonly node: Node }
   | { readonly type: "remove"; readonly id: string }
-  | { readonly type: "position"; readonly id: string; readonly position: Node["position"] }
+  | {
+      readonly type: "position";
+      readonly id: string;
+      readonly position: Node["position"];
+    }
   | { readonly type: "update"; readonly node: Node };
 
 export type WorkflowEdgePatch =
@@ -33,7 +37,10 @@ const nodeEquals = (a: Node, b: Node): boolean =>
   JSON.stringify(a) === JSON.stringify(b);
 
 export function diffWorkflowGraph(
-  previous: { readonly nodes: readonly Node[]; readonly edges: readonly Edge[] },
+  previous: {
+    readonly nodes: readonly Node[];
+    readonly edges: readonly Edge[];
+  },
   next: { readonly nodes: readonly Node[]; readonly edges: readonly Edge[] }
 ): WorkflowGraphPatchPayload {
   const nodePatches: WorkflowNodePatch[] = [];
@@ -72,7 +79,9 @@ export function diffWorkflowGraph(
     }
   }
 
-  const prevEdges = new Map(previous.edges.map((edge) => [edgeKey(edge), edge]));
+  const prevEdges = new Map(
+    previous.edges.map((edge) => [edgeKey(edge), edge])
+  );
   const nextEdges = new Map(next.edges.map((edge) => [edgeKey(edge), edge]));
 
   for (const [key, edge] of prevEdges) {
@@ -107,8 +116,7 @@ export function applyWorkflowGraphPatch(
       case "remove":
         nodes = nodes.filter((node) => node.id !== nodePatch.id);
         edges = edges.filter(
-          (edge) =>
-            edge.source !== nodePatch.id && edge.target !== nodePatch.id
+          (edge) => edge.source !== nodePatch.id && edge.target !== nodePatch.id
         );
         break;
       case "position":

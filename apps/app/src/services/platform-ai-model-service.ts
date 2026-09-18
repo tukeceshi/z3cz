@@ -108,9 +108,9 @@ export function usePlatformVideoModelBaselines(orgId: string | undefined) {
   const { data, error, isLoading, mutate } = useSWR(
     key,
     async () =>
-      makeRequest<{ models: import("@dafthunk/types").PlatformVideoModelBaseline[] }>(
-        `${key}`
-      ),
+      makeRequest<{
+        models: import("@dafthunk/types").PlatformVideoModelBaseline[];
+      }>(`${key}`),
     ORG_MODELS_SWR_OPTIONS
   );
 
@@ -170,9 +170,10 @@ export function useVolcanoAggregateCatalog(
     orgId && enabled ? `${platformAiEndpoint(orgId)}/volcano-catalog` : null;
   const { data, error, isLoading, mutate } = useSWR(
     key,
-    async () => makeRequest<{ readonly models: readonly AiModelCatalogEntry[] }>(
-      `${key}`
-    ),
+    async () =>
+      makeRequest<{ readonly models: readonly AiModelCatalogEntry[] }>(
+        `${key}`
+      ),
     ORG_MODELS_SWR_OPTIONS
   );
 
@@ -380,13 +381,10 @@ export async function ensureDirectUploadCorsForOrg(
   readonly throttled?: boolean;
   readonly blocksGenerativeMedia: boolean;
 }> {
-  return makeRequest(
-    `${platformAiEndpoint(orgId)}/ensure-direct-upload-cors`,
-    {
-      method: "POST",
-      body: JSON.stringify({ origin }),
-    }
-  );
+  return makeRequest(`${platformAiEndpoint(orgId)}/ensure-direct-upload-cors`, {
+    method: "POST",
+    body: JSON.stringify({ origin }),
+  });
 }
 
 /** One-shot configured check for non-canvas views (e.g. workflow library). */
@@ -411,7 +409,9 @@ export function useOrgCloudStorageConfigured(orgId: string | undefined) {
 
 /** @deprecated Use useCloudStorageCanvasContext inside the workflow editor. */
 export function useOrgCloudStorageStatus(orgId: string | undefined) {
-  const key = orgId ? `${platformAiEndpoint(orgId)}/storage-status?scope=health` : null;
+  const key = orgId
+    ? `${platformAiEndpoint(orgId)}/storage-status?scope=health`
+    : null;
   const { data, error, isLoading, mutate } = useSWR(
     key,
     async () => fetchOrgCloudStorageHealth(orgId!),
@@ -597,7 +597,9 @@ export async function completeGenerationJobUpload(
     `${platformAiEndpoint(orgId)}/generation-jobs/${encodeURIComponent(jobId)}/complete-upload`,
     {
       method: "POST",
-      body: JSON.stringify({ finalMedia } satisfies CompleteGenerationJobUploadRequest),
+      body: JSON.stringify({
+        finalMedia,
+      } satisfies CompleteGenerationJobUploadRequest),
     }
   );
 }
@@ -747,7 +749,10 @@ export async function generateAiTextStream(
             continue;
           }
 
-          if (event.type === "started" && typeof event.invocationId === "string") {
+          if (
+            event.type === "started" &&
+            typeof event.invocationId === "string"
+          ) {
             handlers.onStarted?.({
               invocationId: event.invocationId,
               workflowNodeContent: event.workflowNodeContent,
@@ -832,8 +837,9 @@ export function useModelCalls(
     ? `${platformAiEndpoint(orgId)}/model-calls?${params.toString()}`
     : null;
 
-  const { data, error, isLoading, mutate } = useSWR(key, async () =>
-    makeRequest<ListAiModelInvocationsResponse>(`${key}`),
+  const { data, error, isLoading, mutate } = useSWR(
+    key,
+    async () => makeRequest<ListAiModelInvocationsResponse>(`${key}`),
     {
       refreshInterval: (latest) =>
         latest?.invocations.some((entry) => entry.status === "pending")

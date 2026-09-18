@@ -129,9 +129,9 @@ describe("Encryption Utilities", () => {
     it("should not decrypt with wrong organization ID", async () => {
       const encrypted = await encryptSecret(testSecret, mockEnv, "org-1");
 
-      await expect(
-        decryptSecret(encrypted, mockEnv, "org-2")
-      ).rejects.toThrow(DecryptionFailedError);
+      await expect(decryptSecret(encrypted, mockEnv, "org-2")).rejects.toThrow(
+        DecryptionFailedError
+      );
     });
 
     it("should maintain organization isolation consistently", async () => {

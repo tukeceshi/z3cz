@@ -1,6 +1,10 @@
 export const AI_VIDEO_PANEL_META_KEY = "aiVideoPanel" as const;
 
-export type AiVideoPanelKind = "generate" | "enhance" | "retake" | "subtitleErase";
+export type AiVideoPanelKind =
+  | "generate"
+  | "enhance"
+  | "retake"
+  | "subtitleErase";
 
 /** @deprecated Legacy lock flag — treat as retake panel. */
 export const VIDEO_RETAKE_LOCK_META_KEY = "videoRetakeLock" as const;
@@ -54,9 +58,7 @@ export function isAiVideoRetakePanel(
   return parseAiVideoPanelKind(metadata) === "retake";
 }
 
-export function serializeAiVideoPanelMetadata(
-  kind: AiVideoPanelKind
-): string {
+export function serializeAiVideoPanelMetadata(kind: AiVideoPanelKind): string {
   return JSON.stringify({ kind } satisfies AiVideoPanelMetadata);
 }
 

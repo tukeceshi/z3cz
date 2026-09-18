@@ -143,7 +143,10 @@ export function compileRemotionSource(source: string): RemotionCompileResult {
 var root = typeof RemotionRoot === "function" ? RemotionRoot : typeof Root === "function" ? Root : null;
 if (!root) { throw new Error("Define RemotionRoot that returns <Composition />."); }
 return root();`
-    ) as (react: typeof import("react"), remotion: typeof remotionApi) => unknown;
+    ) as (
+      react: typeof import("react"),
+      remotion: typeof remotionApi
+    ) => unknown;
 
     const tree = run(React, remotionApi);
     let found: Record<string, unknown> | undefined;

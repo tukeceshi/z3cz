@@ -12,7 +12,11 @@ import {
   type TextModelParameterRules,
 } from "@dafthunk/types";
 
-import type { NodeType, WorkflowNodeType, WorkflowParameter } from "./workflow-types";
+import type {
+  NodeType,
+  WorkflowNodeType,
+  WorkflowParameter,
+} from "./workflow-types";
 import {
   withGenerativeGeneratedContentMode,
   withGenerativeManualContentMode,
@@ -127,7 +131,8 @@ export function mergeAiTextNodeCatalogInputs(
       type: "any",
       hidden: true,
       repeated: true,
-      description: "Upstream references (text / image / video per model limits).",
+      description:
+        "Upstream references (text / image / video per model limits).",
     },
   ];
 
@@ -284,7 +289,9 @@ export function readAiTextResult(
     return normalizeTableMarkdownForDisplay(fromBody.value);
   }
 
-  const fromInput = inputs.find((input) => input.id === AI_TEXT_RESULT_INPUT_ID);
+  const fromInput = inputs.find(
+    (input) => input.id === AI_TEXT_RESULT_INPUT_ID
+  );
   const inputValue = fromInput?.value;
   if (typeof inputValue === "string" && inputValue.trim()) {
     return normalizeTableMarkdownForDisplay(inputValue);
@@ -341,9 +348,11 @@ export function readAiTextResultHistory(
           typeof (entry as AiTextResultHistoryItem).id === "string" &&
           (typeof (entry as AiTextResultHistoryItem).text === "string" ||
             typeof (entry as AiTextResultHistoryItem).resourceId === "string" ||
-            typeof (entry as AiTextResultHistoryItem).contentSha256 === "string" ||
+            typeof (entry as AiTextResultHistoryItem).contentSha256 ===
+              "string" ||
             typeof (entry as AiTextResultHistoryItem).excerpt === "string" ||
-            typeof (entry as AiTextResultHistoryItem).invocationId === "string" ||
+            typeof (entry as AiTextResultHistoryItem).invocationId ===
+              "string" ||
             typeof (entry as AiTextResultHistoryItem).createdAt === "string")
       )
     : [];
@@ -460,9 +469,7 @@ export function withAiTextGeneratingHistoryFailed(
   const selectedId = history.selectedId;
   const nextItems = history.items.map((item) => {
     const isPending =
-      item.id === selectedId &&
-      !item.text &&
-      !item.contentSha256;
+      item.id === selectedId && !item.text && !item.contentSha256;
     if (!isPending) {
       return item;
     }
@@ -700,7 +707,9 @@ export interface ProbedVideoDimensions {
   readonly height: number;
 }
 
-export function probeVideoUrlDimensions(url: string): Promise<ProbedVideoDimensions> {
+export function probeVideoUrlDimensions(
+  url: string
+): Promise<ProbedVideoDimensions> {
   return new Promise((resolve, reject) => {
     const video = document.createElement("video");
     video.preload = "metadata";

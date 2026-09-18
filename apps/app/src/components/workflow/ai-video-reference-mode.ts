@@ -39,7 +39,9 @@ export function shouldShowReferenceModeAutoSwitchNotice(
   return true;
 }
 
-export function resetReferenceModeAutoSwitchNoticesForNode(nodeId: string): void {
+export function resetReferenceModeAutoSwitchNoticesForNode(
+  nodeId: string
+): void {
   const prefix = `${nodeId}:`;
   for (const key of referenceModeAutoSwitchNotifiedKeys) {
     if (key.startsWith(prefix)) {
@@ -55,7 +57,10 @@ export function clearReferenceModeAutoSwitchNoticeIfResolved(params: {
     ReactFlowEdge<WorkflowEdgeType>,
     "source" | "target" | "sourceHandle" | "targetHandle"
   >[];
-  readonly nodes: readonly { readonly id: string; readonly data: WorkflowNodeType }[];
+  readonly nodes: readonly {
+    readonly id: string;
+    readonly data: WorkflowNodeType;
+  }[];
 }): void {
   const rules = resolveAiVideoReferenceRules({
     targetNodeData: params.nodeData,
@@ -84,7 +89,9 @@ export function resolveEffectiveVideoReferenceMode(
   rules: VideoModelParameterRules,
   params?: Readonly<Record<string, unknown>>
 ): VideoReferenceMode {
-  const raw = params?.reference_mode ?? readNodeGenerationParams(nodeData.inputs).reference_mode;
+  const raw =
+    params?.reference_mode ??
+    readNodeGenerationParams(nodeData.inputs).reference_mode;
   if (raw === "first_last_frame" || raw === "reference_image") {
     return raw;
   }
@@ -99,9 +106,7 @@ export function shouldAutoSwitchVideoReferenceMode(
     return false;
   }
   return (
-    counts.imageCount > 2 ||
-    counts.videoCount > 0 ||
-    counts.audioCount > 0
+    counts.imageCount > 2 || counts.videoCount > 0 || counts.audioCount > 0
   );
 }
 
@@ -133,7 +138,10 @@ export function syncVideoReferenceModeIfNeeded(params: {
     ReactFlowEdge<WorkflowEdgeType>,
     "source" | "target" | "sourceHandle" | "targetHandle"
   >[];
-  readonly nodes: readonly { readonly id: string; readonly data: WorkflowNodeType }[];
+  readonly nodes: readonly {
+    readonly id: string;
+    readonly data: WorkflowNodeType;
+  }[];
   readonly targetNodeId: string;
 }): Partial<Pick<WorkflowNodeType, "inputs" | "metadata">> | null {
   const rules = resolveAiVideoReferenceRules({
@@ -171,11 +179,7 @@ export function annotateVideoReferenceChips(
   if (mode !== "first_last_frame") {
     return chips;
   }
-  if (
-    counts.videoCount > 0 ||
-    counts.audioCount > 0 ||
-    counts.imageCount > 2
-  ) {
+  if (counts.videoCount > 0 || counts.audioCount > 0 || counts.imageCount > 2) {
     return chips;
   }
 

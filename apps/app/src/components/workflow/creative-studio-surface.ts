@@ -29,7 +29,8 @@ export const STUDIO_PANEL = `relative flex min-h-0 w-full flex-col rounded-xl ${
 export const STUDIO_PANEL_HEADER =
   "flex h-11 shrink-0 items-center justify-between px-4 py-3";
 
-export const STUDIO_PANEL_TITLE = "text-sm font-medium leading-none text-foreground";
+export const STUDIO_PANEL_TITLE =
+  "text-sm font-medium leading-none text-foreground";
 
 export const STUDIO_PANEL_COUNT = "text-xs text-muted-foreground/60";
 

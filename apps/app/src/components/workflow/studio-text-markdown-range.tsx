@@ -7,10 +7,7 @@ import {
   STUDIO_TEXT_PLAIN_SEGMENT_EDIT,
 } from "./creative-studio-surface";
 import { isStudioTextInlineEditorActive } from "./is-studio-text-inline-editor-active";
-import {
-  textSegmentKey,
-  type MarkdownSegment,
-} from "./split-markdown-tables";
+import { textSegmentKey, type MarkdownSegment } from "./split-markdown-tables";
 import { StudioTextMdxEditor } from "./studio-text-mdx-editor";
 import { StudioTextTablePreview } from "./studio-text-table-preview";
 
@@ -160,10 +157,7 @@ export function StudioTextMarkdownRange({
               value={visibleText}
               autoFocus
               onChange={(event) =>
-                onTextChange(
-                  segmentKey,
-                  prefix + event.target.value + suffix
-                )
+                onTextChange(segmentKey, prefix + event.target.value + suffix)
               }
               onFocus={onFocus}
               className={cn(
@@ -202,7 +196,8 @@ export function StudioTextMarkdownRange({
               onMouseDown={
                 readOnly
                   ? undefined
-                  : (event) => activateEditorOnPointer(event, handleActivateTable)
+                  : (event) =>
+                      activateEditorOnPointer(event, handleActivateTable)
               }
               onKeyDown={
                 readOnly

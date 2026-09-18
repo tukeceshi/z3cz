@@ -25,9 +25,7 @@ function sampleManifest(
         assets: ["/assets/shared.js"],
       },
     ],
-    staticAssets: [
-      { path: "/landing/dollface.jpg", hash: "3333333333333333" },
-    ],
+    staticAssets: [{ path: "/landing/dollface.jpg", hash: "3333333333333333" }],
     routeToPacks: { "/": ["shared"] },
     ...overrides,
   };

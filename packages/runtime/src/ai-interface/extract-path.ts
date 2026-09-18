@@ -5,10 +5,7 @@ export function splitDotPath(path: string): readonly string[] {
     .filter((segment) => segment.length > 0);
 }
 
-export function readDotPath(
-  value: unknown,
-  path: readonly string[]
-): unknown {
+export function readDotPath(value: unknown, path: readonly string[]): unknown {
   let current: unknown = value;
   for (const segment of path) {
     if (current === null || current === undefined) {

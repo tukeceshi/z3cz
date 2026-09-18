@@ -34,7 +34,12 @@ function createVideoNode(history: unknown): WorkflowNodeType {
       }),
     ],
     outputs: [
-      testWorkflowParam({ id: "videos", name: "videos", type: "video", value: [] }),
+      testWorkflowParam({
+        id: "videos",
+        name: "videos",
+        type: "video",
+        value: [],
+      }),
     ],
     executionState: "idle",
   };

@@ -31,10 +31,7 @@ export function WorkflowViewportPersistenceListener({
   };
 
   const notifyGestureEnd = (viewport: Viewport) => {
-    if (
-      disabled ||
-      !isValidWorkflowEditorViewport(viewport)
-    ) {
+    if (disabled || !isValidWorkflowEditorViewport(viewport)) {
       return;
     }
 

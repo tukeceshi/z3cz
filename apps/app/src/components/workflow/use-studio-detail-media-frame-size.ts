@@ -17,7 +17,9 @@ interface StudioMediaIntrinsicSize {
   readonly height: number;
 }
 
-function readStudioDetailContentBounds(element: HTMLDivElement): StudioDetailBounds {
+function readStudioDetailContentBounds(
+  element: HTMLDivElement
+): StudioDetailBounds {
   const style = getComputedStyle(element);
   const padX = parseFloat(style.paddingLeft) + parseFloat(style.paddingRight);
   const padY = parseFloat(style.paddingTop) + parseFloat(style.paddingBottom);
@@ -46,11 +48,13 @@ export function useStudioDetailMediaFrameSize(mediaKey: string | null): {
   readonly applyPrimaryNaturalSize: (width: number, height: number) => void;
 } {
   const containerRef = useRef<HTMLDivElement>(null);
-  const [bounds, setBounds] = useState<StudioDetailBounds>({ width: 0, height: 0 });
+  const [bounds, setBounds] = useState<StudioDetailBounds>({
+    width: 0,
+    height: 0,
+  });
   const [aspectRatio, setAspectRatio] = useState(DEFAULT_DETAIL_ASPECT_RATIO);
-  const [naturalSize, setNaturalSize] = useState<StudioMediaIntrinsicSize | null>(
-    null
-  );
+  const [naturalSize, setNaturalSize] =
+    useState<StudioMediaIntrinsicSize | null>(null);
 
   useEffect(() => {
     setAspectRatio(DEFAULT_DETAIL_ASPECT_RATIO);

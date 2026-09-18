@@ -81,8 +81,8 @@ export function testTopologicalOrdering(
     });
 
     it("should handle diamond dependency pattern", async () => {
-      // Pattern: A â†?B â†?D
-      //          A â†?C â†?D
+      // Pattern: A â†’B â†’D
+      //          A â†’C â†’D
       const workflow = {
         id: "test-workflow-diamond",
         name: "Diamond Pattern",

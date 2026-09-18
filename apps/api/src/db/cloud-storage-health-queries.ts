@@ -4,10 +4,7 @@ import type {
 } from "@dafthunk/types";
 
 import type { Database } from "../db";
-import {
-  generationJobs,
-  organizationCloudStorageHealth,
-} from "../db/schema";
+import { generationJobs, organizationCloudStorageHealth } from "../db/schema";
 import { and, eq, inArray, lt, or, sql } from "drizzle-orm";
 
 import { ACTIVE_GENERATION_JOB_STATUSES } from "@dafthunk/types";
@@ -79,10 +76,7 @@ export async function upsertOrganizationCloudStorageHealth(
       },
     });
 
-  if (
-    params.snapshot.status === "blocked" &&
-    previous?.status !== "blocked"
-  ) {
+  if (params.snapshot.status === "blocked" && previous?.status !== "blocked") {
     await cancelActiveGenerationJobsForStorageHealth(db, {
       organizationId: params.organizationId,
       healthReason: params.snapshot.reason ?? "blocked",

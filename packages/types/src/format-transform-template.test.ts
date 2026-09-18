@@ -39,9 +39,9 @@ describe("format-transform-template presets", () => {
 
   it("rejects incomplete mapping config", () => {
     const preset = buildSeedanceTransformExamplePreset();
-    expect(
-      isTransformMappingConfigComplete(preset.upstreamParams, [])
-    ).toBe(false);
+    expect(isTransformMappingConfigComplete(preset.upstreamParams, [])).toBe(
+      false
+    );
   });
 
   it("defaults incomplete poll mapping", () => {
@@ -88,7 +88,9 @@ describe("resolveTransformUpstreamDisplayExample", () => {
       )
     ).toEqual([{ url: "https://example.com/ref.png" }]);
     expect(
-      resolveTransformUpstreamDisplayExample(findTransformSchemaNodeById("size")!)
+      resolveTransformUpstreamDisplayExample(
+        findTransformSchemaNodeById("size")!
+      )
     ).toBe("1280x720");
   });
 });

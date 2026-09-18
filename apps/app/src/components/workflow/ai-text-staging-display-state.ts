@@ -6,12 +6,7 @@ export type AiTextStagingDisplayState =
   | "empty"
   | "failed";
 
-const DISPLAY_STATES = new Set<string>([
-  "loading",
-  "ready",
-  "empty",
-  "failed",
-]);
+const DISPLAY_STATES = new Set<string>(["loading", "ready", "empty", "failed"]);
 
 export function readAiTextStagingDisplayState(
   metadata: Record<string, string> | undefined

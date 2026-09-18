@@ -10,7 +10,6 @@ export interface ObjectReference {
   storageBackend?: "platform" | "volcengine_tos";
 }
 
-
 /**
  * Workflow trigger types
  */
@@ -616,9 +615,15 @@ export interface WorkflowState extends Workflow {
   timestamp: number;
 }
 
-import type { WorkflowPublicMessage, WorkflowPublicState } from "./workflow-public-state";
+import type {
+  WorkflowPublicMessage,
+  WorkflowPublicState,
+} from "./workflow-public-state";
 
-export type { WorkflowPublicMessage, WorkflowPublicState } from "./workflow-public-state";
+export type {
+  WorkflowPublicMessage,
+  WorkflowPublicState,
+} from "./workflow-public-state";
 export { workflowPublicStateFromSiteSettings } from "./workflow-public-state";
 
 /**

@@ -52,7 +52,9 @@ export function CreativeStudioListItem({
       data-studio-focus-id={focusId}
       onDoubleClick={onNodeDoubleClick}
     >
-      {hoverClassName ? <span className={hoverClassName} aria-hidden="true" /> : null}
+      {hoverClassName ? (
+        <span className={hoverClassName} aria-hidden="true" />
+      ) : null}
       {isActive && activeClassName ? (
         <span className={activeClassName} aria-hidden="true" />
       ) : null}

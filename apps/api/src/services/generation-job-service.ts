@@ -42,7 +42,10 @@ import { CloudflareAiInterfaceService } from "../runtime/cloudflare-ai-interface
 import { assertCloudStorageHealthyForGenerativeMedia } from "./assert-cloud-storage-healthy-for-generative-media";
 import { syncGenerationJobInvocation } from "./sync-generation-job-invocation";
 import { ensureFailedJobPlaceholderResourcesMarked } from "./ensure-failed-job-placeholder-resources";
-import { markMediaResourcesFailed, placeholderMimeTypeForModality } from "./mark-media-resources-failed";
+import {
+  markMediaResourcesFailed,
+  placeholderMimeTypeForModality,
+} from "./mark-media-resources-failed";
 import {
   registerMediaResourceTransitions,
   registerMediaResourcesFromReferences,
@@ -163,9 +166,7 @@ export async function markVideoGenerationJobReadyToPersist(
   const readyAt = new Date().toISOString();
   const resultJson: GenerationJobResultJson = {
     ...(params.job.resultJson ?? {}),
-    pendingMedia: [
-      buildVideoPendingMedia(params.job, params.videoUrl),
-    ],
+    pendingMedia: [buildVideoPendingMedia(params.job, params.videoUrl)],
     upstreamTaskId: params.job.upstreamTaskId ?? undefined,
     aiInterfaceId: params.job.interfaceId,
   };
@@ -236,14 +237,12 @@ function pendingMediaFromEphemeralMedia(
   media: readonly MediaReference[],
   mediaKind: "ai-image" | "ai-video" | "ai-audio"
 ): readonly GenerationJobPendingMedia[] {
-  return media
-    .filter(isEphemeralMediaReference)
-    .map((item) => ({
-      sourceUrl: item.url,
-      mimeType: item.mimeType,
-      mediaKind,
-      resourceId: item.mediaId,
-    }));
+  return media.filter(isEphemeralMediaReference).map((item) => ({
+    sourceUrl: item.url,
+    mimeType: item.mimeType,
+    mediaKind,
+    resourceId: item.mediaId,
+  }));
 }
 
 function buildMediaResourceTransitionsFromJobComplete(
@@ -305,7 +304,9 @@ async function enterVideoDeferredCancel(
 
   if (cancelling) {
     await syncJobCancellingToWorkflow(env, cancelling, true);
-    return toCancelGenerationJobResponse(db, cancelling, { cancelPending: true });
+    return toCancelGenerationJobResponse(db, cancelling, {
+      cancelPending: true,
+    });
   }
 
   const latest = await getGenerationJob(db, job.id, job.organizationId);
@@ -412,13 +413,13 @@ async function tryCancelUpstreamVideoTask(
     },
     () =>
       cancelOrgVideoTask({
-    apiKey: iface.apiKey,
-    canonicalId: job.modelCanonicalId,
-    pollUrl: pollUrl ?? undefined,
-    baseUrl: iface.baseUrl,
-    upstreamTaskId: job.upstreamTaskId ?? undefined,
-    videoEndpoints,
-    upstreamLog: createJobUpstreamRequestLogger(db, job, "cancel"),
+        apiKey: iface.apiKey,
+        canonicalId: job.modelCanonicalId,
+        pollUrl: pollUrl ?? undefined,
+        baseUrl: iface.baseUrl,
+        upstreamTaskId: job.upstreamTaskId ?? undefined,
+        videoEndpoints,
+        upstreamLog: createJobUpstreamRequestLogger(db, job, "cancel"),
       })
   );
 
@@ -543,7 +544,9 @@ export async function pollVideoGenerationJob(
   });
   if (!iface) {
     const expectedStatuses =
-      job.status === "cancelling" ? (["cancelling"] as const) : (["generating"] as const);
+      job.status === "cancelling"
+        ? (["cancelling"] as const)
+        : (["generating"] as const);
     const failed = await updateGenerationJob(db, {
       id: job.id,
       organizationId: job.organizationId,
@@ -572,14 +575,14 @@ export async function pollVideoGenerationJob(
     },
     () =>
       pollOrgVideoTask({
-    apiKey: iface.apiKey,
-    canonicalId: job.modelCanonicalId,
-    baseUrl,
-    upstreamTaskId: job.upstreamTaskId ?? "",
-    videoPollUrl: job.resultJson?.videoPollUrl,
-    videoEndpoints: iface.videoEndpoints,
-    formatTransform: iface.formatTransform,
-    upstreamLog: createJobUpstreamRequestLogger(db, job, "poll"),
+        apiKey: iface.apiKey,
+        canonicalId: job.modelCanonicalId,
+        baseUrl,
+        upstreamTaskId: job.upstreamTaskId ?? "",
+        videoPollUrl: job.resultJson?.videoPollUrl,
+        videoEndpoints: iface.videoEndpoints,
+        formatTransform: iface.formatTransform,
+        upstreamLog: createJobUpstreamRequestLogger(db, job, "poll"),
       })
   );
 
@@ -710,10 +713,7 @@ async function runServerGenerationJobPersist(
   }
 
   try {
-    await assertCloudStorageHealthyForGenerativeMedia(
-      env,
-      job.organizationId
-    );
+    await assertCloudStorageHealthyForGenerativeMedia(env, job.organizationId);
   } catch {
     const cancelled = await updateGenerationJob(db, {
       id: job.id,
@@ -851,10 +851,7 @@ export async function requestServerGenerationJobPersist(
     return toGetGenerationJobResponse(db, job);
   }
 
-  if (
-    job.status === "uploading" &&
-    readPersistOwner(job) === "server"
-  ) {
+  if (job.status === "uploading" && readPersistOwner(job) === "server") {
     return toGetGenerationJobResponse(db, job);
   }
 
@@ -964,16 +961,16 @@ export async function completeGenerationJobClientUpload(
     return toGetGenerationJobResponse(db, job);
   }
 
-  if (
-    job.status === "uploading" &&
-    readPersistOwner(job) === "server"
-  ) {
+  if (job.status === "uploading" && readPersistOwner(job) === "server") {
     return toGetGenerationJobResponse(db, job);
   }
 
   let validatedFinalMedia: readonly MediaReference[];
   try {
-    validatedFinalMedia = validateGenerationJobUploadMedia(job, params.finalMedia);
+    validatedFinalMedia = validateGenerationJobUploadMedia(
+      job,
+      params.finalMedia
+    );
     await assertGenerationJobUploadKeysBelongToOrg(
       env,
       params.organizationId,

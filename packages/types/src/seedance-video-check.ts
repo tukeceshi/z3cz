@@ -27,10 +27,7 @@ export interface SeedanceVideoCheckApiLog {
   readonly response: Record<string, unknown>;
 }
 
-export type SeedanceVideoCheckResultStatus =
-  | "pending"
-  | "completed"
-  | "failed";
+export type SeedanceVideoCheckResultStatus = "pending" | "completed" | "failed";
 
 export interface SeedanceVideoCheckResult {
   readonly status: SeedanceVideoCheckResultStatus;

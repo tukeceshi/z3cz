@@ -70,7 +70,9 @@ export function TemplatePreviewPage() {
   if (!template) {
     return (
       <div className="w-full h-screen flex items-center justify-center bg-neutral-50">
-        <div className="text-neutral-500">{t("pages.templatePreview.notFound")}</div>
+        <div className="text-neutral-500">
+          {t("pages.templatePreview.notFound")}
+        </div>
       </div>
     );
   }

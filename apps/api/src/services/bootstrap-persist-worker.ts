@@ -1,4 +1,7 @@
-import type { BootstrapPersistWorkerRequest, PersistWorker } from "@dafthunk/types";
+import type {
+  BootstrapPersistWorkerRequest,
+  PersistWorker,
+} from "@dafthunk/types";
 import { Client } from "ssh2";
 
 import type { Bindings } from "../context";

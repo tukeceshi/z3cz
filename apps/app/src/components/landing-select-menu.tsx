@@ -26,7 +26,7 @@ export function formatLandingParamDuration(seconds: number): string {
 
 export function formatLandingParamReferenceSummary(
   count: number,
-  seconds: number,
+  seconds: number
 ): string {
   return `${count}*${seconds}s`;
 }
@@ -34,7 +34,7 @@ export function formatLandingParamReferenceSummary(
 export const LANDING_PARAM_CHIP_CLASS = cn(
   "landing-featured-param inline-flex items-center border px-2 py-1 text-[10px] uppercase tracking-[0.02em] text-foreground/70",
   LANDING_MENU_BORDER,
-  "before:mr-1.5 before:text-[#4a55cf] before:content-['▪']",
+  "before:mr-1.5 before:text-[#4a55cf] before:content-['▪']"
 );
 
 export const LANDING_PARAM_TRIGGER_CLASS =
@@ -45,7 +45,7 @@ export function landingMenuContentClass(className?: string): string {
     "w-auto min-w-32 bg-[#f7f5f1] p-1 text-foreground shadow-sm",
     LANDING_MENU_BORDER,
     "dark:bg-neutral-900",
-    className,
+    className
   );
 }
 
@@ -54,7 +54,7 @@ export function landingMenuItemClass(active?: boolean): string {
     "rounded-md px-2 py-1.5 text-left text-xs transition-colors",
     active
       ? "bg-[#f0ede6] text-foreground dark:bg-neutral-800"
-      : "text-foreground/80 hover:bg-[#f0ede6] hover:text-foreground dark:hover:bg-neutral-800",
+      : "text-foreground/80 hover:bg-[#f0ede6] hover:text-foreground dark:hover:bg-neutral-800"
   );
 }
 
@@ -153,7 +153,7 @@ export function LandingDropdownMenuItem(props: {
     <DropdownMenuItem
       className={cn(
         landingMenuItemClass(props.active),
-        "cursor-pointer focus:bg-[#f0ede6] dark:focus:bg-neutral-800",
+        "cursor-pointer focus:bg-[#f0ede6] dark:focus:bg-neutral-800"
       )}
       onClick={props.onSelect}
     >

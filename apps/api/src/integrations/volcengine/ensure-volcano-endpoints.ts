@@ -66,7 +66,9 @@ async function createVolcanoEndpoint(params: {
   readonly canonicalId: string;
   readonly providerModelId: string;
 }): Promise<string | null> {
-  const reference = parseVolcanoFoundationModelReference(params.providerModelId);
+  const reference = parseVolcanoFoundationModelReference(
+    params.providerModelId
+  );
   if (!reference) {
     return null;
   }
@@ -132,7 +134,10 @@ async function reconcileListedEndpoints(params: {
   readonly credentials: VolcengineCredentials;
   readonly arkEndpoints: Readonly<Record<string, string>>;
   readonly catalog: Map<string, AiModelCatalogEntry>;
-}): Promise<{ readonly arkEndpoints: Record<string, string>; readonly changed: boolean }> {
+}): Promise<{
+  readonly arkEndpoints: Record<string, string>;
+  readonly changed: boolean;
+}> {
   const endpointIds = await listVolcanoEndpointIds(params.credentials);
   if (endpointIds.length === 0) {
     return { arkEndpoints: { ...params.arkEndpoints }, changed: false };

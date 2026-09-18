@@ -124,11 +124,7 @@ async function processInboxEvents(
     let matched = false;
     for (const continuation of listExternalEventContinuations(next)) {
       if (
-        !matchesExternalEvent(
-          continuation,
-          envelope.eventType,
-          envelope.nodeId
-        )
+        !matchesExternalEvent(continuation, envelope.eventType, envelope.nodeId)
       ) {
         continue;
       }
@@ -202,9 +198,7 @@ export async function runHeartbeatTick(
   }
 
   const invokeResults = await Promise.all(
-    readyIds.map((nodeId) =>
-      host.invokeNode(context, next.execution, nodeId)
-    )
+    readyIds.map((nodeId) => host.invokeNode(context, next.execution, nodeId))
   );
 
   next = { ...next, started };
@@ -320,7 +314,11 @@ export async function runWorkflowHeartbeat(
       continue;
     }
 
-    if (wake.action === "sleep" && wake.delayMs !== undefined && wake.delayMs > 0) {
+    if (
+      wake.action === "sleep" &&
+      wake.delayMs !== undefined &&
+      wake.delayMs > 0
+    ) {
       await callbacks.executeSleep("heartbeat sleep", wake.delayMs);
     }
   }

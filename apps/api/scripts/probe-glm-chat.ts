@@ -56,18 +56,21 @@ function applyDevVars(): void {
 }
 
 async function probeChat(apiKey: string, model: string): Promise<void> {
-  const response = await fetch(`${VOLCANO_ARK_INFERENCE_BASE_URL}/chat/completions`, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      model,
-      messages: [{ role: "user", content: "ping" }],
-      max_tokens: 8,
-    }),
-  });
+  const response = await fetch(
+    `${VOLCANO_ARK_INFERENCE_BASE_URL}/chat/completions`,
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model,
+        messages: [{ role: "user", content: "ping" }],
+        max_tokens: 8,
+      }),
+    }
+  );
 
   const text = await response.text();
   let json: Record<string, unknown> = {};
@@ -133,7 +136,8 @@ async function main(): Promise<void> {
         action: "ListFoundationModelVersions",
         body: { FoundationModelName: name, PageNumber: 1, PageSize: 5 },
       });
-      for (const version of (versions.Items as Record<string, unknown>[]) ?? []) {
+      for (const version of (versions.Items as Record<string, unknown>[]) ??
+        []) {
         console.log(
           `    version=${version.ModelVersion} ModelId=${version.ModelId} Status=${version.Status}`
         );
@@ -233,7 +237,8 @@ async function main(): Promise<void> {
         action: "ListFoundationModelVersions",
         body: { FoundationModelName: name, PageNumber: 1, PageSize: 5 },
       });
-      for (const version of (versions.Items as Record<string, unknown>[]) ?? []) {
+      for (const version of (versions.Items as Record<string, unknown>[]) ??
+        []) {
         const modelId = String(version.ModelId ?? "");
         if (modelId) {
           await probeChat(apiKey, modelId);

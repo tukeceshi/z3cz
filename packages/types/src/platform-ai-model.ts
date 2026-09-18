@@ -93,7 +93,9 @@ export function normalizeGenerationCountPolicy(
   return {
     enabled: raw.enabled,
     effectMode: normalizeGenerationCountEffectMode(
-      raw.effectMode as GenerationCountEffectMode | LegacyGenerationCountEffectMode
+      raw.effectMode as
+        | GenerationCountEffectMode
+        | LegacyGenerationCountEffectMode
     ),
   };
 }
@@ -754,11 +756,7 @@ export const IMAGE_GENERATION_FIELD_CATALOG: readonly UpstreamParamProfileField[
     },
   ] as const;
 
-const DEFAULT_IMAGE_FIELD_NAMES = new Set([
-  "size",
-  "ratio",
-  "watermark",
-]);
+const DEFAULT_IMAGE_FIELD_NAMES = new Set(["size", "ratio", "watermark"]);
 
 /** Defaults for new image models; extended params are enabled in Admin. */
 export const DEFAULT_IMAGE_GENERATION_FIELDS: readonly UpstreamParamProfileField[] =
@@ -790,7 +788,9 @@ export function buildDurationOptions(
 ): readonly string[] {
   const min = Math.max(1, Math.floor(minSeconds));
   const max = Math.max(min, Math.floor(maxSeconds));
-  return Array.from({ length: max - min + 1 }, (_, index) => String(min + index));
+  return Array.from({ length: max - min + 1 }, (_, index) =>
+    String(min + index)
+  );
 }
 
 export function resolveDurationOptions(
@@ -1145,7 +1145,9 @@ export function validateSubmitAiVideoReferences(params: {
 }): { readonly ok: true } | { readonly ok: false; readonly error: string } {
   const trimmedPrompt = params.prompt.trim();
   const totalMedia =
-    params.counts.imageCount + params.counts.videoCount + params.counts.audioCount;
+    params.counts.imageCount +
+    params.counts.videoCount +
+    params.counts.audioCount;
 
   if (!trimmedPrompt && totalMedia === 0) {
     return { ok: false, error: "Prompt is required" };
@@ -1385,7 +1387,11 @@ function resolveImageGenerationFieldValue(
     if (raw && field.enumValues.includes(raw)) {
       return raw;
     }
-    if (field.default !== undefined && field.default !== null && field.default !== "") {
+    if (
+      field.default !== undefined &&
+      field.default !== null &&
+      field.default !== ""
+    ) {
       return field.default;
     }
     return field.enumValues[0];
@@ -1517,9 +1523,7 @@ export function buildVolcanoImageGenerationBody(params: {
 
     const raw = mergedParams[field.name];
     const value =
-      raw === undefined || raw === null || raw === ""
-        ? field.default
-        : raw;
+      raw === undefined || raw === null || raw === "" ? field.default : raw;
 
     if (field.type === "boolean") {
       if (value === undefined || value === null) {
@@ -1767,9 +1771,7 @@ export function mapVideoGenerationFieldsToBody(params: {
     } else {
       const raw = mergedParams[field.name];
       value =
-        raw === undefined || raw === null || raw === ""
-          ? field.default
-          : raw;
+        raw === undefined || raw === null || raw === "" ? field.default : raw;
     }
 
     if (value === undefined || value === null || value === "") {

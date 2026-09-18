@@ -22,7 +22,10 @@ import { useEffect, useMemo, useState, type ReactNode } from "react";
 
 import { useTranslation } from "@/components/locale-provider";
 import { ModelBrandIcon } from "@/components/model-brand-icon";
-import { ModelBrandIconPicker, DEFAULT_BRAND_ICON } from "@/components/model-brand-icon-picker";
+import {
+  ModelBrandIconPicker,
+  DEFAULT_BRAND_ICON,
+} from "@/components/model-brand-icon-picker";
 import { PAGE_SCROLL_CLASS } from "@/components/list-scroll";
 import { Button } from "@/components/ui/button";
 import {
@@ -65,7 +68,8 @@ export const ADMIN_READONLY_CONTROL_CLASS = cn(
 );
 
 /** Three-column settings grid (matches application / count policy sections). */
-export const ADMIN_SETTINGS_GRID_CLASS = "grid grid-cols-1 gap-3 sm:grid-cols-3";
+export const ADMIN_SETTINGS_GRID_CLASS =
+  "grid grid-cols-1 gap-3 sm:grid-cols-3";
 
 const ADMIN_SETTINGS_GRID_2_CLASS = "grid gap-3 sm:grid-cols-2";
 
@@ -103,7 +107,9 @@ export function AdminModelList({
   const orderedModels = useMemo(
     () =>
       [...models].sort(
-        (a, b) => a.sortOrder - b.sortOrder || a.displayName.localeCompare(b.displayName)
+        (a, b) =>
+          a.sortOrder - b.sortOrder ||
+          a.displayName.localeCompare(b.displayName)
       ),
     [models]
   );
@@ -125,7 +131,9 @@ export function AdminModelList({
       return;
     }
 
-    const oldIndex = items.findIndex((model) => model.canonicalId === active.id);
+    const oldIndex = items.findIndex(
+      (model) => model.canonicalId === active.id
+    );
     const newIndex = items.findIndex((model) => model.canonicalId === over.id);
     if (oldIndex < 0 || newIndex < 0) {
       return;
@@ -310,7 +318,9 @@ export function ModelSettingsDialogShell({
           <DialogDescription>{description}</DialogDescription>
         </DialogHeader>
 
-        <div className={cn(PAGE_SCROLL_CLASS, "flex-1 space-y-3 px-6 py-4 pr-5")}>
+        <div
+          className={cn(PAGE_SCROLL_CLASS, "flex-1 space-y-3 px-6 py-4 pr-5")}
+        >
           {children}
         </div>
 
@@ -384,7 +394,13 @@ export function SettingsSection({
 
   if (compact) {
     return (
-      <div className={cn("rounded-lg border p-3", SURFACE_BORDER, SURFACE_MUTED_INSET)}>
+      <div
+        className={cn(
+          "rounded-lg border p-3",
+          SURFACE_BORDER,
+          SURFACE_MUTED_INSET
+        )}
+      >
         <div className="mb-2 flex items-center justify-between gap-2">
           <div className="flex min-w-0 items-center gap-1.5">
             <p className="text-xs font-medium text-foreground">{title}</p>
@@ -392,11 +408,7 @@ export function SettingsSection({
           </div>
           {action}
         </div>
-        <div
-          className={cn(
-            stacked ? "flex flex-col gap-3" : gridClass
-          )}
-        >
+        <div className={cn(stacked ? "flex flex-col gap-3" : gridClass)}>
           {children}
         </div>
       </div>
@@ -404,16 +416,13 @@ export function SettingsSection({
   }
 
   return (
-    <div className={cn("rounded-lg border", SURFACE_BORDER, SURFACE_MUTED_INSET)}>
+    <div
+      className={cn("rounded-lg border", SURFACE_BORDER, SURFACE_MUTED_INSET)}
+    >
       <div className={cn("border-b px-3 py-2", SURFACE_BORDER)}>
         <p className="text-sm font-semibold">{title}</p>
       </div>
-      <div
-        className={cn(
-          "p-3",
-          stacked ? "flex flex-col gap-3" : gridClass
-        )}
-      >
+      <div className={cn("p-3", stacked ? "flex flex-col gap-3" : gridClass)}>
         {children}
       </div>
     </div>

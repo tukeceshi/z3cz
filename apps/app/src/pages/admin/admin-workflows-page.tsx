@@ -115,10 +115,7 @@ export function AdminWorkflowsPage() {
   const { workflows, pagination, workflowsError, isWorkflowsLoading } =
     useAdminWorkflows(page, limit, search || undefined, organizationId);
 
-  const columns = useMemo(
-    () => createColumns(navigate, t),
-    [navigate, t]
-  );
+  const columns = useMemo(() => createColumns(navigate, t), [navigate, t]);
 
   if (isWorkflowsLoading) {
     return <InsetLoading title={t("admin.workflows.title")} />;

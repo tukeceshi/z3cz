@@ -62,8 +62,7 @@ export async function presignTosMediaUpload(
   const storageKey = client.buildObjectKey({
     prefix: cloud.tosStorage.prefix,
     workflowId,
-    mediaKind:
-      params.mediaKind === "reference" ? "ai-image" : params.mediaKind,
+    mediaKind: params.mediaKind === "reference" ? "ai-image" : params.mediaKind,
     objectId,
     mimeType: params.mimeType,
   });

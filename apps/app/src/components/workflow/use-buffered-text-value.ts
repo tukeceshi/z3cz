@@ -67,11 +67,14 @@ export function useBufferedTextValue(
     }
   }, []);
 
-  const persist = useCallback((value: string) => {
-    clearScheduled();
-    if (value === externalValueRef.current) return;
-    onCommitRef.current(value);
-  }, [clearScheduled]);
+  const persist = useCallback(
+    (value: string) => {
+      clearScheduled();
+      if (value === externalValueRef.current) return;
+      onCommitRef.current(value);
+    },
+    [clearScheduled]
+  );
 
   const schedulePersist = useCallback(
     (value: string) => {
@@ -138,9 +141,9 @@ export function useBufferedTextValue(
   }, [clearScheduled]);
 
   const onCompositionEnd = useCallback(() => {
-      composingRef.current = false;
-      schedulePersist(localValueRef.current);
-    }, [schedulePersist]);
+    composingRef.current = false;
+    schedulePersist(localValueRef.current);
+  }, [schedulePersist]);
 
   return {
     value: localValue,

@@ -88,11 +88,7 @@ describe("connection-pane-hit-test", () => {
     });
 
     expect(
-      nodeIdUnderPanePointer(
-        { x: 300, y: 300 },
-        { domNode },
-        elementsFromPoint
-      )
+      nodeIdUnderPanePointer({ x: 300, y: 300 }, { domNode }, elementsFromPoint)
     ).toBe("image-mid");
 
     expect(elementsFromPoint).toHaveBeenCalledWith(300, 300);

@@ -68,12 +68,7 @@ const OAUTH_RETURN_TO_MAX_AGE = 300; // 5 minutes
 const INVALID_CREDENTIALS_MESSAGE = "Invalid email or password";
 const EMAIL_NOT_FOUND_CODE = "EMAIL_NOT_FOUND";
 
-const emailSchema = z
-  .string()
-  .trim()
-  .toLowerCase()
-  .email()
-  .max(255);
+const emailSchema = z.string().trim().toLowerCase().email().max(255);
 
 const passwordLoginSchema = z.object({
   email: emailSchema,
@@ -921,7 +916,8 @@ auth.post(
   "/register/sub-account",
   zValidator("json", subAccountRegisterSchema),
   async (c) => {
-    const { email, password, invitationId, verificationCode } = c.req.valid("json");
+    const { email, password, invitationId, verificationCode } =
+      c.req.valid("json");
     const passwordError = validatePasswordStrength(password);
     if (passwordError) {
       return c.json({ error: passwordError }, 400);

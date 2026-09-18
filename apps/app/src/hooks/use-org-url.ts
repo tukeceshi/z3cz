@@ -9,28 +9,31 @@ export const useOrgUrl = () => {
   const { organization } = useAuth();
   const orgId = organization?.id;
 
-  const getOrgUrl = useCallback((path: string): string => {
-    if (!orgId) {
-      console.warn("No organization ID available for URL generation");
-      return "/";
-    }
+  const getOrgUrl = useCallback(
+    (path: string): string => {
+      if (!orgId) {
+        console.warn("No organization ID available for URL generation");
+        return "/";
+      }
 
-    // Remove leading slash if present
-    const cleanPath = path.startsWith("/") ? path.slice(1) : path;
+      // Remove leading slash if present
+      const cleanPath = path.startsWith("/") ? path.slice(1) : path;
 
-    // If path already includes org ID, return as is
-    if (cleanPath.startsWith(`org/${orgId}/`)) {
-      return `/${cleanPath}`;
-    }
+      // If path already includes org ID, return as is
+      if (cleanPath.startsWith(`org/${orgId}/`)) {
+        return `/${cleanPath}`;
+      }
 
-    // If path starts with org/, replace with org/:organizationId
-    if (cleanPath.startsWith("org/")) {
-      return `/${cleanPath.replace("org/", `org/${orgId}/`)}`;
-    }
+      // If path starts with org/, replace with org/:organizationId
+      if (cleanPath.startsWith("org/")) {
+        return `/${cleanPath.replace("org/", `org/${orgId}/`)}`;
+      }
 
-    // Otherwise, prepend org/:organizationId
-    return `/org/${orgId}/${cleanPath}`;
-  }, [orgId]);
+      // Otherwise, prepend org/:organizationId
+      return `/org/${orgId}/${cleanPath}`;
+    },
+    [orgId]
+  );
 
   return {
     orgId,

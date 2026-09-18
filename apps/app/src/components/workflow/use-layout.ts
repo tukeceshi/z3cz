@@ -45,8 +45,7 @@ export function useLayout({
     void computeWorkflowOrganizeLayoutUpdates(
       layoutNodes,
       edgesRef.current,
-      (node) =>
-        resolveWorkflowNodeDimensions(node.data.nodeType, node)
+      (node) => resolveWorkflowNodeDimensions(node.data.nodeType, node)
     ).then((updates) => {
       if (updates.length === 0) {
         reactFlowInstance?.fitView({ duration: 200 });
@@ -72,7 +71,14 @@ export function useLayout({
         reactFlowInstance?.fitView({ duration: 200 });
       });
     });
-  }, [disabled, onBeforeLayout, reactFlowInstance, nodesRef, edgesRef, setNodes]);
+  }, [
+    disabled,
+    onBeforeLayout,
+    reactFlowInstance,
+    nodesRef,
+    edgesRef,
+    setNodes,
+  ]);
 
   return { applyLayout };
 }

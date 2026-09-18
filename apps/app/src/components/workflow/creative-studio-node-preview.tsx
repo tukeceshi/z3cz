@@ -25,7 +25,10 @@ import { useCachedAiTextBody } from "@/hooks/use-cached-ai-text-body";
 import { useResolvedAiText } from "@/hooks/use-resolved-ai-text";
 import { cn } from "@/utils/utils";
 
-import { readAiAudioCardAudios, isAiAudioGenerating } from "./ai-audio-node-utils";
+import {
+  readAiAudioCardAudios,
+  isAiAudioGenerating,
+} from "./ai-audio-node-utils";
 import { collectAiImageUnifiedReferenceChips } from "./ai-image-prompt-reference";
 import { readAiImageCardPrimaryImage } from "./ai-image-node-utils";
 import { collectAiVideoUnifiedReferenceChips } from "./ai-video-prompt-reference";
@@ -35,7 +38,10 @@ import { GenerativeCardErrorBlock } from "./generative-card-error-block";
 import { GenerativeCardEmptyUploadSlot } from "./generative-card-empty-upload-slot";
 import type { GenerativeCardUploadKind } from "./generative-card-upload-utils";
 import { StudioMediaEmptyPreview } from "./creative-studio-media-preview-frame";
-import { readStudioMediaCardState, formatStudioMediaCardPlaceholder } from "./studio-media-card-state";
+import {
+  readStudioMediaCardState,
+  formatStudioMediaCardPlaceholder,
+} from "./studio-media-card-state";
 import { StudioMediaFullPreview } from "./studio-media-full-preview";
 import {
   STUDIO_PREVIEW_MEDIA_FALLBACK,
@@ -46,9 +52,7 @@ import {
 } from "./creative-studio-surface";
 import { MediaImageField } from "./fields/media-image-field";
 import { WorkflowMediaAudioPlayer } from "./workflow-media-audio-player";
-import {
-  WorkflowMediaVideoPlayer,
-} from "./workflow-media-video-player";
+import { WorkflowMediaVideoPlayer } from "./workflow-media-video-player";
 import type { WorkflowNodeType } from "./workflow-types";
 import { useWorkflow } from "./workflow-context";
 
@@ -103,7 +107,12 @@ function StudioVideoPreview({
 
   if (variant === "card") {
     return (
-      <div className={cn("relative h-full w-full overflow-hidden bg-card dark:bg-black", className)}>
+      <div
+        className={cn(
+          "relative h-full w-full overflow-hidden bg-card dark:bg-black",
+          className
+        )}
+      >
         <video
           src={displayUrl}
           className="h-full w-full object-contain"
@@ -180,7 +189,9 @@ function StudioAudioPreview({
         )}
       >
         <Music className="h-5 w-5 shrink-0" />
-        <span className="truncate text-xs">{getResourceIdFromValue(media)}</span>
+        <span className="truncate text-xs">
+          {getResourceIdFromValue(media)}
+        </span>
       </div>
     );
   }
@@ -366,7 +377,11 @@ export function CreativeStudioNodePreview({
     data.outputs,
     data.metadata
   );
-  const audios = readAiAudioCardAudios(data.inputs, data.outputs, data.metadata);
+  const audios = readAiAudioCardAudios(
+    data.inputs,
+    data.outputs,
+    data.metadata
+  );
 
   const primaryAudio = audios[0];
 
@@ -395,7 +410,10 @@ export function CreativeStudioNodePreview({
             <LoaderIcon className="size-5 animate-spin text-muted-foreground/50" />
           </div>
         ) : (
-          <EmptyPreview variant={variant} message={t("workflow.studio.emptyMedia")} />
+          <EmptyPreview
+            variant={variant}
+            message={t("workflow.studio.emptyMedia")}
+          />
         )}
       </div>
     );
@@ -490,18 +508,18 @@ export function CreativeStudioNodePreview({
       );
     }
     return (
-      <StudioVideoPreview media={primaryVideo} variant={variant} className={className} />
+      <StudioVideoPreview
+        media={primaryVideo}
+        variant={variant}
+        className={className}
+      />
     );
   }
 
   if (nodeType === AI_AUDIO_NODE_TYPE) {
     if (!primaryAudio) {
       const audioBusy = isAiAudioGenerating(data.metadata) || uploading;
-      if (
-        variant === "detail" &&
-        emptyUpload?.kind === "audio" &&
-        !audioBusy
-      ) {
+      if (variant === "detail" && emptyUpload?.kind === "audio" && !audioBusy) {
         return (
           <div
             className={cn(
@@ -562,7 +580,10 @@ function EmptyPreview({
       )}
     >
       {busy ? (
-        <LoaderIcon className="size-5 animate-spin text-yellow-500" aria-hidden />
+        <LoaderIcon
+          className="size-5 animate-spin text-yellow-500"
+          aria-hidden
+        />
       ) : null}
       {message}
     </div>
@@ -583,7 +604,8 @@ export function CreativeStudioReferenceThumbs({
   const { edges = [] } = useWorkflow();
   const nodes = useNodes<ReactFlowNode<WorkflowNodeType>>();
 
-  const typedNodes = nodes as unknown as readonly ReactFlowNode<WorkflowNodeType>[];
+  const typedNodes =
+    nodes as unknown as readonly ReactFlowNode<WorkflowNodeType>[];
   const nodeType = data.nodeType ?? "";
 
   const chips = useMemo(() => {
@@ -631,13 +653,7 @@ function ReferenceThumb({
   });
 
   if (thumbUrl) {
-    return (
-      <img
-        src={thumbUrl}
-        alt=""
-        className={STUDIO_REFERENCE_THUMB}
-      />
-    );
+    return <img src={thumbUrl} alt="" className={STUDIO_REFERENCE_THUMB} />;
   }
 
   if (phase === "loading" && media) {

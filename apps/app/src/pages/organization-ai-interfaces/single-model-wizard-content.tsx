@@ -81,12 +81,8 @@ import {
   SingleModelEndpointRulesFields,
   type SingleModelEndpointRulesFormState,
 } from "./single-model-endpoint-rules-fields";
-import {
-  SingleModelEndpointUrlFields,
-} from "./single-model-endpoint-url-preview";
-import {
-  resolveDefaultInterfaceListName,
-} from "./single-model-display-name";
+import { SingleModelEndpointUrlFields } from "./single-model-endpoint-url-preview";
+import { resolveDefaultInterfaceListName } from "./single-model-display-name";
 import {
   isSingleModelSelectionValid,
   SingleModelPickerStep,
@@ -149,10 +145,14 @@ export function SingleModelWizardContent({
 }: SingleModelWizardContentProps) {
   const { t } = useTranslation();
   const appToast = useAppToast();
-  const { models: platformModels } = usePlatformCatalogTextModels(organizationId);
-  const { models: imagePlatformModels } = usePlatformCatalogImageModels(organizationId);
-  const { models: videoPlatformModels } = usePlatformCatalogVideoModels(organizationId);
-  const { models: audioPlatformModels } = usePlatformCatalogAudioModels(organizationId);
+  const { models: platformModels } =
+    usePlatformCatalogTextModels(organizationId);
+  const { models: imagePlatformModels } =
+    usePlatformCatalogImageModels(organizationId);
+  const { models: videoPlatformModels } =
+    usePlatformCatalogVideoModels(organizationId);
+  const { models: audioPlatformModels } =
+    usePlatformCatalogAudioModels(organizationId);
   const { presetChannelIds: apiPresetChannelIds } =
     useApiPresetChannelIdMap(organizationId);
 
@@ -377,7 +377,8 @@ export function SingleModelWizardContent({
         presetId: DEEPSEEK_PROVIDER_CARD_ID,
         category: "text" as const,
         defaultEndpoint: DEEPSEEK_DEFAULT_ENDPOINT_URL,
-        listNameKey: "pages.aiInterfaces.singleModel.presets.deepseekProvider" as const,
+        listNameKey:
+          "pages.aiInterfaces.singleModel.presets.deepseekProvider" as const,
         availableModels: deepSeekAvailableModels,
         showEndpointRegionHints: false,
       };
@@ -387,7 +388,8 @@ export function SingleModelWizardContent({
         presetId: SEED_PROVIDER_CARD_ID,
         category: "text" as const,
         defaultEndpoint: SEED_DEFAULT_ENDPOINT_URL,
-        listNameKey: "pages.aiInterfaces.singleModel.presets.seedProvider" as const,
+        listNameKey:
+          "pages.aiInterfaces.singleModel.presets.seedProvider" as const,
         availableModels: seedAvailableModels,
         showEndpointRegionHints: false,
       };
@@ -397,7 +399,8 @@ export function SingleModelWizardContent({
         presetId: GLM_PROVIDER_CARD_ID,
         category: "text" as const,
         defaultEndpoint: GLM_DEFAULT_ENDPOINT_URL,
-        listNameKey: "pages.aiInterfaces.singleModel.presets.glmProvider" as const,
+        listNameKey:
+          "pages.aiInterfaces.singleModel.presets.glmProvider" as const,
         availableModels: glmAvailableModels,
         showEndpointRegionHints: false,
       };
@@ -407,7 +410,8 @@ export function SingleModelWizardContent({
         presetId: KIMI_PROVIDER_CARD_ID,
         category: "text" as const,
         defaultEndpoint: KIMI_DEFAULT_ENDPOINT_URL,
-        listNameKey: "pages.aiInterfaces.singleModel.presets.kimiProvider" as const,
+        listNameKey:
+          "pages.aiInterfaces.singleModel.presets.kimiProvider" as const,
         availableModels: kimiAvailableModels,
         showEndpointRegionHints: true,
       };
@@ -417,7 +421,8 @@ export function SingleModelWizardContent({
         presetId: OPENAI_PROVIDER_CARD_ID,
         category: "text" as const,
         defaultEndpoint: OPENAI_DEFAULT_ENDPOINT_URL,
-        listNameKey: "pages.aiInterfaces.singleModel.presets.openaiProvider" as const,
+        listNameKey:
+          "pages.aiInterfaces.singleModel.presets.openaiProvider" as const,
         availableModels: openAiAvailableModels,
         showEndpointRegionHints: false,
       };
@@ -427,7 +432,8 @@ export function SingleModelWizardContent({
         presetId: GEMINI_PROVIDER_CARD_ID,
         category: "text" as const,
         defaultEndpoint: GEMINI_DEFAULT_ENDPOINT_URL,
-        listNameKey: "pages.aiInterfaces.singleModel.presets.geminiProvider" as const,
+        listNameKey:
+          "pages.aiInterfaces.singleModel.presets.geminiProvider" as const,
         availableModels: geminiAvailableModels,
         showEndpointRegionHints: false,
       };
@@ -437,7 +443,8 @@ export function SingleModelWizardContent({
         presetId: GROK_PROVIDER_CARD_ID,
         category: "text" as const,
         defaultEndpoint: GROK_DEFAULT_ENDPOINT_URL,
-        listNameKey: "pages.aiInterfaces.singleModel.presets.grokProvider" as const,
+        listNameKey:
+          "pages.aiInterfaces.singleModel.presets.grokProvider" as const,
         availableModels: grokAvailableModels,
         showEndpointRegionHints: false,
       };
@@ -447,7 +454,8 @@ export function SingleModelWizardContent({
         presetId: CLAUDE_PROVIDER_CARD_ID,
         category: "text" as const,
         defaultEndpoint: CLAUDE_DEFAULT_ENDPOINT_URL,
-        listNameKey: "pages.aiInterfaces.singleModel.presets.claudeProvider" as const,
+        listNameKey:
+          "pages.aiInterfaces.singleModel.presets.claudeProvider" as const,
         availableModels: claudeAvailableModels,
         showEndpointRegionHints: false,
       };
@@ -457,7 +465,8 @@ export function SingleModelWizardContent({
         presetId: SEEDANCE_PROVIDER_CARD_ID,
         category: "video" as const,
         defaultEndpoint: SEEDANCE_DEFAULT_ENDPOINT_URL,
-        listNameKey: "pages.aiInterfaces.singleModel.presets.seedanceProvider" as const,
+        listNameKey:
+          "pages.aiInterfaces.singleModel.presets.seedanceProvider" as const,
         availableModels: seedanceAvailableModels,
         showEndpointRegionHints: false,
       };
@@ -467,7 +476,8 @@ export function SingleModelWizardContent({
         presetId: VEO_PROVIDER_CARD_ID,
         category: "video" as const,
         defaultEndpoint: VEO_DEFAULT_ENDPOINT_URL,
-        listNameKey: "pages.aiInterfaces.singleModel.presets.veoProvider" as const,
+        listNameKey:
+          "pages.aiInterfaces.singleModel.presets.veoProvider" as const,
         availableModels: veoAvailableModels,
         showEndpointRegionHints: false,
       };
@@ -477,7 +487,8 @@ export function SingleModelWizardContent({
         presetId: GROK_IMAGINE_VIDEO_PROVIDER_CARD_ID,
         category: "video" as const,
         defaultEndpoint: GROK_IMAGINE_VIDEO_DEFAULT_ENDPOINT_URL,
-        listNameKey: "pages.aiInterfaces.singleModel.presets.grokImagineVideoProvider" as const,
+        listNameKey:
+          "pages.aiInterfaces.singleModel.presets.grokImagineVideoProvider" as const,
         availableModels: grokImagineVideoAvailableModels,
         showEndpointRegionHints: false,
       };
@@ -487,7 +498,8 @@ export function SingleModelWizardContent({
         presetId: MINIMAX_SPEECH_PROVIDER_CARD_ID,
         category: "audio" as const,
         defaultEndpoint: MINIMAX_SPEECH_DEFAULT_ENDPOINT_URL,
-        listNameKey: "pages.aiInterfaces.singleModel.presets.minimaxSpeechProvider" as const,
+        listNameKey:
+          "pages.aiInterfaces.singleModel.presets.minimaxSpeechProvider" as const,
         availableModels: minimaxSpeechAvailableModels,
         showEndpointRegionHints: false,
       };
@@ -497,7 +509,8 @@ export function SingleModelWizardContent({
         presetId: MINIMAX_VIDEO_PROVIDER_CARD_ID,
         category: "video" as const,
         defaultEndpoint: MINIMAX_VIDEO_DEFAULT_ENDPOINT_URL,
-        listNameKey: "pages.aiInterfaces.singleModel.presets.minimaxVideoProvider" as const,
+        listNameKey:
+          "pages.aiInterfaces.singleModel.presets.minimaxVideoProvider" as const,
         availableModels: minimaxVideoAvailableModels,
         showEndpointRegionHints: false,
       };
@@ -507,7 +520,8 @@ export function SingleModelWizardContent({
         presetId: SEEDREAM_PROVIDER_CARD_ID,
         category: "image" as const,
         defaultEndpoint: SEEDREAM_DEFAULT_ENDPOINT_URL,
-        listNameKey: "pages.aiInterfaces.singleModel.presets.seedreamProvider" as const,
+        listNameKey:
+          "pages.aiInterfaces.singleModel.presets.seedreamProvider" as const,
         availableModels: seedreamAvailableModels,
         showEndpointRegionHints: false,
       };
@@ -517,7 +531,8 @@ export function SingleModelWizardContent({
         presetId: OPENAI_IMAGE_PROVIDER_CARD_ID,
         category: "image" as const,
         defaultEndpoint: OPENAI_IMAGE_DEFAULT_ENDPOINT_URL,
-        listNameKey: "pages.aiInterfaces.singleModel.presets.openaiImageProvider" as const,
+        listNameKey:
+          "pages.aiInterfaces.singleModel.presets.openaiImageProvider" as const,
         availableModels: openAiImageAvailableModels,
         showEndpointRegionHints: false,
       };
@@ -527,7 +542,8 @@ export function SingleModelWizardContent({
         presetId: NANO_BANANA_PROVIDER_CARD_ID,
         category: "image" as const,
         defaultEndpoint: NANO_BANANA_DEFAULT_ENDPOINT_URL,
-        listNameKey: "pages.aiInterfaces.singleModel.presets.nanoBananaProvider" as const,
+        listNameKey:
+          "pages.aiInterfaces.singleModel.presets.nanoBananaProvider" as const,
         availableModels: nanoBananaAvailableModels,
         showEndpointRegionHints: false,
       };
@@ -537,7 +553,8 @@ export function SingleModelWizardContent({
         presetId: GROK_IMAGINE_IMAGE_PROVIDER_CARD_ID,
         category: "image" as const,
         defaultEndpoint: GROK_IMAGINE_IMAGE_DEFAULT_ENDPOINT_URL,
-        listNameKey: "pages.aiInterfaces.singleModel.presets.grokImagineImageProvider" as const,
+        listNameKey:
+          "pages.aiInterfaces.singleModel.presets.grokImagineImageProvider" as const,
         availableModels: grokImagineImageAvailableModels,
         showEndpointRegionHints: false,
       };
@@ -703,7 +720,8 @@ export function SingleModelWizardContent({
         return false;
       }
       return modelInstances.some(
-        (instance) => instance.enabled && instance.upstreamModelId.trim().length > 0
+        (instance) =>
+          instance.enabled && instance.upstreamModelId.trim().length > 0
       );
     }
 
@@ -735,10 +753,7 @@ export function SingleModelWizardContent({
       return;
     }
 
-    if (
-      endpointRulesCategory === "video" &&
-      !endpointRulesForm.useOfficial
-    ) {
+    if (endpointRulesCategory === "video" && !endpointRulesForm.useOfficial) {
       if (!sharedFormatTransform) {
         appToast.error("pages.aiInterfaces.singleModel.formatTemplateRequired");
         return;
@@ -750,7 +765,10 @@ export function SingleModelWizardContent({
       let created = false;
       const baseUrl = endpointUrl.trim();
 
-      if (multiModelProviderConfig && isMultiModelProviderSelection(selection)) {
+      if (
+        multiModelProviderConfig &&
+        isMultiModelProviderSelection(selection)
+      ) {
         if (!apiKey.trim()) {
           appToast.error("pages.aiInterfaces.apiKeyRequired");
           return;
@@ -863,7 +881,9 @@ export function SingleModelWizardContent({
       await onComplete();
     } catch (error) {
       appToast.errorRaw(
-        error instanceof Error ? error.message : t("pages.aiInterfaces.saveFailed")
+        error instanceof Error
+          ? error.message
+          : t("pages.aiInterfaces.saveFailed")
       );
     } finally {
       setIsSaving(false);
@@ -955,7 +975,9 @@ export function SingleModelWizardContent({
                 />
               </div>
               <div className="space-y-2">
-                <Label>{t("pages.aiInterfaces.singleModel.selectModels")}</Label>
+                <Label>
+                  {t("pages.aiInterfaces.singleModel.selectModels")}
+                </Label>
                 <SingleModelInstanceList
                   availableModels={modelPoolOptions}
                   instances={modelInstances}

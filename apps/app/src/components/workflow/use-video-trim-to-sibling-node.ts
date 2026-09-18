@@ -12,9 +12,7 @@ import { useParams } from "react-router";
 import { useObjectService } from "@/services/object-service";
 import { useAppToast } from "@/hooks/use-app-toast";
 
-import {
-  AI_VIDEO_OUTPUT_ID,
-} from "./ai-video-node-utils";
+import { AI_VIDEO_OUTPUT_ID } from "./ai-video-node-utils";
 import { withAiVideoRetakeDraft } from "./ai-video-retake-node-utils";
 import {
   buildEmptyAiVideoSiblingNode,
@@ -42,7 +40,8 @@ export interface CreateAiVideoSiblingNodeShellResult {
   readonly referenceLinked: boolean;
 }
 
-export type CreateTrimSiblingNodeShellResult = CreateAiVideoSiblingNodeShellResult;
+export type CreateTrimSiblingNodeShellResult =
+  CreateAiVideoSiblingNodeShellResult;
 
 interface CreateAiVideoSiblingNodeShellParams {
   readonly kind: "trim" | "retake" | "subtitle-erase";
@@ -50,11 +49,15 @@ interface CreateAiVideoSiblingNodeShellParams {
 }
 
 export function useCreateAiVideoSiblingNode(sourceNodeId: string) {
-  const { nodeTypes = [], disabled, generativeReferenceCatalogs } =
-    useWorkflow();
+  const {
+    nodeTypes = [],
+    disabled,
+    generativeReferenceCatalogs,
+  } = useWorkflow();
   const nodes = useNodes();
   const edges = useEdges<ReactFlowEdge<WorkflowEdgeType>>();
-  const { setNodes, setEdges, getNode, getViewport, setCenter } = useReactFlow();
+  const { setNodes, setEdges, getNode, getViewport, setCenter } =
+    useReactFlow();
   const { createObjectUrl } = useObjectService();
   const { id: workflowId } = useParams<{ id: string }>();
 
@@ -78,7 +81,8 @@ export function useCreateAiVideoSiblingNode(sourceNodeId: string) {
 
       const sourceData = sourceNode.data as WorkflowNodeType;
       const sourceName = sourceData.name?.trim() || catalog.name;
-      const typedNodes = nodes as unknown as readonly ReactFlowNode<WorkflowNodeType>[];
+      const typedNodes =
+        nodes as unknown as readonly ReactFlowNode<WorkflowNodeType>[];
       const nodeName =
         params.kind === "retake"
           ? resolveRetakeSiblingNodeName({
@@ -143,7 +147,8 @@ export function useCreateAiVideoSiblingNode(sourceNodeId: string) {
           })
         : false;
 
-      const { width, height } = resolveWorkflowNodeDimensions(AI_VIDEO_NODE_TYPE);
+      const { width, height } =
+        resolveWorkflowNodeDimensions(AI_VIDEO_NODE_TYPE);
       const centerX = position.x + width / 2;
       const centerY = position.y + height / 2;
       const { zoom } = getViewport();
@@ -198,17 +203,22 @@ export interface CreateLockedRetakeCopyNodeResult {
 }
 
 export function useCreateLockedRetakeCopyNode(sourceNodeId: string) {
-  const { nodeTypes = [], disabled, generativeReferenceCatalogs, updateNodeData } =
-    useWorkflow();
+  const {
+    nodeTypes = [],
+    disabled,
+    generativeReferenceCatalogs,
+    updateNodeData,
+  } = useWorkflow();
   const nodes = useNodes();
   const edges = useEdges<ReactFlowEdge<WorkflowEdgeType>>();
-  const { setNodes, setEdges, getNode, getViewport, setCenter } = useReactFlow();
+  const { setNodes, setEdges, getNode, getViewport, setCenter } =
+    useReactFlow();
   const { createObjectUrl } = useObjectService();
   const toast = useAppToast();
   const { id: workflowId } = useParams<{ id: string }>();
 
-  const createLockedRetakeCopyNode = useCallback(
-    (): CreateLockedRetakeCopyNodeResult | null => {
+  const createLockedRetakeCopyNode =
+    useCallback((): CreateLockedRetakeCopyNodeResult | null => {
       if (disabled || !workflowId) {
         return null;
       }
@@ -225,7 +235,8 @@ export function useCreateLockedRetakeCopyNode(sourceNodeId: string) {
 
       const sourceData = sourceNode.data as WorkflowNodeType;
       const sourceName = sourceData.name?.trim() || catalog.name;
-      const typedNodes = nodes as unknown as readonly ReactFlowNode<WorkflowNodeType>[];
+      const typedNodes =
+        nodes as unknown as readonly ReactFlowNode<WorkflowNodeType>[];
       const nodeName = resolveRetakeSiblingNodeName({
         sourceNodeName: sourceName,
         existingNodes: typedNodes,
@@ -304,15 +315,15 @@ export function useCreateLockedRetakeCopyNode(sourceNodeId: string) {
         );
       }
 
-      const { width, height } = resolveWorkflowNodeDimensions(AI_VIDEO_NODE_TYPE);
+      const { width, height } =
+        resolveWorkflowNodeDimensions(AI_VIDEO_NODE_TYPE);
       const centerX = position.x + width / 2;
       const centerY = position.y + height / 2;
       const { zoom } = getViewport();
       setCenter(centerX, centerY, { zoom, duration: 200 });
 
       return { nodeId };
-    },
-    [
+    }, [
       createObjectUrl,
       disabled,
       edges,
@@ -328,8 +339,7 @@ export function useCreateLockedRetakeCopyNode(sourceNodeId: string) {
       toast,
       updateNodeData,
       workflowId,
-    ]
-  );
+    ]);
 
   return { createLockedRetakeCopyNode };
 }

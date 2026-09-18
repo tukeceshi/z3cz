@@ -23,9 +23,13 @@ export function patchGenerativeNodeWithHungMedia(params: {
   const prompt = readGenerativePrompt(params.current.inputs).trim();
   if (prompt) {
     if (params.nodeType === "ai-video") {
-      return appendAiVideoGeneratedHistoryItems(params.current, [params.media], {
-        prompt,
-      });
+      return appendAiVideoGeneratedHistoryItems(
+        params.current,
+        [params.media],
+        {
+          prompt,
+        }
+      );
     }
     if (params.nodeType === "ai-audio") {
       return appendAiAudioGeneratedHistoryItems(

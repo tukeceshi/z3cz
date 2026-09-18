@@ -9,7 +9,11 @@ import type {
   WorkflowTrigger,
   WorkflowWithMetadata,
 } from "@dafthunk/types";
-import { applyWorkflowGraphPatch, findFirstWorkflowCoverCandidate, hasWorkflowGraphInPartial } from "@dafthunk/types";
+import {
+  applyWorkflowGraphPatch,
+  findFirstWorkflowCoverCandidate,
+  hasWorkflowGraphInPartial,
+} from "@dafthunk/types";
 import type { Edge, Node } from "@xyflow/react";
 import { useCallback, useEffect, useRef, useState } from "react";
 
@@ -170,7 +174,10 @@ export function useEditableWorkflow({
     if (!wsRef.current?.isConnected()) return;
 
     try {
-      const sent = wsRef.current.sendGraphPatch(lastSentGraphRef.current, payload);
+      const sent = wsRef.current.sendGraphPatch(
+        lastSentGraphRef.current,
+        payload
+      );
       if (sent) {
         lastSentGraphRef.current = payload;
         lastSavedSerializedRef.current = serialized;
@@ -393,68 +400,66 @@ export function useEditableWorkflow({
   }, []);
 
   const applyFallbackFromHttp = useCallback(() => {
-      const fallback = fallbackWorkflowRef.current;
-      if (hasInitializedRef.current || !fallback?.id) {
-        return false;
-      }
+    const fallback = fallbackWorkflowRef.current;
+    if (hasInitializedRef.current || !fallback?.id) {
+      return false;
+    }
 
-      const reactFlowNodes = adaptBackendNodesToReactFlowNodes(
-        fallback.nodes ?? [],
-        nodeTypes
-      );
-      const reactFlowEdges = (fallback.edges ?? []).map((edge) => ({
-        id: `${edge.source}:${edge.sourceOutput}-${edge.target}:${edge.targetInput}`,
-        source: edge.source,
-        target: edge.target,
-        sourceHandle: edge.sourceOutput,
-        targetHandle: edge.targetInput,
-        type: "workflowEdge" as const,
-        data: {
-          isValid: true,
-          sourceType: edge.sourceOutput,
-          targetType: edge.targetInput,
-        },
-      }));
+    const reactFlowNodes = adaptBackendNodesToReactFlowNodes(
+      fallback.nodes ?? [],
+      nodeTypes
+    );
+    const reactFlowEdges = (fallback.edges ?? []).map((edge) => ({
+      id: `${edge.source}:${edge.sourceOutput}-${edge.target}:${edge.targetInput}`,
+      source: edge.source,
+      target: edge.target,
+      sourceHandle: edge.sourceOutput,
+      targetHandle: edge.targetInput,
+      type: "workflowEdge" as const,
+      data: {
+        isValid: true,
+        sourceType: edge.sourceOutput,
+        targetType: edge.targetInput,
+      },
+    }));
 
-      setWorkflowMetadata({
-        id: fallback.id,
-        name: fallback.name || "",
-        description: fallback.description,
-        schemeId: fallback.schemeId,
-        trigger: fallback.trigger || "manual",
-        runtime: fallback.runtime as WorkflowRuntime | undefined,
-      });
-      workflowMetadataRef.current = {
-        id: fallback.id,
-        name: fallback.name || "",
-        description: fallback.description,
-        schemeId: fallback.schemeId,
-        trigger: fallback.trigger || "manual",
-        runtime: fallback.runtime as WorkflowRuntime | undefined,
-      };
-      nodesRef.current = reactFlowNodes;
-      edgesRef.current = reactFlowEdges;
-      const payload = buildWorkflowPayload(reactFlowNodes, reactFlowEdges);
-      lastSavedSerializedRef.current = JSON.stringify(payload);
-      lastSentGraphRef.current = payload;
-      setNodes(reactFlowNodes);
-      setEdges(reactFlowEdges);
-      generativeDefaultsRef.current = fallback.generativeDefaults;
-      lastPersistedGenerativeDefaultsRef.current = JSON.stringify(
-        fallback.generativeDefaults ?? null
-      );
-      setGenerativeDefaults(fallback.generativeDefaults);
-      lastRemoteTimestampRef.current =
-        fallback.updatedAt instanceof Date
-          ? fallback.updatedAt.getTime()
-          : new Date(fallback.updatedAt).getTime();
-      hasInitializedRef.current = true;
-      setIsGraphReady(true);
-      setIsInitializing(false);
-      return true;
-    },
-    [nodeTypes]
-  );
+    setWorkflowMetadata({
+      id: fallback.id,
+      name: fallback.name || "",
+      description: fallback.description,
+      schemeId: fallback.schemeId,
+      trigger: fallback.trigger || "manual",
+      runtime: fallback.runtime as WorkflowRuntime | undefined,
+    });
+    workflowMetadataRef.current = {
+      id: fallback.id,
+      name: fallback.name || "",
+      description: fallback.description,
+      schemeId: fallback.schemeId,
+      trigger: fallback.trigger || "manual",
+      runtime: fallback.runtime as WorkflowRuntime | undefined,
+    };
+    nodesRef.current = reactFlowNodes;
+    edgesRef.current = reactFlowEdges;
+    const payload = buildWorkflowPayload(reactFlowNodes, reactFlowEdges);
+    lastSavedSerializedRef.current = JSON.stringify(payload);
+    lastSentGraphRef.current = payload;
+    setNodes(reactFlowNodes);
+    setEdges(reactFlowEdges);
+    generativeDefaultsRef.current = fallback.generativeDefaults;
+    lastPersistedGenerativeDefaultsRef.current = JSON.stringify(
+      fallback.generativeDefaults ?? null
+    );
+    setGenerativeDefaults(fallback.generativeDefaults);
+    lastRemoteTimestampRef.current =
+      fallback.updatedAt instanceof Date
+        ? fallback.updatedAt.getTime()
+        : new Date(fallback.updatedAt).getTime();
+    hasInitializedRef.current = true;
+    setIsGraphReady(true);
+    setIsInitializing(false);
+    return true;
+  }, [nodeTypes]);
 
   const applyFallbackFromHttpRef = useRef(applyFallbackFromHttp);
   applyFallbackFromHttpRef.current = applyFallbackFromHttp;
@@ -491,7 +496,11 @@ export function useEditableWorkflow({
 
   // Apply HTTP workflow graph when it arrives before WS init.
   useEffect(() => {
-    if (hasInitializedRef.current || !fallbackWorkflow?.id || !httpMetadataLoaded) {
+    if (
+      hasInitializedRef.current ||
+      !fallbackWorkflow?.id ||
+      !httpMetadataLoaded
+    ) {
       return;
     }
     applyFallbackFromHttpRef.current();

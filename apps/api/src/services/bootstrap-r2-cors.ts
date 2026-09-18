@@ -4,10 +4,7 @@ import {
   resolveDirectUploadCorsOrigins,
 } from "./ensure-direct-upload-cors";
 import type { BootstrapR2Credentials } from "./bootstrap-r2-client";
-import {
-  createAwsClient,
-  buildR2Endpoint,
-} from "./bootstrap-r2-client";
+import { createAwsClient, buildR2Endpoint } from "./bootstrap-r2-client";
 
 export interface R2CorsRule {
   readonly allowedOrigins: readonly string[];
@@ -46,28 +43,16 @@ export function buildR2CorsConfigurationXml(
   const ruleBlocks = rules
     .map((rule) => {
       const origins = rule.allowedOrigins
-        .map(
-          (origin) =>
-            `<AllowedOrigin>${escapeXml(origin)}</AllowedOrigin>`
-        )
+        .map((origin) => `<AllowedOrigin>${escapeXml(origin)}</AllowedOrigin>`)
         .join("");
       const methods = rule.allowedMethods
-        .map(
-          (method) =>
-            `<AllowedMethod>${escapeXml(method)}</AllowedMethod>`
-        )
+        .map((method) => `<AllowedMethod>${escapeXml(method)}</AllowedMethod>`)
         .join("");
       const headers = rule.allowedHeaders
-        .map(
-          (header) =>
-            `<AllowedHeader>${escapeXml(header)}</AllowedHeader>`
-        )
+        .map((header) => `<AllowedHeader>${escapeXml(header)}</AllowedHeader>`)
         .join("");
       const exposeHeaders = rule.exposeHeaders
-        .map(
-          (header) =>
-            `<ExposeHeader>${escapeXml(header)}</ExposeHeader>`
-        )
+        .map((header) => `<ExposeHeader>${escapeXml(header)}</ExposeHeader>`)
         .join("");
       return `<CORSRule>${origins}${methods}${headers}${exposeHeaders}<MaxAgeSeconds>${rule.maxAgeSeconds}</MaxAgeSeconds></CORSRule>`;
     })
@@ -106,7 +91,8 @@ export function parseR2CorsConfigurationXml(xml: string): R2CorsRule[] {
   return rules.map((rule) => ({
     allowedOrigins: rule.allowedOrigins,
     allowedMethods: rule.allowedMethods,
-    allowedHeaders: rule.allowedHeaders.length > 0 ? rule.allowedHeaders : ["*"],
+    allowedHeaders:
+      rule.allowedHeaders.length > 0 ? rule.allowedHeaders : ["*"],
     exposeHeaders: rule.exposeHeaders,
     maxAgeSeconds: rule.maxAgeSeconds,
   }));
@@ -161,12 +147,7 @@ export function mergeShellFetchRule(
     ],
     allowedHeaders: current.allowedHeaders.includes("*")
       ? [...SHELL_ACCESS_HEADERS]
-      : [
-          ...new Set([
-            ...current.allowedHeaders,
-            ...shellRule.allowedHeaders,
-          ]),
-        ],
+      : [...new Set([...current.allowedHeaders, ...shellRule.allowedHeaders])],
     exposeHeaders: [
       ...new Set([...current.exposeHeaders, ...shellRule.exposeHeaders]),
     ],
@@ -229,7 +210,10 @@ export async function putR2BucketCors(
 export async function ensureBootstrapR2ShellCors(params: {
   readonly credentials: BootstrapR2Credentials;
   readonly allowedOrigins: readonly string[];
-}): Promise<{ readonly applied: boolean; readonly origins: readonly string[] }> {
+}): Promise<{
+  readonly applied: boolean;
+  readonly origins: readonly string[];
+}> {
   if (params.allowedOrigins.length === 0) {
     return { applied: false, origins: [] };
   }
@@ -255,7 +239,10 @@ export async function ensureBootstrapR2ShellCors(params: {
 export async function ensureBootstrapR2ShellCorsFromEnv(params: {
   readonly credentials: BootstrapR2Credentials;
   readonly env: Pick<Bindings, "WEB_HOST" | "WEBSITE_URL">;
-}): Promise<{ readonly applied: boolean; readonly origins: readonly string[] }> {
+}): Promise<{
+  readonly applied: boolean;
+  readonly origins: readonly string[];
+}> {
   const origins = mergeDirectUploadCorsOrigins(params.env);
   return ensureBootstrapR2ShellCors({
     credentials: params.credentials,

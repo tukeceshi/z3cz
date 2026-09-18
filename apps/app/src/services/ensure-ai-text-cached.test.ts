@@ -13,9 +13,9 @@ describe("ensure-ai-text-cached local trust", () => {
   });
 
   it("empty local is never trusted even when workflow sha exists", async () => {
-    await expect(
-      isLocalTextTrustedForSync("", "a".repeat(64))
-    ).resolves.toBe(false);
+    await expect(isLocalTextTrustedForSync("", "a".repeat(64))).resolves.toBe(
+      false
+    );
   });
 
   it("non-empty local without workflow sha is trusted", async () => {

@@ -1,12 +1,22 @@
 import type { WorkflowMediaValue } from "@dafthunk/types";
 import { isWorkflowMediaValue } from "@dafthunk/types";
-import type { Edge as ReactFlowEdge, Node as ReactFlowNode } from "@xyflow/react";
+import type {
+  Edge as ReactFlowEdge,
+  Node as ReactFlowNode,
+} from "@xyflow/react";
 import ImageIcon from "lucide-react/icons/image";
 import PlusIcon from "lucide-react/icons/plus";
 import TypeIcon from "lucide-react/icons/type";
 import VideoIcon from "lucide-react/icons/video";
 import XIcon from "lucide-react/icons/x";
-import { useEffect, useMemo, useRef, useState, type MouseEvent, type ReactNode } from "react";
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type MouseEvent,
+  type ReactNode,
+} from "react";
 import { createPortal } from "react-dom";
 
 import { useTranslation } from "@/components/locale-provider";
@@ -87,7 +97,8 @@ export function ReferenceChipMediaThumb({
     nodeType: mediaNodeTypeForChip(chip),
     paused: thumbUrlOverride !== undefined,
   });
-  const thumbUrl = thumbUrlOverride !== undefined ? thumbUrlOverride : hookThumbUrl;
+  const thumbUrl =
+    thumbUrlOverride !== undefined ? thumbUrlOverride : hookThumbUrl;
 
   const mediaContent =
     thumbUrl && (chip.kind === "image" || chip.kind === "video") ? (
@@ -96,7 +107,8 @@ export function ReferenceChipMediaThumb({
         alt={chip.label}
         className="h-full w-full object-cover"
       />
-    ) : phase === "loading" && (chip.kind === "image" || chip.kind === "video") ? (
+    ) : phase === "loading" &&
+      (chip.kind === "image" || chip.kind === "video") ? (
       <MediaDisplayLoadingPlaceholder className="h-full w-full" />
     ) : (
       <span className="text-muted-foreground">{fallbackIcon}</span>
@@ -129,7 +141,8 @@ export function ReferenceHoverPreview({
     nodeType: mediaNodeTypeForChip(chip),
     paused: thumbUrlOverride !== undefined,
   });
-  const thumbUrl = thumbUrlOverride !== undefined ? thumbUrlOverride : hookThumbUrl;
+  const thumbUrl =
+    thumbUrlOverride !== undefined ? thumbUrlOverride : hookThumbUrl;
 
   const style = {
     left: anchor.left + anchor.width / 2,

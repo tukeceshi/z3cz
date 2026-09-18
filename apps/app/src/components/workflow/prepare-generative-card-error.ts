@@ -33,7 +33,8 @@ export function prepareGenerativeCardError(
 ): GenerativeCardError {
   const trimmed = raw.trim();
   if (!trimmed) {
-    const summary = t?.("workflow.generativeErrors.generationFailed") ?? "生成失败";
+    const summary =
+      t?.("workflow.generativeErrors.generationFailed") ?? "生成失败";
     return {
       summary,
       cardLines: [summary],
@@ -82,7 +83,9 @@ export function prepareGenerativeCardError(
   const matched = matchGenerativeErrorRule({ raw: trimmed, modelKind, locale });
   if (matched?.cardLines?.length) {
     const message = extractGenerativeApiErrorMessage(trimmed).trim();
-    const cardLines = message ? [...matched.cardLines, message] : matched.cardLines;
+    const cardLines = message
+      ? [...matched.cardLines, message]
+      : matched.cardLines;
     return withCardLines({
       summary: matched.cardLines[0] ?? matched.message,
       cardLines,

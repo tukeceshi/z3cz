@@ -62,7 +62,10 @@ export function WorkflowEditorCanvasChrome({
       <div className="pointer-events-auto flex min-w-0 items-center gap-2">
         <Link
           to={workflowsListUrl}
-          className={cn(canvasChromeChipClassName, "min-w-0 max-w-[10rem] sm:max-w-[14rem]")}
+          className={cn(
+            canvasChromeChipClassName,
+            "min-w-0 max-w-[10rem] sm:max-w-[14rem]"
+          )}
         >
           <Bot className="size-4 shrink-0" />
           <span className="truncate font-medium">{siteSettings.siteName}</span>

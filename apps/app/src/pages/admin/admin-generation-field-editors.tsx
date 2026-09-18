@@ -160,14 +160,23 @@ export function formatAdminGenerationOptionLabel(
   option: string,
   labels: GenerationOptionLabels
 ): string {
-  const videoLabel = formatAdminVideoGenerationOptionLabel(fieldName, option, labels);
+  const videoLabel = formatAdminVideoGenerationOptionLabel(
+    fieldName,
+    option,
+    labels
+  );
   if (videoLabel !== option) {
     return videoLabel;
   }
-  const smart = formatImageGenerationOptionLabel(fieldName, option, labels.smartOption, {
-    optimizePromptStandard: labels.optimizePromptStandard,
-    optimizePromptFast: labels.optimizePromptFast,
-  });
+  const smart = formatImageGenerationOptionLabel(
+    fieldName,
+    option,
+    labels.smartOption,
+    {
+      optimizePromptStandard: labels.optimizePromptStandard,
+      optimizePromptFast: labels.optimizePromptFast,
+    }
+  );
   if (smart !== option) {
     return smart;
   }
@@ -244,8 +253,7 @@ export function GenerationEnumChips({
 }) {
   const options = catalogEnumOptions(field, modality);
   const enabled = new Set(field.enumValues ?? []);
-  const defaultValue =
-    field.default === undefined ? "" : String(field.default);
+  const defaultValue = field.default === undefined ? "" : String(field.default);
 
   const handleClick = (option: string) => {
     const isEnabled = enabled.has(option);
@@ -262,7 +270,9 @@ export function GenerationEnumChips({
         default:
           field.type === "number"
             ? Number(option)
-            : (field.default === undefined ? option : field.default),
+            : field.default === undefined
+              ? option
+              : field.default,
       });
       return;
     }
@@ -343,80 +353,74 @@ export function SizePolicyEditor({
 
   return (
     <div className={ADMIN_SETTINGS_GRID_CLASS}>
-        <div className="space-y-1.5">
+      <div className="space-y-1.5">
+        <Label className={ADMIN_PARAM_LABEL_CLASS}>
+          {t("pages.adminAiModels.implementationModeLabel")}
+        </Label>
+        <Select
+          value={mode}
+          onValueChange={(value) =>
+            onChange({
+              ...policy,
+              enabled: true,
+              effectMode: value as GenerationSizeEffectMode,
+            })
+          }
+        >
+          <SelectTrigger className={ADMIN_CONTROL_CLASS}>
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="ratio_prompt">
+              {t("pages.adminAiModels.sizeEffectModeRatioPrompt")}
+            </SelectItem>
+            <SelectItem value="pixel_size">
+              {t("pages.adminAiModels.sizeEffectModePixelSize")}
+            </SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+      {sizeField ? (
+        <div className="col-span-full space-y-1.5">
           <Label className={ADMIN_PARAM_LABEL_CLASS}>
-            {t("pages.adminAiModels.implementationModeLabel")}
+            {t("pages.adminAiModels.sizeResolutionLabel")}
           </Label>
-          <Select
-            value={mode}
-            onValueChange={(value) =>
-              onChange({
-                ...policy,
-                enabled: true,
-                effectMode: value as GenerationSizeEffectMode,
-              })
+          <GenerationEnumChips
+            field={sizeField}
+            modality="image"
+            optionLabels={optionLabels}
+            onChange={(next) =>
+              onFieldsChange(
+                fields.map((field) => (field.name === "size" ? next : field))
+              )
             }
-          >
-            <SelectTrigger className={ADMIN_CONTROL_CLASS}>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="ratio_prompt">
-                {t("pages.adminAiModels.sizeEffectModeRatioPrompt")}
-              </SelectItem>
-              <SelectItem value="pixel_size">
-                {t("pages.adminAiModels.sizeEffectModePixelSize")}
-              </SelectItem>
-            </SelectContent>
-          </Select>
+          />
         </div>
-        {sizeField ? (
-          <div className="col-span-full space-y-1.5">
-            <Label className={ADMIN_PARAM_LABEL_CLASS}>
-              {t("pages.adminAiModels.sizeResolutionLabel")}
-            </Label>
-            <GenerationEnumChips
-              field={sizeField}
-              modality="image"
-              optionLabels={optionLabels}
-              onChange={(next) =>
-                onFieldsChange(
-                  fields.map((field) =>
-                    field.name === "size" ? next : field
-                  )
-                )
-              }
-            />
-          </div>
-        ) : null}
-        {ratioField ? (
-          <div className="col-span-full space-y-1.5">
-            <Label className={ADMIN_PARAM_LABEL_CLASS}>
-              {t("pages.adminAiModels.sizeRatioLabel")}
-            </Label>
-            <GenerationEnumChips
-              field={ratioField}
-              modality="image"
-              optionLabels={optionLabels}
-              onChange={(next) =>
-                onFieldsChange(
-                  fields.map((field) =>
-                    field.name === "ratio" ? next : field
-                  )
-                )
-              }
-            />
-          </div>
-        ) : null}
+      ) : null}
+      {ratioField ? (
+        <div className="col-span-full space-y-1.5">
+          <Label className={ADMIN_PARAM_LABEL_CLASS}>
+            {t("pages.adminAiModels.sizeRatioLabel")}
+          </Label>
+          <GenerationEnumChips
+            field={ratioField}
+            modality="image"
+            optionLabels={optionLabels}
+            onChange={(next) =>
+              onFieldsChange(
+                fields.map((field) => (field.name === "ratio" ? next : field))
+              )
+            }
+          />
+        </div>
+      ) : null}
     </div>
   );
 }
 
 const IMAGE_GENERATE_COUNT_MAX = 15;
 
-function resolveMaxCountFromField(
-  field: UpstreamParamProfileField
-): number {
+function resolveMaxCountFromField(field: UpstreamParamProfileField): number {
   const fromEnum = (field.enumValues ?? [])
     .map((value) => Number(value))
     .filter((count) => Number.isFinite(count) && count >= 1);
@@ -477,10 +481,7 @@ export function ImageCountEditor({
     if (!working) {
       return;
     }
-    const clampedMax = Math.min(
-      IMAGE_GENERATE_COUNT_MAX,
-      Math.max(1, nextMax)
-    );
+    const clampedMax = Math.min(IMAGE_GENERATE_COUNT_MAX, Math.max(1, nextMax));
     setCountField({
       ...working,
       enumValues: [...buildGenerateCountOptions(clampedMax)],
@@ -492,10 +493,7 @@ export function ImageCountEditor({
     if (!working) {
       return;
     }
-    const clampedDefault = Math.min(
-      maxCount,
-      Math.max(1, nextDefault)
-    );
+    const clampedDefault = Math.min(maxCount, Math.max(1, nextDefault));
     setCountField({
       ...working,
       default: clampedDefault,
@@ -608,12 +606,8 @@ export function VideoDurationEditor({
   const working = durationField ?? template;
   const boundMin = platformBounds?.min ?? VIDEO_DURATION_MIN;
   const boundMax = platformBounds?.max ?? VIDEO_DURATION_MAX;
-  const minDuration = working
-    ? resolveMinDurationFromField(working)
-    : boundMin;
-  const maxDuration = working
-    ? resolveMaxDurationFromField(working)
-    : boundMax;
+  const minDuration = working ? resolveMinDurationFromField(working) : boundMin;
+  const maxDuration = working ? resolveMaxDurationFromField(working) : boundMax;
   const defaultDuration = working
     ? Math.min(resolveDefaultDurationFromField(working), maxDuration)
     : boundMin;
@@ -632,10 +626,7 @@ export function VideoDurationEditor({
   };
 
   const clampDurationRange = (nextMin: number, nextMax: number) => {
-    const clampedMin = Math.max(
-      boundMin,
-      Math.min(nextMin, boundMax)
-    );
+    const clampedMin = Math.max(boundMin, Math.min(nextMin, boundMax));
     const clampedMax = Math.max(
       clampedMin,
       Math.min(Math.max(nextMax, clampedMin), boundMax)
@@ -673,10 +664,7 @@ export function VideoDurationEditor({
     }
     setDurationField({
       ...working,
-      default: Math.min(
-        maxDuration,
-        Math.max(minDuration, nextDefault)
-      ),
+      default: Math.min(maxDuration, Math.max(minDuration, nextDefault)),
     });
   };
 
@@ -919,13 +907,17 @@ function useGenerationFieldTitleResolver(modality: AdminGenerationModality) {
         case "web_search":
           return t("pages.adminAiModels.videoFieldLabels.web_search");
         case "virtual_avatar_library":
-          return t("pages.adminAiModels.videoFieldLabels.virtual_avatar_library");
+          return t(
+            "pages.adminAiModels.videoFieldLabels.virtual_avatar_library"
+          );
         case "return_last_frame":
           return t("pages.adminAiModels.videoFieldLabels.return_last_frame");
         case "output_format":
           return t("pages.adminAiModels.videoFieldLabels.output_format");
         case "execution_expires_after":
-          return t("pages.adminAiModels.videoFieldLabels.execution_expires_after");
+          return t(
+            "pages.adminAiModels.videoFieldLabels.execution_expires_after"
+          );
         default:
           return fallback;
       }
@@ -976,16 +968,13 @@ function FlatFeatureParamSection({
           enabled ? (
             titleAddon
           ) : (
-            <span className={ADMIN_PARAM_API_NAME_CLASS}>{working.apiName}</span>
+            <span className={ADMIN_PARAM_API_NAME_CLASS}>
+              {working.apiName}
+            </span>
           )
         ) : undefined
       }
-      action={
-        <Switch
-          checked={enabled}
-          onCheckedChange={onEnableChange}
-        />
-      }
+      action={<Switch checked={enabled} onCheckedChange={onEnableChange} />}
     >
       <GenerationFeatureRowContent
         template={template}

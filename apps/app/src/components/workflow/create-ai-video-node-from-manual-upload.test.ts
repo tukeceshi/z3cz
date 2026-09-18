@@ -1,4 +1,8 @@
-import { AI_VIDEO_NODE_TYPE, isAiVideoRetakePanel, type NodeType } from "@dafthunk/types";
+import {
+  AI_VIDEO_NODE_TYPE,
+  isAiVideoRetakePanel,
+  type NodeType,
+} from "@dafthunk/types";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -79,10 +83,16 @@ describe("buildLockedRetakeCopyNode", () => {
 
     expect(node.data.name).toBe("镜头A-重拍");
     expect(isAiVideoRetakePanel(node.data.metadata)).toBe(true);
-    expect(node.data.inputs.find((input) => input.id === "retake_draft")?.value).toMatchObject({
+    expect(
+      node.data.inputs.find((input) => input.id === "retake_draft")?.value
+    ).toMatchObject({
       primaryVideoEdgeId: null,
     });
-    expect(node.data.inputs.find((input) => input.id === "manual_videos")?.value).toBeUndefined();
-    expect(node.data.inputs.find((input) => input.id === "videos_history")?.value).toBeUndefined();
+    expect(
+      node.data.inputs.find((input) => input.id === "manual_videos")?.value
+    ).toBeUndefined();
+    expect(
+      node.data.inputs.find((input) => input.id === "videos_history")?.value
+    ).toBeUndefined();
   });
 });

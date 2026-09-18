@@ -1,6 +1,4 @@
-import {
-  type WorkflowMediaValue,
-} from "@dafthunk/types";
+import { type WorkflowMediaValue } from "@dafthunk/types";
 import {
   useInternalNode,
   useNodeId,
@@ -73,7 +71,9 @@ function useCanvasNodeOnScreen(
     const nodeY = internalNode.internals.positionAbsolute.y;
     const nodeW =
       internalNode.measured?.width ??
-      (typeof internalNode.width === "number" ? internalNode.width : fallbackWidthPx);
+      (typeof internalNode.width === "number"
+        ? internalNode.width
+        : fallbackWidthPx);
     const nodeH =
       internalNode.measured?.height ??
       (typeof internalNode.height === "number"

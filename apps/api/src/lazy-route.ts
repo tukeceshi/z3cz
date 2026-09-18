@@ -46,7 +46,9 @@ function resolveMountPrefix(c: Context<ApiContext>): string | null {
 }
 
 /** First path segment under `/{organizationId}/…` mounts. */
-function organizationIdFromMountPrefix(prefix: string | undefined): string | undefined {
+function organizationIdFromMountPrefix(
+  prefix: string | undefined
+): string | undefined {
   if (!prefix) {
     return undefined;
   }
@@ -62,7 +64,11 @@ function buildMountedRequest(c: Context<ApiContext>): Request {
   if (prefix && url.pathname.startsWith(prefix)) {
     const relative = url.pathname.slice(prefix.length);
     url.pathname =
-      relative === "" ? "/" : relative.startsWith("/") ? relative : `/${relative}`;
+      relative === ""
+        ? "/"
+        : relative.startsWith("/")
+          ? relative
+          : `/${relative}`;
   }
 
   const headers = new Headers(c.req.raw.headers);

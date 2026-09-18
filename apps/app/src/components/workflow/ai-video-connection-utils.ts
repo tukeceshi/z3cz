@@ -15,9 +15,7 @@ import {
 import { AI_AUDIO_OUTPUT_ID } from "./ai-audio-node-utils";
 import { AI_IMAGE_OUTPUT_ID } from "./ai-image-node-utils";
 import { nodeIdUnderPanePointer } from "./connection-pane-hit-test";
-import {
-  snapGenerativeContentBorderPoint,
-} from "./generative-node-content-geometry";
+import { snapGenerativeContentBorderPoint } from "./generative-node-content-geometry";
 import type { WorkflowEdgeType } from "./workflow-types";
 
 type AiVideoReferenceEdge = Pick<
@@ -39,7 +37,10 @@ interface AiVideoSnapTarget {
 interface FlowConnection {
   readonly inProgress: boolean;
   readonly fromNode: InternalNode<Node> | null;
-  readonly fromHandle: { readonly type: string; readonly id?: string | null } | null;
+  readonly fromHandle: {
+    readonly type: string;
+    readonly id?: string | null;
+  } | null;
   readonly to: { readonly x: number; readonly y: number } | null;
   readonly toNode?: InternalNode<Node> | null;
   readonly pointer?: { readonly x: number; readonly y: number } | null;
@@ -150,7 +151,9 @@ export function findAiVideoConnectionTargetNodeId(
   const pointer = connectionPointer(connection);
   if (!pointer) return null;
 
-  const resolveTarget = (targetId: string | null | undefined): string | null => {
+  const resolveTarget = (
+    targetId: string | null | undefined
+  ): string | null => {
     if (!targetId || targetId === connection.fromNode?.id) return null;
     if (!isAiVideoValidHighlightTarget(connection, targetId, nodeLookup)) {
       return null;
@@ -183,15 +186,17 @@ export function findAiVideoConnectionSnap(
   return aiVideoSnapFromNode(node);
 }
 
-export function snapAiVideoReferenceBorderPoint(
-  node: InternalNode<Node>
-): { x: number; y: number } {
+export function snapAiVideoReferenceBorderPoint(node: InternalNode<Node>): {
+  x: number;
+  y: number;
+} {
   return snapGenerativeContentBorderPoint(node, "left");
 }
 
-export function snapAiVideoOutputBorderPoint(
-  node: InternalNode<Node>
-): { x: number; y: number } {
+export function snapAiVideoOutputBorderPoint(node: InternalNode<Node>): {
+  x: number;
+  y: number;
+} {
   return snapGenerativeContentBorderPoint(node, "right");
 }
 

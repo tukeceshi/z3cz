@@ -1,5 +1,9 @@
 import { AI_IMAGE_NODE_TYPE } from "@dafthunk/types";
-import { useNodes, useReactFlow, type Node as ReactFlowNode } from "@xyflow/react";
+import {
+  useNodes,
+  useReactFlow,
+  type Node as ReactFlowNode,
+} from "@xyflow/react";
 import { useCallback, useState } from "react";
 import { useParams } from "react-router";
 
@@ -88,7 +92,8 @@ export function useVideoFrameToAiImageNode(sourceNodeId: string) {
         const sourceName =
           (sourceNode.data as WorkflowNodeType).name?.trim() || catalog.name;
         const frameSuffix = formatVideoFrameSuffix(mode, capturedAtSeconds);
-        const typedNodes = nodes as unknown as readonly ReactFlowNode<WorkflowNodeType>[];
+        const typedNodes =
+          nodes as unknown as readonly ReactFlowNode<WorkflowNodeType>[];
         const nodeName = resolveVideoFrameAiImageNodeName({
           sourceNodeName: sourceName,
           frameSuffix,
@@ -125,9 +130,12 @@ export function useVideoFrameToAiImageNode(sourceNodeId: string) {
         if (openInSecondary) {
           studio.markPendingSecondaryNode(newId);
           studio.openSecondaryDetail(newId);
-          toast.success("workflow.aiVideoPanel.captureFrameSuccessInSecondary", {
-            nodeName,
-          });
+          toast.success(
+            "workflow.aiVideoPanel.captureFrameSuccessInSecondary",
+            {
+              nodeName,
+            }
+          );
         } else {
           toast.success("workflow.aiVideoPanel.captureFrameSuccess", {
             nodeName,

@@ -1,7 +1,4 @@
-import {
-  isCloudObjectReference,
-  type ObjectReference,
-} from "@dafthunk/types";
+import { isCloudObjectReference, type ObjectReference } from "@dafthunk/types";
 
 import { allocateGenerativeMediaResourceId } from "@/services/allocate-generative-media-resource-id";
 import { reportCloudStorageError } from "@/services/cloud-storage-error-reporter";

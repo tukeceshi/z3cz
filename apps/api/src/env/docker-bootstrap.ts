@@ -65,7 +65,10 @@ export function ensureDockerSecretsFile(
   }
 }
 
-function parseDatabaseTarget(databaseUrl: string): { host: string; port: number } {
+function parseDatabaseTarget(databaseUrl: string): {
+  host: string;
+  port: number;
+} {
   const normalized = databaseUrl.replace(/^postgresql:\/\//, "http://");
   const url = new URL(normalized);
   return {
@@ -74,7 +77,10 @@ function parseDatabaseTarget(databaseUrl: string): { host: string; port: number 
   };
 }
 
-async function canConnectToPostgres(host: string, port: number): Promise<boolean> {
+async function canConnectToPostgres(
+  host: string,
+  port: number
+): Promise<boolean> {
   return new Promise((resolve) => {
     const socket = net.createConnection({ host, port }, () => {
       socket.end();

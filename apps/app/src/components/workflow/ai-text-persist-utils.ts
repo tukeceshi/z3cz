@@ -6,10 +6,7 @@ import {
   type ResourceIdReference,
   type WorkflowMediaValue,
 } from "@dafthunk/types";
-import {
-  getResourceIdFromValue,
-  isResourceIdReference,
-} from "@dafthunk/types";
+import { getResourceIdFromValue, isResourceIdReference } from "@dafthunk/types";
 
 import {
   AI_TEXT_BODY_OUTPUT_ID,
@@ -28,8 +25,9 @@ import type { WorkflowNodeType, WorkflowParameter } from "./workflow-types";
 export function readAiTextResultReference(
   inputs: readonly WorkflowParameter[]
 ): WorkflowMediaValue | undefined {
-  const value = inputs.find((input) => input.id === AI_TEXT_RESULT_INPUT_ID)
-    ?.value;
+  const value = inputs.find(
+    (input) => input.id === AI_TEXT_RESULT_INPUT_ID
+  )?.value;
   if (
     value &&
     typeof value === "object" &&
@@ -324,7 +322,11 @@ export function normalizeAiTextNodeDataForPersist(
       : output
   );
 
-  return { ...data, inputs: inputs as WorkflowParameter[], outputs: outputs as WorkflowParameter[] };
+  return {
+    ...data,
+    inputs: inputs as WorkflowParameter[],
+    outputs: outputs as WorkflowParameter[],
+  };
 }
 
 export function buildResourceIdReference(params: {

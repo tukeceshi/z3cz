@@ -211,13 +211,20 @@ function PriceEstimateDetail({
       {showOptimalReferenceSeconds ? (
         <PriceEstimateDetailRow
           label={t("workflow.aiVideoPanel.priceEstimateOptimalReferenceSec")}
-          value={t("workflow.aiVideoPanel.priceEstimateOptimalReferenceSecValue", {
-            seconds: optimalReferenceSecondsDisplay,
-          })}
+          value={t(
+            "workflow.aiVideoPanel.priceEstimateOptimalReferenceSecValue",
+            {
+              seconds: optimalReferenceSecondsDisplay,
+            }
+          )}
           labelNode={
             <DashedHelpLabel
-              label={t("workflow.aiVideoPanel.priceEstimateOptimalReferenceSec")}
-              help={t("workflow.aiVideoPanel.priceEstimateOptimalReferenceSecHelp")}
+              label={t(
+                "workflow.aiVideoPanel.priceEstimateOptimalReferenceSec"
+              )}
+              help={t(
+                "workflow.aiVideoPanel.priceEstimateOptimalReferenceSecHelp"
+              )}
             />
           }
         />
@@ -273,9 +280,8 @@ export function AiVideoPriceEstimateChip({
     "duration",
     5
   );
-  const outputDurationSec = normalizeOutputDurationSecForEstimate(
-    rawOutputDurationSec
-  );
+  const outputDurationSec =
+    normalizeOutputDurationSecForEstimate(rawOutputDurationSec);
   const inputDurationSec = hasReferenceVideo
     ? normalizeReferenceInputDurationSecForEstimate(rawInputDurationSec)
     : 0;

@@ -334,7 +334,9 @@ export function StudioImagePhotoProvider({
     <StudioImageZoomMetricsContext.Provider
       value={{ naturalSize, setNaturalSize }}
     >
-      <StudioImagePhotoProviderContent onLightboxOpenChange={onLightboxOpenChange}>
+      <StudioImagePhotoProviderContent
+        onLightboxOpenChange={onLightboxOpenChange}
+      >
         {children}
       </StudioImagePhotoProviderContent>
     </StudioImageZoomMetricsContext.Provider>

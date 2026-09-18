@@ -12,7 +12,9 @@ interface PendingEventWait {
 }
 
 function parseTimeoutMs(timeout: string): number | undefined {
-  const match = timeout.trim().match(/^(\d+(?:\.\d+)?)\s*(second|minute|hour|day)s?$/i);
+  const match = timeout
+    .trim()
+    .match(/^(\d+(?:\.\d+)?)\s*(second|minute|hour|day)s?$/i);
   if (!match) {
     return undefined;
   }

@@ -1,4 +1,7 @@
-import type { AiModelModality, SingleModelInstanceDraft } from "@dafthunk/types";
+import type {
+  AiModelModality,
+  SingleModelInstanceDraft,
+} from "@dafthunk/types";
 import {
   createSingleModelInstanceDraft,
   defaultUpstreamModelIdForCanonical,
@@ -66,7 +69,9 @@ export function SingleModelInstanceList({
   ) => {
     onChange(
       instances.map((instance) =>
-        instance.instanceId === instanceId ? { ...instance, ...patch } : instance
+        instance.instanceId === instanceId
+          ? { ...instance, ...patch }
+          : instance
       )
     );
   };
@@ -97,7 +102,9 @@ export function SingleModelInstanceList({
   };
 
   const handleRemove = (instanceId: string) => {
-    onChange(instances.filter((instance) => instance.instanceId !== instanceId));
+    onChange(
+      instances.filter((instance) => instance.instanceId !== instanceId)
+    );
   };
 
   return (
@@ -115,7 +122,9 @@ export function SingleModelInstanceList({
               key={model.canonicalId}
               className="flex flex-col gap-2 rounded-lg border p-3"
             >
-              <span className="truncate text-sm font-medium">{displayName}</span>
+              <span className="truncate text-sm font-medium">
+                {displayName}
+              </span>
               <Button
                 type="button"
                 variant="outline"
@@ -145,7 +154,9 @@ export function SingleModelInstanceList({
           >
             <span>{modelColumnLabel}</span>
             <span className="pl-6 sm:pl-0">{modelIdLabel}</span>
-            <span className="text-right sm:text-left">{t("common.actions")}</span>
+            <span className="text-right sm:text-left">
+              {t("common.actions")}
+            </span>
           </div>
           <div className="divide-y">
             {instances.map((instance) => (

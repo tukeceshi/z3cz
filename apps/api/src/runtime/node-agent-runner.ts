@@ -330,8 +330,7 @@ class NodeAgentRunnerInstance {
       return undefined;
     }
 
-    const trimmed =
-      prev.length > maxHistory ? prev.slice(-maxHistory) : prev;
+    const trimmed = prev.length > maxHistory ? prev.slice(-maxHistory) : prev;
 
     return {
       messages: [...trimmed, { role: "user" as const, content: userMessage }],
@@ -436,8 +435,7 @@ const nodeAgentRunnerHub = new NodeAgentRunnerHub();
 
 export function createNodeAgentRunnerNamespace(): DurableObjectNamespace {
   return {
-    idFromName: (name: string) =>
-      ({ toString: () => name }) as DurableObjectId,
+    idFromName: (name: string) => ({ toString: () => name }) as DurableObjectId,
     idFromString: (id: string) => ({ toString: () => id }) as DurableObjectId,
     newUniqueId: () =>
       ({ toString: () => crypto.randomUUID() }) as DurableObjectId,

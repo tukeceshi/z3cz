@@ -7,9 +7,7 @@ import {
   type SingleModelModelConfig,
   type SingleModelProviderMetadata,
 } from "./single-model-interface-metadata";
-import {
-  listSingleModelMetadataEntries,
-} from "./single-model-instances";
+import { listSingleModelMetadataEntries } from "./single-model-instances";
 
 export interface SingleModelSnapshotRow {
   readonly instanceId: string;

@@ -83,7 +83,8 @@ function AiTextWidget({
     outputs: nodeData.outputs,
     nodeData,
   });
-  const needFullBody = selected && !isGenerating && previewText.state === "ready";
+  const needFullBody =
+    selected && !isGenerating && previewText.state === "ready";
   const stagingBody = useCachedAiTextBody({
     reference: previewText.reference,
     enabled: needFullBody,
@@ -96,11 +97,10 @@ function AiTextWidget({
     : selected
       ? stagingBody.text || streamBody
       : previewText.displayExcerpt;
-  const hasOutput =
-    isGenerating
-      ? hasStreamOutput || previewText.displayExcerpt.trim().length > 0
-      : previewText.state === "ready" ||
-        previewText.displayExcerpt.trim().length > 0;
+  const hasOutput = isGenerating
+    ? hasStreamOutput || previewText.displayExcerpt.trim().length > 0
+    : previewText.state === "ready" ||
+      previewText.displayExcerpt.trim().length > 0;
   const selectedHistoryItem =
     historyItems.items.find((item) => item.id === historyItems.selectedId) ??
     historyItems.items[0];
@@ -113,7 +113,9 @@ function AiTextWidget({
   useGenerativeRecordErrorDisplay({
     orgId,
     nodeId,
-    invocationId: selectedFailed ? selectedHistoryItem?.invocationId : undefined,
+    invocationId: selectedFailed
+      ? selectedHistoryItem?.invocationId
+      : undefined,
     modality: "text",
     enabled: selectedFailed && Boolean(selectedHistoryItem?.invocationId),
     clearError: Boolean(
@@ -128,8 +130,7 @@ function AiTextWidget({
     !selectedFailed &&
     (previewText.state === "loading" ||
       (needFullBody && stagingBody.loading && !displayValue.trim()));
-  const showGeneratingMask =
-    isAiTextAwaitingStream(metadata) && !generateError;
+  const showGeneratingMask = isAiTextAwaitingStream(metadata) && !generateError;
   const generatingMessage = t("workflow.aiTextPanel.generating");
   const editLocked = disabled || isGenerating;
 
@@ -150,19 +151,16 @@ function AiTextWidget({
     onApplyText: onChange,
   });
 
-  const {
-    scrollContainerRef,
-    handleScroll,
-    tailPreview,
-  } = useAiTextOutputScroll({
-    text: displayValue,
-    isGenerating,
-    contentKey: `${nodeId}:${historyItems.selectedId ?? ""}`,
-    variant: "canvas-card",
-    isEditing: false,
-    selected,
-    holdTailAfterComplete: selected && holdTailAfterGenerate,
-  });
+  const { scrollContainerRef, handleScroll, tailPreview } =
+    useAiTextOutputScroll({
+      text: displayValue,
+      isGenerating,
+      contentKey: `${nodeId}:${historyItems.selectedId ?? ""}`,
+      variant: "canvas-card",
+      isEditing: false,
+      selected,
+      holdTailAfterComplete: selected && holdTailAfterGenerate,
+    });
 
   useEffect(() => {
     if (isGenerating) {
@@ -219,10 +217,7 @@ function AiTextWidget({
     !isGenerating &&
     !uploading;
   const showEmptyBusy =
-    !hasOutput &&
-    !showTextLoading &&
-    !generateError &&
-    uploading;
+    !hasOutput && !showTextLoading && !generateError && uploading;
 
   return (
     <>
@@ -252,7 +247,11 @@ function AiTextWidget({
             canUpload={false}
             onUploadClick={handleUploadClick}
             busy
-            busyMessage={uploading ? t("workflow.aiTextPanel.cardUploading") : generatingMessage}
+            busyMessage={
+              uploading
+                ? t("workflow.aiTextPanel.cardUploading")
+                : generatingMessage
+            }
             className="min-h-0 flex-1"
           />
         ) : showTextLoading ? (

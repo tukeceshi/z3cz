@@ -282,11 +282,7 @@ export function GenerativeConnectionSides({
         disabled={disabled}
         leftDisabled={leftDisabled}
       />
-      <GenerativeEdgeSide
-        side="right"
-        config={config}
-        disabled={disabled}
-      />
+      <GenerativeEdgeSide side="right" config={config} disabled={disabled} />
     </>
   );
 }

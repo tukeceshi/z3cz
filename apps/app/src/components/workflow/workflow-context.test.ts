@@ -17,9 +17,7 @@ describe("upsertNodeInputValue", () => {
       },
     ];
 
-    expect(
-      upsertNodeInputValue(inputs, "ai_interface_id", "iface-a")
-    ).toEqual([
+    expect(upsertNodeInputValue(inputs, "ai_interface_id", "iface-a")).toEqual([
       inputs[0],
       {
         id: "ai_interface_id",

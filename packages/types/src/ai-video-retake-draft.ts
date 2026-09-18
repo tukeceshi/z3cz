@@ -61,7 +61,9 @@ function isVideoTrimRangeSec(value: unknown): value is VideoTrimRangeSec {
   );
 }
 
-export function parseAiVideoRetakeDraft(raw: unknown): AiVideoRetakeDraft | null {
+export function parseAiVideoRetakeDraft(
+  raw: unknown
+): AiVideoRetakeDraft | null {
   if (!raw || typeof raw !== "object") {
     return null;
   }
@@ -80,9 +82,13 @@ export function parseAiVideoRetakeDraft(raw: unknown): AiVideoRetakeDraft | null
       : "loading";
   return {
     videoDurationSec:
-      typeof record.videoDurationSec === "number" ? record.videoDurationSec : null,
+      typeof record.videoDurationSec === "number"
+        ? record.videoDurationSec
+        : null,
     sourceVideoWidth:
-      typeof record.sourceVideoWidth === "number" ? record.sourceVideoWidth : null,
+      typeof record.sourceVideoWidth === "number"
+        ? record.sourceVideoWidth
+        : null,
     sourceVideoHeight:
       typeof record.sourceVideoHeight === "number"
         ? record.sourceVideoHeight
@@ -121,7 +127,8 @@ export function parseAiVideoRetakeDraft(raw: unknown): AiVideoRetakeDraft | null
 export function readAiVideoRetakeDraftFromInputs(
   inputs: readonly { readonly id: string; readonly value?: unknown }[]
 ): AiVideoRetakeDraft {
-  const raw = inputs.find((input) => input.id === AI_VIDEO_RETAKE_DRAFT_INPUT_ID)
-    ?.value;
+  const raw = inputs.find(
+    (input) => input.id === AI_VIDEO_RETAKE_DRAFT_INPUT_ID
+  )?.value;
   return parseAiVideoRetakeDraft(raw) ?? createDefaultAiVideoRetakeDraft();
 }

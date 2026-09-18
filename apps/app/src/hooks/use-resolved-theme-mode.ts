@@ -8,7 +8,9 @@ function readResolvedThemeMode(): "light" | "dark" {
 
 export function useResolvedThemeMode(): "light" | "dark" {
   const { theme } = useTheme();
-  const [resolved, setResolved] = useState<"light" | "dark">(readResolvedThemeMode);
+  const [resolved, setResolved] = useState<"light" | "dark">(
+    readResolvedThemeMode
+  );
 
   useEffect(() => {
     const update = () => {

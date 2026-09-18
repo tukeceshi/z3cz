@@ -42,9 +42,7 @@ class CloudflareQueue implements RuntimeQueue {
  * backed by Cloudflare Queues.
  */
 export class CloudflareQueueService implements QueueService {
-  constructor(
-    private env: DatabaseEnv & Pick<Bindings, "WORKFLOW_QUEUE">
-  ) {}
+  constructor(private env: DatabaseEnv & Pick<Bindings, "WORKFLOW_QUEUE">) {}
 
   async resolve(
     queueId: string,

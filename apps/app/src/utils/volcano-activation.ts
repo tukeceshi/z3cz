@@ -14,10 +14,7 @@ export {
 };
 
 export function isVolcanoModelActivationBlocking(
-  row: Pick<
-    VolcanoModelSnapshotRow,
-    "activation" | "package" | "canonicalId"
-  >
+  row: Pick<VolcanoModelSnapshotRow, "activation" | "package" | "canonicalId">
 ): boolean {
   return isVolcanoModelActivationBlockingFromTypes({
     probe: row.activation ?? null,
@@ -27,10 +24,7 @@ export function isVolcanoModelActivationBlocking(
 }
 
 export function getVolcanoEffectiveActivationStatus(
-  row: Pick<
-    VolcanoModelSnapshotRow,
-    "activation" | "package" | "canonicalId"
-  >
+  row: Pick<VolcanoModelSnapshotRow, "activation" | "package" | "canonicalId">
 ): ModelActivationStatus | null {
   return resolveVolcanoEffectiveActivationStatus({
     probe: row.activation ?? null,

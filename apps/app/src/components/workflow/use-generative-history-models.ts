@@ -32,9 +32,15 @@ export function useGenerativeHistoryModels(): GenerativeHistoryModels {
   const { organization } = useAuth();
   const orgId = organization?.id;
   const { models: text } = useOrgTextModels(orgId, { enabled: Boolean(orgId) });
-  const { models: image } = useOrgImageModels(orgId, { enabled: Boolean(orgId) });
-  const { models: video } = useOrgVideoModels(orgId, { enabled: Boolean(orgId) });
-  const { models: audio } = useOrgAudioModels(orgId, { enabled: Boolean(orgId) });
+  const { models: image } = useOrgImageModels(orgId, {
+    enabled: Boolean(orgId),
+  });
+  const { models: video } = useOrgVideoModels(orgId, {
+    enabled: Boolean(orgId),
+  });
+  const { models: audio } = useOrgAudioModels(orgId, {
+    enabled: Boolean(orgId),
+  });
   return { text, image, video, audio };
 }
 

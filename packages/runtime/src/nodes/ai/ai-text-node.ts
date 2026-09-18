@@ -67,7 +67,8 @@ export class AiTextNode extends ExecutableNode {
       {
         name: AI_TEXT_KEYWORDS_INPUT,
         type: "any",
-        description: "Upstream references (text / image / video per model limits).",
+        description:
+          "Upstream references (text / image / video per model limits).",
         required: false,
         hidden: true,
         repeated: true,
@@ -82,7 +83,8 @@ export class AiTextNode extends ExecutableNode {
       {
         name: "prompt",
         type: "string",
-        description: "Manual instruction; combined with connected keywords when present.",
+        description:
+          "Manual instruction; combined with connected keywords when present.",
         required: false,
         hidden: true,
       },
@@ -153,7 +155,9 @@ export class AiTextNode extends ExecutableNode {
       );
     } catch (error) {
       return this.createErrorResult(
-        error instanceof Error ? error.message : "Failed to resolve media references"
+        error instanceof Error
+          ? error.message
+          : "Failed to resolve media references"
       );
     }
 
@@ -168,7 +172,9 @@ export class AiTextNode extends ExecutableNode {
     });
 
     if (!result.ok || !result.text) {
-      return this.createErrorResult(result.error ?? "AI text generation failed.");
+      return this.createErrorResult(
+        result.error ?? "AI text generation failed."
+      );
     }
 
     return this.createSuccessResult({ text: result.text }, 1);

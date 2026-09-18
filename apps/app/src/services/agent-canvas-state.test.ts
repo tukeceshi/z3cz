@@ -80,9 +80,7 @@ function imageNode(
           id: "images_result",
           name: "images_result",
           type: "any",
-          value: resourceId
-            ? [{ resourceId, mimeType: "image/png" }]
-            : [],
+          value: resourceId ? [{ resourceId, mimeType: "image/png" }] : [],
         },
       ],
       outputs: [{ id: "images", name: "images", type: "image" }],
@@ -361,7 +359,8 @@ describe("executeCanvasAgentTool", () => {
         nodeId: "",
         payload: JSON.stringify({
           action: "write",
-          source: "function Scene() { return null; }\nfunction RemotionRoot() { return <Composition id=\"Main\" component={Scene} durationInFrames={90} fps={30} width={1280} height={720} />; }",
+          source:
+            'function Scene() { return null; }\nfunction RemotionRoot() { return <Composition id="Main" component={Scene} durationInFrames={90} fps={30} width={1280} height={720} />; }',
         }),
       },
       snapshot: { nodes: [], edges: [] },
@@ -435,7 +434,10 @@ describe("executeCanvasAgentTool", () => {
   });
 
   it("opens simple animation viewport without granting write", async () => {
-    const requestConsent = vi.fn(async () => ({ authorized: true, open: true }));
+    const requestConsent = vi.fn(async () => ({
+      authorized: true,
+      open: true,
+    }));
     const showViewport = vi.fn();
     const text = await executeCanvasAgentTool({
       call: {
@@ -469,7 +471,8 @@ describe("executeCanvasAgentTool", () => {
         nodeId: "",
         payload: JSON.stringify({
           action: "write",
-          source: "function Scene() { return null; }\nfunction RemotionRoot() { return <Composition id=\"Main\" component={Scene} durationInFrames={90} fps={30} width={1280} height={720} />; }",
+          source:
+            'function Scene() { return null; }\nfunction RemotionRoot() { return <Composition id="Main" component={Scene} durationInFrames={90} fps={30} width={1280} height={720} />; }',
         }),
       },
       snapshot: { nodes: [], edges: [] },
@@ -544,7 +547,8 @@ describe("executeCanvasAgentTool", () => {
         nodeId: "",
         payload: JSON.stringify({
           action: "write",
-          source: "function Scene() { return null; }\nfunction RemotionRoot() { return <Composition id=\"Main\" component={Scene} durationInFrames={90} fps={30} width={1280} height={720} />; }",
+          source:
+            'function Scene() { return null; }\nfunction RemotionRoot() { return <Composition id="Main" component={Scene} durationInFrames={90} fps={30} width={1280} height={720} />; }',
         }),
       },
       snapshot: { nodes: [], edges: [] },
@@ -634,9 +638,9 @@ describe("executeCanvasAgentTool", () => {
     const prompt =
       "导入公开画布内容并恢复其全部节点、文字、提示词、素材引用和连接关系： https://xj.quantv.com/api/canvas/public/featured/cmtspfjjq1yo8gizq7e4j3nfo";
     expect(generationPromptIsCanvasImport(prompt)).toBe(true);
-    expect(
-      generationPromptIsCanvasImport("一只穿橙色衬衫的模特三视图")
-    ).toBe(false);
+    expect(generationPromptIsCanvasImport("一只穿橙色衬衫的模特三视图")).toBe(
+      false
+    );
     const text = await executeCanvasAgentTool({
       call: {
         name: "canvas_create_generation_flow",
@@ -811,7 +815,12 @@ describe("executeCanvasAgentTool", () => {
       parseWriteNodesInput(
         JSON.stringify({
           nodes: [
-            { id: "a", mode: "image", prompt: "模特", url: "https://cdn/a.png" },
+            {
+              id: "a",
+              mode: "image",
+              prompt: "模特",
+              url: "https://cdn/a.png",
+            },
             { id: "b", mode: "text", prompt: "脚本", x: 10, y: 20 },
           ],
           connections: [{ from: "a", to: "b" }],
@@ -959,7 +968,8 @@ describe("executeCanvasAgentTool", () => {
         nodeId: "",
         payload: JSON.stringify({
           action: "write",
-          source: "function Scene() { return null; }\nfunction RemotionRoot() { return <Composition id=\"Main\" component={Scene} durationInFrames={90} fps={30} width={1280} height={720} />; }",
+          source:
+            'function Scene() { return null; }\nfunction RemotionRoot() { return <Composition id="Main" component={Scene} durationInFrames={90} fps={30} width={1280} height={720} />; }',
         }),
       },
       snapshot: { nodes: [], edges: [] },
@@ -1013,7 +1023,8 @@ describe("executeCanvasAgentTool", () => {
         nodeId: "",
         payload: JSON.stringify({
           action: "write",
-          source: "function Scene() { return null; }\nfunction RemotionRoot() { return <Composition id=\"Main\" component={Scene} durationInFrames={90} fps={30} width={1280} height={720} />; }",
+          source:
+            'function Scene() { return null; }\nfunction RemotionRoot() { return <Composition id="Main" component={Scene} durationInFrames={90} fps={30} width={1280} height={720} />; }',
         }),
       },
       snapshot: { nodes: [], edges: [] },

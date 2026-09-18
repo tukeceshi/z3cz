@@ -41,73 +41,76 @@ interface MediaWorkerScope {
 
 const workerScope = self as unknown as MediaWorkerScope;
 
-workerScope.addEventListener("message", (event: MessageEvent<WorkerRequest>) => {
-  const payload = event.data;
+workerScope.addEventListener(
+  "message",
+  (event: MessageEvent<WorkerRequest>) => {
+    const payload = event.data;
 
-  void (async () => {
-    try {
-      if (payload.type === "concat") {
-        const buffer = await concatVideoBuffers(payload.buffers);
+    void (async () => {
+      try {
+        if (payload.type === "concat") {
+          const buffer = await concatVideoBuffers(payload.buffers);
+          const success: WorkerSuccess = { ok: true, buffer };
+          workerScope.postMessage(success, [buffer]);
+          return;
+        }
+
+        if (payload.type !== "trim") {
+          return;
+        }
+
+        const response = await fetch(payload.sourceUrl);
+        if (!response.ok) {
+          const failure: WorkerFailure = {
+            ok: false,
+            error: `trim_fetch_failed_${response.status}`,
+          };
+          workerScope.postMessage(failure);
+          return;
+        }
+
+        const blob = await response.blob();
+        const input = new Input({
+          source: new BlobSource(blob),
+          formats: ALL_FORMATS,
+        });
+        const output = new Output({
+          format: new Mp4OutputFormat(),
+          target: new BufferTarget(),
+        });
+        const conversion = await Conversion.init({
+          input,
+          output,
+          tracks: "primary",
+          trim: {
+            start: payload.startSec,
+            end: payload.endSec,
+          },
+          tags: {},
+        });
+        await conversion.execute();
+
+        const buffer = output.target.buffer;
+        if (!buffer) {
+          const failure: WorkerFailure = {
+            ok: false,
+            error: "trim_empty_output",
+          };
+          workerScope.postMessage(failure);
+          return;
+        }
+
         const success: WorkerSuccess = { ok: true, buffer };
         workerScope.postMessage(success, [buffer]);
-        return;
-      }
-
-      if (payload.type !== "trim") {
-        return;
-      }
-
-      const response = await fetch(payload.sourceUrl);
-      if (!response.ok) {
+      } catch (error) {
         const failure: WorkerFailure = {
           ok: false,
-          error: `trim_fetch_failed_${response.status}`,
+          error: error instanceof Error ? error.message : "media_worker_failed",
         };
         workerScope.postMessage(failure);
-        return;
       }
-
-      const blob = await response.blob();
-      const input = new Input({
-        source: new BlobSource(blob),
-        formats: ALL_FORMATS,
-      });
-      const output = new Output({
-        format: new Mp4OutputFormat(),
-        target: new BufferTarget(),
-      });
-      const conversion = await Conversion.init({
-        input,
-        output,
-        tracks: "primary",
-        trim: {
-          start: payload.startSec,
-          end: payload.endSec,
-        },
-        tags: {},
-      });
-      await conversion.execute();
-
-      const buffer = output.target.buffer;
-      if (!buffer) {
-        const failure: WorkerFailure = {
-          ok: false,
-          error: "trim_empty_output",
-        };
-        workerScope.postMessage(failure);
-        return;
-      }
-
-      const success: WorkerSuccess = { ok: true, buffer };
-      workerScope.postMessage(success, [buffer]);
-    } catch (error) {
-      const failure: WorkerFailure = {
-        ok: false,
-        error: error instanceof Error ? error.message : "media_worker_failed",
-      };
-      workerScope.postMessage(failure);
-    }
-  })();
-});
+    })();
+  }
+);
 
 export {};

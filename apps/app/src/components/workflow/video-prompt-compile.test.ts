@@ -135,9 +135,9 @@ describe("retake edit prompt prefix", () => {
   const defaultRange = { startSec: 4, endSec: 8 } as const;
 
   it("formats display and submit prefixes", () => {
-    expect(
-      formatRetakeEditTimeRangeLabel({ startSec: 4.4, endSec: 8.4 })
-    ).toBe("00:04—00:08");
+    expect(formatRetakeEditTimeRangeLabel({ startSec: 4.4, endSec: 8.4 })).toBe(
+      "00:04—00:08"
+    );
     expect(formatRetakeEditSubmitPrefix()).toBe("编辑<视频1>");
   });
 
@@ -146,7 +146,11 @@ describe("retake edit prompt prefix", () => {
       { edgeId: "edge-a", kind: "image" },
     ]);
     expect(
-      compileRetakePromptForSubmit("换{{ref:edge-a}}背景", indexMap, defaultRange)
+      compileRetakePromptForSubmit(
+        "换{{ref:edge-a}}背景",
+        indexMap,
+        defaultRange
+      )
     ).toEqual({
       ok: true,
       prompt: "编辑<视频1>00:04—00:08换图片1背景",
@@ -167,9 +171,9 @@ describe("retake edit prompt prefix", () => {
 
   it("replaces and parses time range in stored prompt", () => {
     const stored = "编辑<视频1>00:04—00:08换背景";
-    expect(replaceRetakePromptTimeRange(stored, { startSec: 10, endSec: 15 })).toBe(
-      "编辑<视频1>00:10—00:15换背景"
-    );
+    expect(
+      replaceRetakePromptTimeRange(stored, { startSec: 10, endSec: 15 })
+    ).toBe("编辑<视频1>00:10—00:15换背景");
     expect(parseRetakePromptTimeRange(stored)).toEqual({
       startSec: 4,
       endSec: 8,

@@ -72,10 +72,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Keep route guards pending while SWR retries; stop once retries finish.
   const isLoading =
     isUserLoading ||
-    (!user &&
-      !!swrError &&
-      !(swrError instanceof AuthError) &&
-      isValidating);
+    (!user && !!swrError && !(swrError instanceof AuthError) && isValidating);
   const isAuthenticated = !!user?.sub && !(swrError instanceof AuthError);
 
   const organization = useMemo<OrganizationInfo | null>(() => {

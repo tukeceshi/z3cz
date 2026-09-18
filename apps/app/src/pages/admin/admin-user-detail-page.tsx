@@ -421,7 +421,9 @@ export function AdminUserDetailPage() {
           {!isDrafting && draft && (
             <div className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="draft-subject">{t("admin.userDetail.subject")}</Label>
+                <Label htmlFor="draft-subject">
+                  {t("admin.userDetail.subject")}
+                </Label>
                 <Input
                   id="draft-subject"
                   value={draftSubject}
@@ -429,7 +431,9 @@ export function AdminUserDetailPage() {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="draft-body">{t("admin.userDetail.message")}</Label>
+                <Label htmlFor="draft-body">
+                  {t("admin.userDetail.message")}
+                </Label>
                 <Textarea
                   id="draft-body"
                   rows={12}
@@ -484,7 +488,9 @@ export function AdminUserDetailPage() {
                 {draft.context.orgWorkflowNames.length > 0 && (
                   <div>
                     {t("admin.userDetail.orgWorkflows", {
-                      names: draft.context.orgWorkflowNames.slice(0, 5).join(", "),
+                      names: draft.context.orgWorkflowNames
+                        .slice(0, 5)
+                        .join(", "),
                     })}
                   </div>
                 )}
@@ -525,9 +531,13 @@ export function AdminUserDetailPage() {
       <AlertDialog open={resendOpen} onOpenChange={setResendOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>{t("admin.userDetail.resendTitle")}</AlertDialogTitle>
+            <AlertDialogTitle>
+              {t("admin.userDetail.resendTitle")}
+            </AlertDialogTitle>
             <AlertDialogDescription>
-              {t("admin.userDetail.resendDescription", { email: user.email ?? "" })}
+              {t("admin.userDetail.resendDescription", {
+                email: user.email ?? "",
+              })}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -570,7 +580,9 @@ export function AdminUserDetailPage() {
                 {user.role}
               </Badge>
               {user.developerMode && (
-                <Badge variant="outline">{t("admin.userDetail.developer")}</Badge>
+                <Badge variant="outline">
+                  {t("admin.userDetail.developer")}
+                </Badge>
               )}
             </div>
 
@@ -609,7 +621,9 @@ export function AdminUserDetailPage() {
               <Github className="h-5 w-5" />
               <span>{t("admin.userDetail.github")}</span>
               {user.githubId ? (
-                <Badge variant="default">{t("admin.userDetail.connected")}</Badge>
+                <Badge variant="default">
+                  {t("admin.userDetail.connected")}
+                </Badge>
               ) : (
                 <Badge variant="secondary">
                   {t("admin.userDetail.notConnected")}
@@ -637,7 +651,9 @@ export function AdminUserDetailPage() {
               </svg>
               <span>{t("admin.userDetail.google")}</span>
               {user.googleId ? (
-                <Badge variant="default">{t("admin.userDetail.connected")}</Badge>
+                <Badge variant="default">
+                  {t("admin.userDetail.connected")}
+                </Badge>
               ) : (
                 <Badge variant="secondary">
                   {t("admin.userDetail.notConnected")}
@@ -872,7 +888,9 @@ export function AdminUserDetailPage() {
                 <p className="text-xs text-muted-foreground">
                   {usagePercent < 100
                     ? t("admin.userDetail.remaining", {
-                        count: (includedCredits - usageThisPeriod).toLocaleString(),
+                        count: (
+                          includedCredits - usageThisPeriod
+                        ).toLocaleString(),
                       })
                     : isPro
                       ? t("admin.userDetail.includedExhausted")
@@ -946,7 +964,9 @@ export function AdminUserDetailPage() {
           </div>
           {threadsPagination && threadsPagination.total > 0 && (
             <Button variant="outline" size="sm" asChild>
-              <Link to={supportFilterHref}>{t("admin.userDetail.viewAll")}</Link>
+              <Link to={supportFilterHref}>
+                {t("admin.userDetail.viewAll")}
+              </Link>
             </Button>
           )}
         </CardHeader>

@@ -57,7 +57,12 @@ import {
 } from "./single-model-interface-metadata";
 import { VOLCANO_AGGREGATE_PRESET_ID } from "./platform-ai-model-channel";
 
-export type SingleModelPresetCategory = "text" | "image" | "video" | "audio" | "storage";
+export type SingleModelPresetCategory =
+  | "text"
+  | "image"
+  | "video"
+  | "audio"
+  | "storage";
 
 const SINGLE_MODEL_PROVIDER_GROUP_IDS = [
   DEEPSEEK_PROVIDER_CARD_ID,
@@ -115,7 +120,9 @@ const SEED_CANONICAL_ID_SET = new Set<string>(SEED_CANONICAL_IDS);
 const GLM_CANONICAL_ID_SET = new Set<string>(GLM_CANONICAL_IDS);
 const KIMI_CANONICAL_ID_SET = new Set<string>(KIMI_CANONICAL_IDS);
 const OPENAI_CANONICAL_ID_SET = new Set<string>(OPENAI_CANONICAL_IDS);
-const OPENAI_IMAGE_CANONICAL_ID_SET = new Set<string>(OPENAI_IMAGE_CANONICAL_IDS);
+const OPENAI_IMAGE_CANONICAL_ID_SET = new Set<string>(
+  OPENAI_IMAGE_CANONICAL_IDS
+);
 const GEMINI_CANONICAL_ID_SET = new Set<string>(GEMINI_CANONICAL_IDS);
 const NANO_BANANA_CANONICAL_ID_SET = new Set<string>(NANO_BANANA_CANONICAL_IDS);
 const VEO_CANONICAL_ID_SET = new Set<string>(VEO_CANONICAL_IDS);
@@ -292,10 +299,7 @@ export function resolveSingleModelGroupLabel(groupId: string): string {
 export function getSingleModelPresetsByCategory(): Readonly<
   Record<SingleModelPresetCategory, readonly SingleModelPresetEntry[]>
 > {
-  const grouped: Record<
-    SingleModelPresetCategory,
-    SingleModelPresetEntry[]
-  > = {
+  const grouped: Record<SingleModelPresetCategory, SingleModelPresetEntry[]> = {
     text: [],
     image: [],
     video: [],

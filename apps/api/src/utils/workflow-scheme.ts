@@ -23,8 +23,14 @@ export function assertTriggerAllowedByScheme(
   scheme: WorkflowScheme,
   trigger: string
 ): void {
-  if (!scheme.allowedTriggers.includes(trigger as WorkflowScheme["allowedTriggers"][number])) {
-    throw new Error(`Trigger "${trigger}" is not allowed in scheme "${scheme.name}"`);
+  if (
+    !scheme.allowedTriggers.includes(
+      trigger as WorkflowScheme["allowedTriggers"][number]
+    )
+  ) {
+    throw new Error(
+      `Trigger "${trigger}" is not allowed in scheme "${scheme.name}"`
+    );
   }
 }
 
@@ -32,7 +38,11 @@ export function assertRuntimeAllowedByScheme(
   scheme: WorkflowScheme,
   runtime: string
 ): void {
-  if (!scheme.allowedRuntimes.includes(runtime as WorkflowScheme["allowedRuntimes"][number])) {
+  if (
+    !scheme.allowedRuntimes.includes(
+      runtime as WorkflowScheme["allowedRuntimes"][number]
+    )
+  ) {
     throw new Error(
       `Execution mode "${runtime}" is not allowed in scheme "${scheme.name}"`
     );

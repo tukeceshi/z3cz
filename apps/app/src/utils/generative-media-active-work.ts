@@ -21,9 +21,7 @@ export function beginGenerativeMediaWork(): () => void {
   };
 }
 
-export function subscribeGenerativeMediaWork(
-  listener: () => void
-): () => void {
+export function subscribeGenerativeMediaWork(listener: () => void): () => void {
   listeners.add(listener);
   return () => {
     listeners.delete(listener);

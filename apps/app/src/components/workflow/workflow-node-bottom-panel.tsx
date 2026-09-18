@@ -82,8 +82,7 @@ function WorkflowNodeBottomPanelInner({
   const isSubtitleErasePanelActive =
     subtitleEraseSession?.isSubtitleEraseActiveForNode(nodeId) ?? false;
   const isRetakePanelActive =
-    data.nodeType === AI_VIDEO_NODE_TYPE &&
-    isAiVideoRetakePanel(data.metadata);
+    data.nodeType === AI_VIDEO_NODE_TYPE && isAiVideoRetakePanel(data.metadata);
 
   // AI generative nodes get a dedicated config panel
   if (data.nodeType === AI_TEXT_NODE_TYPE) {
@@ -295,7 +294,9 @@ function WorkflowNodeBottomPanelInner({
               onClick={() => setErrorExpanded(!errorExpanded)}
               className="group flex w-full items-center justify-between px-3 py-2"
             >
-              <h2 className="text-sm font-semibold text-foreground">{t("workflow.panel.error")}</h2>
+              <h2 className="text-sm font-semibold text-foreground">
+                {t("workflow.panel.error")}
+              </h2>
               <ChevronDownIcon
                 className={cn(
                   "h-4 w-4 text-neutral-400 dark:text-neutral-500",
@@ -319,7 +320,9 @@ function WorkflowNodeBottomPanelInner({
             onClick={() => setInputsExpanded(!inputsExpanded)}
             className="group flex w-full items-center justify-between px-3 py-2"
           >
-            <h2 className="text-sm font-semibold text-foreground">{t("workflow.panel.inputs")}</h2>
+            <h2 className="text-sm font-semibold text-foreground">
+              {t("workflow.panel.inputs")}
+            </h2>
             <ChevronDownIcon
               className={cn(
                 "h-4 w-4 text-neutral-400 group-hover:text-neutral-700 dark:text-neutral-500 dark:group-hover:text-neutral-300",
@@ -351,7 +354,9 @@ function WorkflowNodeBottomPanelInner({
             onClick={() => setOutputsExpanded(!outputsExpanded)}
             className="group flex w-full items-center justify-between px-3 py-2"
           >
-            <h2 className="text-sm font-semibold text-foreground">{t("workflow.panel.outputs")}</h2>
+            <h2 className="text-sm font-semibold text-foreground">
+              {t("workflow.panel.outputs")}
+            </h2>
             <ChevronDownIcon
               className={cn(
                 "h-4 w-4 text-neutral-400 dark:text-neutral-500",

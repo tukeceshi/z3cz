@@ -120,7 +120,10 @@ export function GenerativeCardEmptyUploadSlot({
         }}
       >
         <Upload
-          className={cn("shrink-0 opacity-70", isDetail ? "h-7 w-7" : "h-6 w-6")}
+          className={cn(
+            "shrink-0 opacity-70",
+            isDetail ? "h-7 w-7" : "h-6 w-6"
+          )}
           aria-hidden
         />
         <span className={cn("font-medium", isDetail ? "text-sm" : "text-xs")}>

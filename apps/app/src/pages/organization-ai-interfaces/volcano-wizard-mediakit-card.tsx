@@ -64,7 +64,10 @@ export function VolcanoWizardMediaKitCard({
     <>
       <div className="rounded-lg border p-3 space-y-2">
         <div className="flex items-start gap-3">
-          <Switch checked={config.enabled} onCheckedChange={handleMasterToggle} />
+          <Switch
+            checked={config.enabled}
+            onCheckedChange={handleMasterToggle}
+          />
           <div className="min-w-0 flex-1 space-y-1">
             <div className="flex flex-wrap items-center gap-2">
               <Sparkles className="size-4 text-muted-foreground" />
@@ -96,7 +99,9 @@ export function VolcanoWizardMediaKitCard({
         hasApiKey={Boolean(apiKey.trim())}
         requireApiKey
         onOpenChange={setSettingsOpen}
-        onSave={async (next, mediaKitApiKey) => handleSettingsSave(next, mediaKitApiKey)}
+        onSave={async (next, mediaKitApiKey) =>
+          handleSettingsSave(next, mediaKitApiKey)
+        }
         isSaving={false}
       />
     </>

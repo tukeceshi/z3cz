@@ -52,7 +52,9 @@ export function DataTable<TData, TValue>({
           <TableRow>
             <TableCell colSpan={columns.length} className="h-24 text-center">
               <div className="flex flex-col items-center justify-center py-8">
-                <h3 className="font-semibold text-lg">{resolvedEmptyState.title}</h3>
+                <h3 className="font-semibold text-lg">
+                  {resolvedEmptyState.title}
+                </h3>
                 <p className="text-muted-foreground mt-1">
                   {resolvedEmptyState.description}
                 </p>

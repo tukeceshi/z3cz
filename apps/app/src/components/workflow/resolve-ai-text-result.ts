@@ -1,9 +1,16 @@
 import { getResourceIdFromValue, isResourceIdReference } from "@dafthunk/types";
 import type { AiTextReferenceInput } from "@dafthunk/types";
 import { AI_TEXT_NODE_TYPE } from "@dafthunk/types";
-import type { Edge as ReactFlowEdge, Node as ReactFlowNode } from "@xyflow/react";
+import type {
+  Edge as ReactFlowEdge,
+  Node as ReactFlowNode,
+} from "@xyflow/react";
 
-import { isAiTextGenerating, readAiTextDisplayExcerptSync, readAiTextSessionBodySync } from "./ai-text-node-utils";
+import {
+  isAiTextGenerating,
+  readAiTextDisplayExcerptSync,
+  readAiTextSessionBodySync,
+} from "./ai-text-node-utils";
 import { readAiTextResultReference } from "./ai-text-persist-utils";
 import { readAiTextStagingDisplayState } from "./ai-text-staging-display-state";
 import { findAiTextDisplayForMediaId } from "@/services/ai-text-display-registry";
@@ -29,7 +36,9 @@ function readHungDisplayState(data: WorkflowNodeType) {
   return findAiTextDisplayForMediaId(mediaId)?.state;
 }
 
-export function readAiTextResultExcerptSync(data: WorkflowNodeType): string | undefined {
+export function readAiTextResultExcerptSync(
+  data: WorkflowNodeType
+): string | undefined {
   const excerpt = readAiTextDisplayExcerptSync(data) || readHungExcerpt(data);
   return excerpt.trim() ? excerpt : undefined;
 }

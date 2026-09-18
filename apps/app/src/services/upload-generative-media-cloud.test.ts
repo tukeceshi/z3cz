@@ -40,7 +40,9 @@ vi.mock("@/services/utils", () => ({
 }));
 
 const { makeRequest } = await import("@/services/utils");
-const { registerMediaResource } = await import("@/services/register-media-resource");
+const { registerMediaResource } = await import(
+  "@/services/register-media-resource"
+);
 
 describe("uploadBlobToCloudWorkflow", () => {
   beforeEach(() => {

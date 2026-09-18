@@ -13,7 +13,10 @@ interface ResolveMediaResourcesResponse {
   readonly unresolved: readonly string[];
 }
 
-const resolveCache = new Map<string, Promise<ResolvedMediaResourceEntry | null>>();
+const resolveCache = new Map<
+  string,
+  Promise<ResolvedMediaResourceEntry | null>
+>();
 
 function resourcesEndpoint(organizationId: string): string {
   return `/${organizationId}/resources/resolve`;

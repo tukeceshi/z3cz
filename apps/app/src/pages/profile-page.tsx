@@ -49,9 +49,7 @@ export function ProfilePage() {
     return null;
   }
 
-  return (
-    <ProfilePageContent profile={profile} mutateProfile={mutateProfile} />
-  );
+  return <ProfilePageContent profile={profile} mutateProfile={mutateProfile} />;
 }
 
 interface ProfilePageContentProps {
@@ -59,7 +57,10 @@ interface ProfilePageContentProps {
   mutateProfile: ReturnType<typeof useProfile>["mutateProfile"];
 }
 
-function ProfilePageContent({ profile, mutateProfile }: ProfilePageContentProps) {
+function ProfilePageContent({
+  profile,
+  mutateProfile,
+}: ProfilePageContentProps) {
   const { t } = useTranslation();
   const { organization } = useAuth();
   const appToast = useAppToast();

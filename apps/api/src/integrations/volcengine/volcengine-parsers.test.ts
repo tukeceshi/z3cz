@@ -14,10 +14,7 @@ import {
   buildVolcanoPackageUsageMap,
 } from "./aggregate-package-usage";
 import { readApiKeyId, readApiKeyIdValue } from "./get-api-key";
-import {
-  extractVolcanoListItems,
-  readEndpointId,
-} from "./list-endpoints";
+import { extractVolcanoListItems, readEndpointId } from "./list-endpoints";
 import { formatVolcanoUsageDate } from "./get-inference-usage";
 import {
   indexResourcePackagesByConfigurationCode,
@@ -54,12 +51,12 @@ describe("parseResourcePackages", () => {
       "deepseek_v4_pro"
     );
     expect(volcanoPackageMatchKeyForCanonicalId("glm-5-2")).toBe("glm_5.2");
-    expect(
-      volcanoPackageMatchKeyForCanonicalId("doubao-seedance-2-fast")
-    ).toBe("doubao_seedance_2.0_fast");
-    expect(
-      volcanoPackageMatchKeyForCanonicalId("doubao-seedance-2-mini")
-    ).toBe("doubao_seedance_2.0_mini");
+    expect(volcanoPackageMatchKeyForCanonicalId("doubao-seedance-2-fast")).toBe(
+      "doubao_seedance_2.0_fast"
+    );
+    expect(volcanoPackageMatchKeyForCanonicalId("doubao-seedance-2-mini")).toBe(
+      "doubao_seedance_2.0_mini"
+    );
     expect(volcanoPackageMatchKeyForCanonicalId("doubao-seedance-2-5")).toBe(
       "doubao_seedance_2.5"
     );
@@ -80,19 +77,25 @@ describe("parseResourcePackages", () => {
       )
     ).toBe("doubao-seedance-2-fast");
     expect(
-      pickVolcanoPackageOwnerCanonicalId("Doubao_Seedance_2.0_pack_free_infer", [
-        "doubao-seedance-2",
-        "doubao-seedance-2-fast",
-        "doubao-seedance-2-mini",
-      ])
+      pickVolcanoPackageOwnerCanonicalId(
+        "Doubao_Seedance_2.0_pack_free_infer",
+        [
+          "doubao-seedance-2",
+          "doubao-seedance-2-fast",
+          "doubao-seedance-2-mini",
+        ]
+      )
     ).toBe("doubao-seedance-2");
     expect(
-      pickVolcanoPackageOwnerCanonicalId("Doubao_Seedance_2.5_pack_free_infer", [
-        "doubao-seedance-2",
-        "doubao-seedance-2-fast",
-        "doubao-seedance-2-mini",
-        "doubao-seedance-2-5",
-      ])
+      pickVolcanoPackageOwnerCanonicalId(
+        "Doubao_Seedance_2.5_pack_free_infer",
+        [
+          "doubao-seedance-2",
+          "doubao-seedance-2-fast",
+          "doubao-seedance-2-mini",
+          "doubao-seedance-2-5",
+        ]
+      )
     ).toBe("doubao-seedance-2-5");
   });
 
@@ -322,7 +325,9 @@ describe("aggregatePackageUsage", () => {
     });
 
     expect(snapshot.provisioned).toBe(true);
-    expect(snapshot.matchedCodes).toEqual(["Doubao_Seedance_2.0_pack_free_infer"]);
+    expect(snapshot.matchedCodes).toEqual([
+      "Doubao_Seedance_2.0_pack_free_infer",
+    ]);
     expect(snapshot.instanceNos).toEqual(["rpi-1", "rpi-2"]);
 
     const map = buildVolcanoPackageUsageMap({
@@ -347,7 +352,9 @@ describe("aggregatePackageUsage", () => {
   });
 
   it("maps image package units to images", () => {
-    const packagesByCode = indexResourcePackagesByConfigurationCode([seedreamRow]);
+    const packagesByCode = indexResourcePackagesByConfigurationCode([
+      seedreamRow,
+    ]);
     const map = buildVolcanoPackageUsageMap({
       catalog: [
         {
@@ -831,7 +838,9 @@ describe("pruneVolcanoMetadataToCatalog", () => {
 
     expect(pruned.models["doubao-seedream-5-pro"]).toBeUndefined();
     expect(pruned.models["doubao-seedream-5"]?.enabled).toBe(true);
-    expect(pruned.modelActivationCache?.["doubao-seedream-5-pro"]).toBeUndefined();
+    expect(
+      pruned.modelActivationCache?.["doubao-seedream-5-pro"]
+    ).toBeUndefined();
   });
 });
 

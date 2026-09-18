@@ -1,7 +1,4 @@
-import {
-  snapVideoTrimSec,
-  type VideoTrimRangeSec,
-} from "@dafthunk/types";
+import { snapVideoTrimSec, type VideoTrimRangeSec } from "@dafthunk/types";
 
 /** Stored token: `{{ref:edgeId}}` — bound to a reference edge, not a slot index. */
 
@@ -42,7 +39,9 @@ function formatRetakeEditClockSec(valueSec: number): string {
   return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
 }
 
-export function formatRetakeEditTimeRangeLabel(range: VideoTrimRangeSec): string {
+export function formatRetakeEditTimeRangeLabel(
+  range: VideoTrimRangeSec
+): string {
   return `${formatRetakeEditClockSec(range.startSec)}—${formatRetakeEditClockSec(range.endSec)}`;
 }
 
@@ -194,10 +193,13 @@ export function compileVideoPromptForSubmit(
     return { ok: false, reason: "broken_ref", brokenEdgeIds };
   }
 
-  const prompt = stored.replace(VIDEO_PROMPT_REF_TOKEN_PATTERN, (_match, edgeId: string) => {
-    const index = indexMap.get(edgeId);
-    return index === undefined ? _match : formatVideoPromptImageRef(index);
-  });
+  const prompt = stored.replace(
+    VIDEO_PROMPT_REF_TOKEN_PATTERN,
+    (_match, edgeId: string) => {
+      const index = indexMap.get(edgeId);
+      return index === undefined ? _match : formatVideoPromptImageRef(index);
+    }
+  );
 
   return { ok: true, prompt };
 }

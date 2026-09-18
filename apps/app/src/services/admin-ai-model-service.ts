@@ -80,8 +80,9 @@ export function useAdminModelInvocations(options?: {
     params.set("tzOffset", String(options.tzOffset));
   }
   const key = `/admin/model-invocations?${params.toString()}`;
-  const { data, error, isLoading, mutate } = useSWR(key, async () =>
-    makeRequest<ListAiModelInvocationsResponse>(`${key}`),
+  const { data, error, isLoading, mutate } = useSWR(
+    key,
+    async () => makeRequest<ListAiModelInvocationsResponse>(`${key}`),
     {
       refreshInterval: (latest) =>
         latest?.invocations.some((entry) => entry.status === "pending")

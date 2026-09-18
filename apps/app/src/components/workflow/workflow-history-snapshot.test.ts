@@ -14,13 +14,23 @@ describe("workflow-history-snapshot", () => {
           id: "a",
           type: "workflowNode",
           position: { x: 0, y: 0 },
-          data: { id: "a", name: "A", inputs: [], outputs: [] } as unknown as WorkflowNodeType,
+          data: {
+            id: "a",
+            name: "A",
+            inputs: [],
+            outputs: [],
+          } as unknown as WorkflowNodeType,
         },
         {
           id: "b",
           type: "workflowNode",
           position: { x: 0, y: 0 },
-          data: { id: "b", name: "B", inputs: [], outputs: [] } as unknown as WorkflowNodeType,
+          data: {
+            id: "b",
+            name: "B",
+            inputs: [],
+            outputs: [],
+          } as unknown as WorkflowNodeType,
         },
       ],
       {

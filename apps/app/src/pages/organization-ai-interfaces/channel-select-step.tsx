@@ -85,7 +85,12 @@ function ChannelCard({
           <Check className="size-3" />
         </span>
       ) : null}
-      <div className={cn("space-y-2", selected || channel.recommended ? "pt-6" : "")}>
+      <div
+        className={cn(
+          "space-y-2",
+          selected || channel.recommended ? "pt-6" : ""
+        )}
+      >
         <div>
           <p className="text-lg font-semibold leading-tight">
             {t(channelTitleKey(channel.id))}
@@ -100,9 +105,21 @@ function ChannelCard({
                     label={t("pages.aiInterfaces.channels.volcano.freeQuota")}
                   >
                     <div className="space-y-1 text-sm leading-relaxed">
-                      <p>{t("pages.aiInterfaces.channels.volcano.freeQuotaLine1")}</p>
-                      <p>{t("pages.aiInterfaces.channels.volcano.freeQuotaLine2")}</p>
-                      <p>{t("pages.aiInterfaces.channels.volcano.freeQuotaLine3")}</p>
+                      <p>
+                        {t(
+                          "pages.aiInterfaces.channels.volcano.freeQuotaLine1"
+                        )}
+                      </p>
+                      <p>
+                        {t(
+                          "pages.aiInterfaces.channels.volcano.freeQuotaLine2"
+                        )}
+                      </p>
+                      <p>
+                        {t(
+                          "pages.aiInterfaces.channels.volcano.freeQuotaLine3"
+                        )}
+                      </p>
                     </div>
                   </DashedHintPopover>
                 </>

@@ -4,7 +4,9 @@ import { parseJsonColumn } from "./parse-json-column";
 
 describe("parseJsonColumn", () => {
   it("parses JSON strings", () => {
-    expect(parseJsonColumn<{ schemaVersion: number }>('{"schemaVersion":1}')).toEqual({
+    expect(
+      parseJsonColumn<{ schemaVersion: number }>('{"schemaVersion":1}')
+    ).toEqual({
       schemaVersion: 1,
     });
   });

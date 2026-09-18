@@ -48,7 +48,7 @@ export function testEdgeCases(
     });
 
     it("should handle workflow with deep chain (10+ nodes)", async () => {
-      // Create a chain: num â†?add1 â†?add2 â†?... â†?add10
+      // Create a chain: num â†’add1 â†’add2 â†’... â†’add10
       const nodes: Workflow["nodes"] = [
         {
           id: "num",

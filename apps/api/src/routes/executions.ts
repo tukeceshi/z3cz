@@ -22,42 +22,43 @@ executionRoutes.get(
   apiKeyOrJwtMiddleware,
   requireWorkflowView(),
   async (c) => {
-  const organizationId = c.get("organizationId")!;
-  const id = c.req.param("id")!;
+    const organizationId = c.get("organizationId")!;
+    const id = c.req.param("id")!;
 
-  if (!isUuid(id)) {
-    return c.json({ error: "Invalid execution ID format" }, 400);
-  }
-
-  const executionStore = new CloudflareExecutionStore(c.env);
-
-  try {
-    const execution = await executionStore.getWithData(id, organizationId);
-
-    if (!execution) {
-      return c.json({ error: "Execution not found" }, 404);
+    if (!isUuid(id)) {
+      return c.json({ error: "Invalid execution ID format" }, 400);
     }
 
-    const workflowExecution: WorkflowExecution = {
-      id: execution.id,
-      workflowId: execution.workflowId,
-      workflowName: execution.workflowName,
-      status: execution.status as WorkflowExecutionStatus,
-      nodeExecutions: execution.data.nodeExecutions || [],
-      error: execution.error || undefined,
-      startedAt: execution.startedAt ?? execution.data.startedAt,
-      endedAt: execution.endedAt ?? execution.data.endedAt,
-    };
+    const executionStore = new CloudflareExecutionStore(c.env);
 
-    const response: GetExecutionResponse = {
-      execution: workflowExecution,
-    };
-    return c.json(response);
-  } catch (error) {
-    console.error("Error retrieving execution:", error);
-    return c.json({ error: "Failed to retrieve execution" }, 500);
+    try {
+      const execution = await executionStore.getWithData(id, organizationId);
+
+      if (!execution) {
+        return c.json({ error: "Execution not found" }, 404);
+      }
+
+      const workflowExecution: WorkflowExecution = {
+        id: execution.id,
+        workflowId: execution.workflowId,
+        workflowName: execution.workflowName,
+        status: execution.status as WorkflowExecutionStatus,
+        nodeExecutions: execution.data.nodeExecutions || [],
+        error: execution.error || undefined,
+        startedAt: execution.startedAt ?? execution.data.startedAt,
+        endedAt: execution.endedAt ?? execution.data.endedAt,
+      };
+
+      const response: GetExecutionResponse = {
+        execution: workflowExecution,
+      };
+      return c.json(response);
+    } catch (error) {
+      console.error("Error retrieving execution:", error);
+      return c.json({ error: "Failed to retrieve execution" }, 500);
+    }
   }
-});
+);
 
 executionRoutes.get("/", jwtMiddleware, requireWorkflowView(), async (c) => {
   const executionStore = new CloudflareExecutionStore(c.env);

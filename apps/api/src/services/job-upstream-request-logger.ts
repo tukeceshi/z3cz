@@ -1,4 +1,7 @@
-import type { GenerationJobRecord, ApiInterfaceRequestLogOperation } from "@dafthunk/types";
+import type {
+  GenerationJobRecord,
+  ApiInterfaceRequestLogOperation,
+} from "@dafthunk/types";
 import type { UpstreamRequestLogSink } from "@dafthunk/runtime/ai-interface/upstream-request-log";
 
 import type { Database } from "../db";

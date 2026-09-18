@@ -37,7 +37,10 @@ export async function ensureVolcanoTosBucketCreated(params: {
       }
 
       const existingBuckets = await params.client.listBuckets();
-      bucket = resolveNewVolcanoTosBucketName(existingBuckets, params.organizationId);
+      bucket = resolveNewVolcanoTosBucketName(
+        existingBuckets,
+        params.organizationId
+      );
     }
   }
 

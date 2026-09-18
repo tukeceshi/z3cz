@@ -954,7 +954,10 @@ export function AiVideoConfigPanel({
           mediaKind: "reference",
         });
 
-        if (!isResourceIdReference(value) || !addImageReferenceNode(value, offset)) {
+        if (
+          !isResourceIdReference(value) ||
+          !addImageReferenceNode(value, offset)
+        ) {
           toast.error("workflow.aiVideoPanel.referenceRejected");
           continue;
         }

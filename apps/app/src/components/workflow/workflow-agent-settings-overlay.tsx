@@ -164,7 +164,10 @@ import {
 } from "./ai-text-preview-scroll";
 import { AgentTalkCite } from "./agent-talk-cite";
 import { patchGenerativeNodeWithHungMedia } from "./patch-generative-node-with-hung-media";
-import { findAgentReferenceConnection, generationModeToNodeType } from "./agent-canvas-connect";
+import {
+  findAgentReferenceConnection,
+  generationModeToNodeType,
+} from "./agent-canvas-connect";
 import {
   filterMentionNodes,
   insertMention,
@@ -527,16 +530,13 @@ export const WorkflowAgentSettingsOverlay = forwardRef<
     []
   );
 
-  const patchSessionMode = useCallback(
-    (mode: AgentSessionMode) => {
-      sessionModeRef.current = mode;
-      setSessionMode(mode);
-      setConversation((current) =>
-        current ? { ...current, sessionMode: mode } : current
-      );
-    },
-    []
-  );
+  const patchSessionMode = useCallback((mode: AgentSessionMode) => {
+    sessionModeRef.current = mode;
+    setSessionMode(mode);
+    setConversation((current) =>
+      current ? { ...current, sessionMode: mode } : current
+    );
+  }, []);
 
   const enterAskMode = useCallback(() => {
     patchSessionMode("ask");
@@ -964,7 +964,9 @@ export const WorkflowAgentSettingsOverlay = forwardRef<
             }
             const latest = readGraph();
             for (const node of created) {
-              const source = input.plan.nodes.find((item) => item.id === node.id);
+              const source = input.plan.nodes.find(
+                (item) => item.id === node.id
+              );
               if (!source?.prompt.includes("@图片")) {
                 continue;
               }
@@ -1453,9 +1455,7 @@ export const WorkflowAgentSettingsOverlay = forwardRef<
       const continuing = Boolean(
         options.continueLastAssistant && lastHistory?.role === "assistant"
       );
-      const assistantId = continuing
-        ? lastHistory.id
-        : messageId();
+      const assistantId = continuing ? lastHistory.id : messageId();
       const initialAnswer = continuing
         ? parseSavedAnswer(lastHistory.content)
         : undefined;
@@ -1470,7 +1470,9 @@ export const WorkflowAgentSettingsOverlay = forwardRef<
               ...historyMessages,
               { id: assistantId, role: "assistant", content: "" },
             ],
-        title: base.eventTitle?.trim() || titleFromMessages(historyMessages, base.title),
+        title:
+          base.eventTitle?.trim() ||
+          titleFromMessages(historyMessages, base.title),
         updatedAt: new Date().toISOString(),
         activeInvocationId: undefined,
         pendingAsk: undefined,
@@ -2187,7 +2189,10 @@ export const WorkflowAgentSettingsOverlay = forwardRef<
       return;
     }
     const nextConsented = new Set(consentedRef.current);
-    if (tool.name === SIMPLE_ANIMATION_TOOL || tool.name.startsWith("remotion_")) {
+    if (
+      tool.name === SIMPLE_ANIMATION_TOOL ||
+      tool.name.startsWith("remotion_")
+    ) {
       nextConsented.add(SIMPLE_ANIMATION_CAPABILITY);
       openRemotionViewport();
     }
@@ -2251,8 +2256,7 @@ export const WorkflowAgentSettingsOverlay = forwardRef<
     const next: LocalAgentConversation = {
       ...opened,
       title:
-        pending.title?.trim() ||
-        titleFromMessages(moved, conversation.title),
+        pending.title?.trim() || titleFromMessages(moved, conversation.title),
       messages: moved,
       eventTitle: pending.title,
       eventEnded: pending.ended,
@@ -2530,7 +2534,7 @@ export const WorkflowAgentSettingsOverlay = forwardRef<
   const storedAsk = pendingAsk ?? conversation?.pendingAsk;
   const visibleAsk =
     storedAsk && storedAsk.options.length === 0
-      ? parseAskQuestionArgs(storedAsk.prompt) ?? storedAsk
+      ? (parseAskQuestionArgs(storedAsk.prompt) ?? storedAsk)
       : storedAsk;
   const showAnimationConfirm =
     pendingAnimationWrite && !streaming && !visibleAsk;
@@ -2724,8 +2728,7 @@ export const WorkflowAgentSettingsOverlay = forwardRef<
                               key={`think-${blockIndex}`}
                               thinking={block.text}
                               live={
-                                thinkingLive &&
-                                blockIndex === blocks.length - 1
+                                thinkingLive && blockIndex === blocks.length - 1
                               }
                               thinkingLabel={t(
                                 "workflow.canvas.agentStatusThinking"

@@ -497,7 +497,9 @@ export interface AgentRoleOptions {
   readonly animation?: boolean;
 }
 
-export function parseScheduledRole(value: string): ScheduledAgentRole | undefined {
+export function parseScheduledRole(
+  value: string
+): ScheduledAgentRole | undefined {
   const text = value.trim();
   let raw = text;
   try {
@@ -538,9 +540,7 @@ export function agentRoleIdentities(
 }
 
 function toolNamesForRoles(options: AgentRoleOptions): ReadonlySet<string> {
-  return new Set(
-    activeAgentRoles(options).flatMap((role) => role.toolNames)
-  );
+  return new Set(activeAgentRoles(options).flatMap((role) => role.toolNames));
 }
 
 export function toolsForInform(

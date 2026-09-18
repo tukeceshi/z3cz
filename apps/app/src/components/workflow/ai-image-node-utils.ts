@@ -17,7 +17,11 @@ import {
   type WorkflowMediaValue,
 } from "@dafthunk/types";
 
-import type { NodeType, WorkflowNodeType, WorkflowParameter } from "./workflow-types";
+import type {
+  NodeType,
+  WorkflowNodeType,
+  WorkflowParameter,
+} from "./workflow-types";
 import {
   AI_GENERATIVE_PANEL_HEIGHT_PX,
   AI_GENERATIVE_PANEL_PROMPT_MIN_HEIGHT_PX,
@@ -199,7 +203,9 @@ export function readAiImageResult(
     return fromInputImages;
   }
 
-  const fromOutput = outputs?.find((output) => output.id === AI_IMAGE_OUTPUT_ID);
+  const fromOutput = outputs?.find(
+    (output) => output.id === AI_IMAGE_OUTPUT_ID
+  );
   return parseWorkflowMediaValues(fromOutput?.value);
 }
 
@@ -218,21 +224,22 @@ export function readAiImageResultHistory(
     selectedId?: unknown;
   };
   const rawItems = Array.isArray(record.items)
-    ? record.items.filter(
-        (entry): entry is AiImageResultHistoryItem =>
-          !!entry &&
-          typeof entry === "object" &&
-          typeof (entry as AiImageResultHistoryItem).id === "string" &&
-          Array.isArray((entry as AiImageResultHistoryItem).images) &&
-          typeof (entry as AiImageResultHistoryItem).createdAt === "string"
-      )
-      .map((entry) => {
-        const item = entry as AiImageResultHistoryItem & { prompt?: string };
-        return {
-          ...item,
-          prompt: typeof item.prompt === "string" ? item.prompt : "",
-        };
-      })
+    ? record.items
+        .filter(
+          (entry): entry is AiImageResultHistoryItem =>
+            !!entry &&
+            typeof entry === "object" &&
+            typeof (entry as AiImageResultHistoryItem).id === "string" &&
+            Array.isArray((entry as AiImageResultHistoryItem).images) &&
+            typeof (entry as AiImageResultHistoryItem).createdAt === "string"
+        )
+        .map((entry) => {
+          const item = entry as AiImageResultHistoryItem & { prompt?: string };
+          return {
+            ...item,
+            prompt: typeof item.prompt === "string" ? item.prompt : "",
+          };
+        })
     : [];
 
   const items = splitHistoryMediaRows({
@@ -279,7 +286,9 @@ export function withAiImageResult(
     const nextHistory: AiImageResultHistory = {
       selectedId: history.selectedId,
       items: history.items.map((item) =>
-        item.id === history.selectedId ? { ...item, images: [...storedImages] } : item
+        item.id === history.selectedId
+          ? { ...item, images: [...storedImages] }
+          : item
       ),
     };
     inputs = upsertInputValue(
@@ -404,16 +413,18 @@ export function withAiImageResourceGeneratingCleared(
     nextHistory,
     "json"
   );
-  const resultImages = readAiImageResult(inputs, current.outputs).map((image) => {
-    if (
-      isResourceIdReference(image) &&
-      image.generating &&
-      ids.has(image.resourceId)
-    ) {
-      return stripGeneratingFlag(image);
+  const resultImages = readAiImageResult(inputs, current.outputs).map(
+    (image) => {
+      if (
+        isResourceIdReference(image) &&
+        image.generating &&
+        ids.has(image.resourceId)
+      ) {
+        return stripGeneratingFlag(image);
+      }
+      return image;
     }
-    return image;
-  });
+  );
   return withAiImageResult(current, resultImages, { inputs });
 }
 
@@ -517,10 +528,11 @@ export function withAiImageResourcesMarkedFailed(
     nextHistory,
     "json"
   );
-  const resultImages = readAiImageResult(inputs, current.outputs).map((image) =>
-    isResourceIdReference(image) && ids.has(image.resourceId)
-      ? markResourceRefFailed(image)
-      : image
+  const resultImages = readAiImageResult(inputs, current.outputs).map(
+    (image) =>
+      isResourceIdReference(image) && ids.has(image.resourceId)
+        ? markResourceRefFailed(image)
+        : image
   );
   return withAiImageResult(current, resultImages, { inputs });
 }
@@ -625,7 +637,12 @@ export function withAiImageManualUpload(
     [...images],
     "json"
   );
-  inputs = upsertInputValue(inputs, AI_IMAGE_RESULT_INPUT_ID, [...images], "json");
+  inputs = upsertInputValue(
+    inputs,
+    AI_IMAGE_RESULT_INPUT_ID,
+    [...images],
+    "json"
+  );
 
   const outputs = current.outputs.map((output) =>
     output.id === AI_IMAGE_OUTPUT_ID
@@ -643,7 +660,11 @@ export function withAiImageManualUpload(
 
 export function withAiImageGeneratedResult(
   current: WorkflowNodeType,
-  images: readonly (WorkflowMediaValue | MediaReference | ResourceIdReference)[],
+  images: readonly (
+    | WorkflowMediaValue
+    | MediaReference
+    | ResourceIdReference
+  )[],
   meta?: {
     readonly prompt: string;
     readonly params?: Readonly<Record<string, unknown>>;
@@ -705,9 +726,11 @@ export function withAiImageGeneratedResult(
         images: [image],
         prompt: meta?.prompt ?? pendingItems[0]?.prompt ?? "",
         params: meta?.params ?? pendingItems[0]?.params,
-        platformModelId: meta?.platformModelId ?? pendingItems[0]?.platformModelId,
+        platformModelId:
+          meta?.platformModelId ?? pendingItems[0]?.platformModelId,
         aiInterfaceId: meta?.aiInterfaceId ?? pendingItems[0]?.aiInterfaceId,
-        providerModelId: meta?.providerModelId ?? pendingItems[0]?.providerModelId,
+        providerModelId:
+          meta?.providerModelId ?? pendingItems[0]?.providerModelId,
         modelDisplayName:
           meta?.modelDisplayName ?? pendingItems[0]?.modelDisplayName,
         requestSnapshot:
@@ -735,18 +758,20 @@ export function withAiImageGeneratedResult(
 
   const createdAt = new Date().toISOString();
   const batchId = Date.now();
-  const newItems: AiImageResultHistoryItem[] = storedImages.map((image, index) => ({
-    id: `gen-${batchId}-${index}-${Math.random().toString(36).slice(2, 8)}`,
-    images: [image],
-    prompt: meta?.prompt ?? "",
-    params: meta?.params,
-    platformModelId: meta?.platformModelId,
-    aiInterfaceId: meta?.aiInterfaceId,
-    providerModelId: meta?.providerModelId,
-    modelDisplayName: meta?.modelDisplayName,
-    requestSnapshot: meta?.requestSnapshot,
-    createdAt,
-  }));
+  const newItems: AiImageResultHistoryItem[] = storedImages.map(
+    (image, index) => ({
+      id: `gen-${batchId}-${index}-${Math.random().toString(36).slice(2, 8)}`,
+      images: [image],
+      prompt: meta?.prompt ?? "",
+      params: meta?.params,
+      platformModelId: meta?.platformModelId,
+      aiInterfaceId: meta?.aiInterfaceId,
+      providerModelId: meta?.providerModelId,
+      modelDisplayName: meta?.modelDisplayName,
+      requestSnapshot: meta?.requestSnapshot,
+      createdAt,
+    })
+  );
   const primary = newItems[0]!;
   const nextHistory: AiImageResultHistory = {
     items: [...newItems, ...history.items].slice(0, AI_IMAGE_MAX_HISTORY_ITEMS),
@@ -897,8 +922,7 @@ export function isAiImageReferenceTarget(
   handleId: string | null | undefined
 ): boolean {
   return (
-    nodeType === AI_IMAGE_NODE_TYPE &&
-    handleId === AI_IMAGE_REFERENCE_HANDLE_ID
+    nodeType === AI_IMAGE_NODE_TYPE && handleId === AI_IMAGE_REFERENCE_HANDLE_ID
   );
 }
 

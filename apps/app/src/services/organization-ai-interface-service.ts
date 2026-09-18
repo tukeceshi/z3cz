@@ -21,7 +21,9 @@ function orgEndpoint(organizationId: string): string {
   return `/${organizationId}/ai-interfaces`;
 }
 
-export function useOrganizationAiInterfaces(organizationId: string | undefined) {
+export function useOrganizationAiInterfaces(
+  organizationId: string | undefined
+) {
   const key = organizationId ? orgEndpoint(organizationId) : null;
   const { data, error, isLoading, mutate } = useSWR(key, async () => {
     const response = await makeRequest<{
@@ -45,9 +47,9 @@ export function useOrganizationFormatTransformTemplates(
     ? `${orgEndpoint(organizationId)}/format-transform-templates`
     : null;
   const { data, error, isLoading, mutate } = useSWR(key, async () => {
-    const response = await makeRequest<{ templates: FormatTransformTemplate[] }>(
-      `${orgEndpoint(organizationId!)}/format-transform-templates`
-    );
+    const response = await makeRequest<{
+      templates: FormatTransformTemplate[];
+    }>(`${orgEndpoint(organizationId!)}/format-transform-templates`);
     return response.templates;
   });
 
@@ -284,9 +286,12 @@ export async function ensureVolcanoTosCors(
   readonly configured: boolean;
   readonly origins: readonly string[];
 }> {
-  return makeRequest(`${orgEndpoint(organizationId)}/${interfaceId}/ensure-tos-cors`, {
-    method: "POST",
-  });
+  return makeRequest(
+    `${orgEndpoint(organizationId)}/${interfaceId}/ensure-tos-cors`,
+    {
+      method: "POST",
+    }
+  );
 }
 
 export async function probeVolcanoActivation(
@@ -298,9 +303,7 @@ export async function probeVolcanoActivation(
     `${orgEndpoint(organizationId)}/${interfaceId}/probe-activation`,
     {
       method: "POST",
-      body: JSON.stringify(
-        canonicalIds ? { canonicalIds } : {}
-      ),
+      body: JSON.stringify(canonicalIds ? { canonicalIds } : {}),
     }
   );
 }

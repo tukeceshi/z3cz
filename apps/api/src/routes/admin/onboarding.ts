@@ -1,5 +1,15 @@
 import { zValidator } from "@hono/zod-validator";
-import { and, asc, count, eq, gte, isNotNull, isNull, lt, sql } from "drizzle-orm";
+import {
+  and,
+  asc,
+  count,
+  eq,
+  gte,
+  isNotNull,
+  isNull,
+  lt,
+  sql,
+} from "drizzle-orm";
 import { Hono } from "hono";
 import { z } from "zod";
 
@@ -363,7 +373,9 @@ adminOnboardingRoutes.get(
       const dormantCutoff = new Date(now - DORMANT_DAYS * 24 * 60 * 60 * 1000);
 
       const countWhere = async (
-        filter: ReturnType<typeof stuckFilter> | ReturnType<typeof dormantFilter>
+        filter:
+          | ReturnType<typeof stuckFilter>
+          | ReturnType<typeof dormantFilter>
       ): Promise<number> => {
         const [row] = await db
           .select({ count: count() })
@@ -372,14 +384,21 @@ adminOnboardingRoutes.get(
         return Number(row?.count ?? 0);
       };
 
-      const [signedUp, tourCompleted, workflowCreated, workflowExecuted, dormant] =
-        await Promise.all([
-          countWhere(stuckFilter("signed_up", lowerCutoff, dormantCutoff)),
-          countWhere(stuckFilter("tour_completed", lowerCutoff, dormantCutoff)),
-          countWhere(stuckFilter("workflow_created", lowerCutoff, dormantCutoff)),
-          countWhere(stuckFilter("workflow_executed", lowerCutoff, dormantCutoff)),
-          countWhere(dormantFilter(dormantCutoff)),
-        ]);
+      const [
+        signedUp,
+        tourCompleted,
+        workflowCreated,
+        workflowExecuted,
+        dormant,
+      ] = await Promise.all([
+        countWhere(stuckFilter("signed_up", lowerCutoff, dormantCutoff)),
+        countWhere(stuckFilter("tour_completed", lowerCutoff, dormantCutoff)),
+        countWhere(stuckFilter("workflow_created", lowerCutoff, dormantCutoff)),
+        countWhere(
+          stuckFilter("workflow_executed", lowerCutoff, dormantCutoff)
+        ),
+        countWhere(dormantFilter(dormantCutoff)),
+      ]);
 
       return c.json({
         minDays,

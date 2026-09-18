@@ -6,7 +6,8 @@ export function resolveGenerationFieldLabel(
   field: UpstreamParamProfileField,
   t: TranslateFn
 ): string {
-  const key = `workflow.generativeParams.fields.${field.name}` as TranslationKey;
+  const key =
+    `workflow.generativeParams.fields.${field.name}` as TranslationKey;
   const translated = t(key);
   return translated !== key ? translated : field.description || field.name;
 }

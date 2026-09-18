@@ -8,7 +8,11 @@ import {
   buildWorkflowPayload,
   type WorkflowCanvasJson,
 } from "@/components/workflow/build-workflow-payload";
-import type { NodeType, WorkflowEdgeType, WorkflowNodeType } from "@/components/workflow/workflow-types";
+import type {
+  NodeType,
+  WorkflowEdgeType,
+  WorkflowNodeType,
+} from "@/components/workflow/workflow-types";
 import { adaptBackendNodesToReactFlowNodes } from "@/utils/utils";
 
 export type { WorkflowCanvasJson };

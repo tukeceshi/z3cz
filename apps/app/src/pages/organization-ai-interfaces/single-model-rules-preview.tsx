@@ -80,17 +80,19 @@ export function SingleModelCapabilityLimitsPreview(
       })
     : null;
   const defaultResolution = String(resolutionField?.default ?? "");
-  const resolutionLabels = (resolutionField?.enumValues ?? []).map((resolution) => {
-    const label = formatAdminGenerationOptionLabel(
-      "resolution",
-      resolution,
-      optionLabels
-    );
-    if (defaultResolution === resolution) {
-      return `${label} (${t("pages.adminAiModels.defaultStateLabel")})`;
+  const resolutionLabels = (resolutionField?.enumValues ?? []).map(
+    (resolution) => {
+      const label = formatAdminGenerationOptionLabel(
+        "resolution",
+        resolution,
+        optionLabels
+      );
+      if (defaultResolution === resolution) {
+        return `${label} (${t("pages.adminAiModels.defaultStateLabel")})`;
+      }
+      return label;
     }
-    return label;
-  });
+  );
   const durationPreview = durationField
     ? t("pages.aiInterfaces.singleModel.durationLimitsPreview", {
         min: resolveMinDurationFromField(durationField),
@@ -152,11 +154,14 @@ export function SingleModelCapabilityLimitsPreview(
         ) : null}
         {props.capabilityLimits?.priceEstimateDiscountFold !== undefined ? (
           <li>
-            {t("pages.aiInterfaces.singleModel.priceEstimateExtraDiscountPreview", {
-              fold: formatVideoPricePromoFold(
-                props.capabilityLimits.priceEstimateDiscountFold
-              ),
-            })}
+            {t(
+              "pages.aiInterfaces.singleModel.priceEstimateExtraDiscountPreview",
+              {
+                fold: formatVideoPricePromoFold(
+                  props.capabilityLimits.priceEstimateDiscountFold
+                ),
+              }
+            )}
           </li>
         ) : null}
       </ul>
@@ -208,7 +213,9 @@ export function SingleModelFormatMappingPreview(
         <ul className="text-muted-foreground space-y-1 font-mono">
           {rules.mappings.map((mapping) => (
             <li key={`${mapping.upstreamParamName}:${mapping.sourceLabel}`}>
-              <span className="text-foreground">{mapping.upstreamParamName}</span>
+              <span className="text-foreground">
+                {mapping.upstreamParamName}
+              </span>
               <span className="text-muted-foreground"> ← </span>
               <span className="text-foreground">{mapping.sourceLabel}</span>
             </li>

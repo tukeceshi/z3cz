@@ -46,10 +46,7 @@ export function resolveVolcanoEffectiveActivationStatus(params: {
     return probeStatus;
   }
 
-  if (
-    probeStatus === "invalid_model_id" ||
-    probeStatus === "transient_error"
-  ) {
+  if (probeStatus === "invalid_model_id" || probeStatus === "transient_error") {
     return probeStatus;
   }
 

@@ -5,11 +5,7 @@ import { Hono } from "hono";
 import { z } from "zod";
 
 import { ApiContext } from "../../context";
-import {
-  createDatabase,
-  getAdminAuthConfig,
-  updateAuthConfig,
-} from "../../db";
+import { createDatabase, getAdminAuthConfig, updateAuthConfig } from "../../db";
 
 const adminAuthConfigRoutes = new Hono<ApiContext>();
 
@@ -70,12 +66,7 @@ adminAuthConfigRoutes.patch(
     const input: UpdateAuthConfigRequest = body;
 
     try {
-      const config = await updateAuthConfig(
-        db,
-        c.env,
-        input,
-        jwtPayload.sub
-      );
+      const config = await updateAuthConfig(db, c.env, input, jwtPayload.sub);
       return c.json(config);
     } catch (error) {
       const message =

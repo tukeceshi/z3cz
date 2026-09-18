@@ -80,7 +80,10 @@ export function readGenerativeStagingMediaIds(
   if (!raw) {
     return [];
   }
-  return raw.split(",").map((entry) => entry.trim()).filter(Boolean);
+  return raw
+    .split(",")
+    .map((entry) => entry.trim())
+    .filter(Boolean);
 }
 
 export function readGenerativeDownloadPercent(
@@ -101,10 +104,7 @@ export function formatGenerativePhaseLabel(params: {
   readonly phase: GenerativeProgressPhase | null;
   readonly progressKey: string;
   readonly metadata: Record<string, string> | undefined;
-  readonly t: (
-    key: string,
-    values?: Record<string, string | number>
-  ) => string;
+  readonly t: (key: string, values?: Record<string, string | number>) => string;
 }): string {
   if (params.phase === "downloading") {
     const percent = readGenerativeDownloadPercent(params.metadata);
@@ -160,7 +160,8 @@ export function withGenerativeProgress(
   if (params.stagingMediaIds === null) {
     delete next[GENERATIVE_STAGING_MEDIA_IDS_META_KEY];
   } else if (params.stagingMediaIds && params.stagingMediaIds.length > 0) {
-    next[GENERATIVE_STAGING_MEDIA_IDS_META_KEY] = params.stagingMediaIds.join(",");
+    next[GENERATIVE_STAGING_MEDIA_IDS_META_KEY] =
+      params.stagingMediaIds.join(",");
   }
 
   if (params.downloadPercent === null) {
@@ -433,10 +434,7 @@ export function formatGenerativeBusyOverlayLabel(params: {
     | "workflow.aiAudioPanel";
   readonly metadata: Record<string, string> | undefined;
   readonly progressNowMs: number;
-  readonly t: (
-    key: string,
-    values?: Record<string, string | number>
-  ) => string;
+  readonly t: (key: string, values?: Record<string, string | number>) => string;
 }): string {
   if (params.phase === "cancelling" || params.phase === "cancelled") {
     return params.t(params.progressButtonKey(params.phase));

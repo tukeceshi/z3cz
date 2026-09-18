@@ -75,11 +75,7 @@ export function WorkflowLibraryPreview({
           className
         )}
       >
-        <img
-          src={coverUrl}
-          alt=""
-          className="h-full w-full object-cover"
-        />
+        <img src={coverUrl} alt="" className="h-full w-full object-cover" />
       </div>
     );
   }
@@ -92,7 +88,10 @@ export function WorkflowLibraryPreview({
           className
         )}
       >
-        <Folder className="h-16 w-16 text-muted-foreground/70" strokeWidth={1.25} />
+        <Folder
+          className="h-16 w-16 text-muted-foreground/70"
+          strokeWidth={1.25}
+        />
       </div>
     );
   }
@@ -109,7 +108,10 @@ export function WorkflowLibraryPreview({
           {fallbackLabel}
         </p>
       ) : (
-        <ImageIcon className="h-10 w-10 text-muted-foreground/50" strokeWidth={1.25} />
+        <ImageIcon
+          className="h-10 w-10 text-muted-foreground/50"
+          strokeWidth={1.25}
+        />
       )}
     </div>
   );

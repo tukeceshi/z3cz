@@ -26,6 +26,11 @@
     "noFallthroughCasesInSwitch": true,
     "noUncheckedSideEffectImports": true
   },
-  "include": ["src", "vite.config.ts", "maintenance-page.ts", "vite-plugin-bootstrap-manifest.ts"],
+  "include": [
+    "src",
+    "vite.config.ts",
+    "maintenance-page.ts",
+    "vite-plugin-bootstrap-manifest.ts"
+  ],
   "exclude": ["functions/**/*"]
 }

@@ -1,4 +1,9 @@
-import { AI_AUDIO_NODE_TYPE, AI_IMAGE_NODE_TYPE, AI_TEXT_NODE_TYPE, AI_VIDEO_NODE_TYPE } from "@dafthunk/types";
+import {
+  AI_AUDIO_NODE_TYPE,
+  AI_IMAGE_NODE_TYPE,
+  AI_TEXT_NODE_TYPE,
+  AI_VIDEO_NODE_TYPE,
+} from "@dafthunk/types";
 import { useCallback } from "react";
 import {
   useStore,
@@ -17,7 +22,9 @@ import { useWorkflowActions } from "./workflow-context";
 import type { GenerativeReferenceModelCatalogs } from "./generative-reference-model-catalogs";
 import type { WorkflowEdgeType, WorkflowNodeType } from "./workflow-types";
 
-function readNodeType(node: InternalNode<Node> | undefined): string | undefined {
+function readNodeType(
+  node: InternalNode<Node> | undefined
+): string | undefined {
   return (node?.data as { nodeType?: string } | undefined)?.nodeType;
 }
 

@@ -101,7 +101,7 @@ describe("matchGenerativeErrorRule", () => {
 
   it("formats multiple cited content indices in one real-person error", () => {
     const raw =
-      'The request failed because the input image \'content[1]\' \'content[2]\' may contain real person.';
+      "The request failed because the input image 'content[1]' 'content[2]' may contain real person.";
     const matched = matchGenerativeErrorRule({
       raw,
       modelKind: "video",

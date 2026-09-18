@@ -17,9 +17,8 @@ import {
   type ResolvedOrgModelInterface,
 } from "./resolve-text-model-interface";
 
-export type ResolvedImageModelInterface = ResolvedOrgModelInterface<
-  ImageModelParameterRules
->;
+export type ResolvedImageModelInterface =
+  ResolvedOrgModelInterface<ImageModelParameterRules>;
 
 export async function listOrgImageModelOptions(
   db: Database,
@@ -35,12 +34,11 @@ export async function listOrgImageModelOptions(
     interfaces: collectOrgBindingInterfaces(interfaces),
   }).map((binding) => ({
     ...binding,
-    unavailableReason:
-      binding.unavailableReason as OrgImageModelUnavailableReason | undefined,
+    unavailableReason: binding.unavailableReason as
+      | OrgImageModelUnavailableReason
+      | undefined,
     parameterRules: getImageParameterRules(
-      platformModels.find(
-        (model) => model.canonicalId === binding.canonicalId
-      )!
+      platformModels.find((model) => model.canonicalId === binding.canonicalId)!
     ),
   }));
 }

@@ -29,11 +29,12 @@ import { z } from "zod";
 
 import { jwtMiddleware } from "../auth";
 import { ApiContext } from "../context";
-import {
-  requireAiInterfacesAccess,
-} from "../middleware/org-permissions";
+import { requireAiInterfacesAccess } from "../middleware/org-permissions";
 import { createDatabase } from "../db";
-import { listEnabledPlatformFormatTransformTemplates, getFormatTransformTemplateById } from "../db/format-transform-template-queries";
+import {
+  listEnabledPlatformFormatTransformTemplates,
+  getFormatTransformTemplateById,
+} from "../db/format-transform-template-queries";
 import {
   getVideoParameterRules as getPlatformVideoRules,
   listPlatformAiModels,
@@ -108,9 +109,7 @@ import {
   readOrgDirectUploadCorsStatus,
 } from "../services/ensure-direct-upload-cors";
 import { VolcengineTosClient } from "../integrations/volcengine/tos-client";
-import {
-  probeVolcanoTosServiceStatus,
-} from "../integrations/volcengine/probe-volcano-tos-service";
+import { probeVolcanoTosServiceStatus } from "../integrations/volcengine/probe-volcano-tos-service";
 import {
   isVolcanoTosNotOpenedError,
   VOLCANO_TOS_NOT_OPENED_CODE,
@@ -494,7 +493,9 @@ aiInterfaceRoutes.get("/", async (c) => {
 
   try {
     const interfaces = await listOrganizationAiInterfaces(db, organizationId);
-    return c.json({ interfaces } satisfies ListOrganizationAiInterfacesResponse);
+    return c.json({
+      interfaces,
+    } satisfies ListOrganizationAiInterfacesResponse);
   } catch (error) {
     console.error("Error listing organization AI interfaces:", error);
     return c.json({ error: "Failed to list AI interfaces" }, 500);
@@ -526,7 +527,9 @@ aiInterfaceRoutes.get("/:id/volcano-snapshot", async (c) => {
       );
     }
     const message =
-      error instanceof Error ? error.message : "Failed to fetch volcano snapshot";
+      error instanceof Error
+        ? error.message
+        : "Failed to fetch volcano snapshot";
     console.error("Error fetching volcano snapshot:", error);
     const status = message === "AI interface not found" ? 404 : 400;
     return c.json({ error: message }, status);
@@ -582,7 +585,11 @@ aiInterfaceRoutes.post("/:id/ensure-tos-cors", async (c) => {
   const db = createDatabase(c.env);
 
   try {
-    const existing = await getOrganizationAiInterfaceRow(db, organizationId, id);
+    const existing = await getOrganizationAiInterfaceRow(
+      db,
+      organizationId,
+      id
+    );
     if (!existing) {
       return c.json({ error: "AI interface not found" }, 404);
     }
@@ -592,7 +599,10 @@ aiInterfaceRoutes.post("/:id/ensure-tos-cors", async (c) => {
       c.env,
       organizationId
     );
-    const corsStatus = await readOrgDirectUploadCorsStatus(c.env, organizationId);
+    const corsStatus = await readOrgDirectUploadCorsStatus(
+      c.env,
+      organizationId
+    );
 
     return c.json({
       applied: applied.applied,
@@ -747,7 +757,9 @@ aiInterfaceRoutes.post(
       if (ensured.renewed || ensured.metadataChanged) {
         await updateOrganizationAiInterface(db, organizationId, row.id, {
           metadata: ensured.metadataRaw,
-          ...(ensured.renewed ? { apiKeyEncrypted: ensured.apiKeyEncrypted } : {}),
+          ...(ensured.renewed
+            ? { apiKeyEncrypted: ensured.apiKeyEncrypted }
+            : {}),
         });
       }
 
@@ -882,10 +894,7 @@ aiInterfaceRoutes.post("/:id/volcano-setup/retry", async (c) => {
 
     const status = row.volcanoSetupStatus;
     if (status !== "failed" && status !== "enqueue_failed") {
-      return c.json(
-        { error: "Setup is not in a failed state", status },
-        409
-      );
+      return c.json({ error: "Setup is not in a failed state", status }, 409);
     }
 
     const metadata = parseInterfaceMetadata(row.metadata);
@@ -928,7 +937,11 @@ aiInterfaceRoutes.post("/:id/volcano-setup/retry", async (c) => {
       return c.json({ error: "Failed to enqueue setup" }, 500);
     }
 
-    const refreshed = await getOrganizationAiInterfaceRow(db, organizationId, id);
+    const refreshed = await getOrganizationAiInterfaceRow(
+      db,
+      organizationId,
+      id
+    );
     if (!refreshed) {
       return c.json({ error: "AI interface not found" }, 404);
     }
@@ -1001,7 +1014,8 @@ aiInterfaceRoutes.post("/", zValidator("json", createSchema), async (c) => {
                   templateId: existingIface.templateId,
                   templateVersion: existingIface.templateVersion,
                   name: existingIface.name,
-                  provider: existingIface.provider as OrganizationAiInterface["provider"],
+                  provider:
+                    existingIface.provider as OrganizationAiInterface["provider"],
                   baseUrl: existingIface.baseUrl,
                   selectedModel: existingIface.selectedModel,
                   enabled: existingIface.enabled,
@@ -1111,7 +1125,11 @@ aiInterfaceRoutes.post("/", zValidator("json", createSchema), async (c) => {
         if (!inserted) {
           const raced = await getCreateIdempotencyRecord(db, idempotencyKey);
           if (raced && raced.interfaceId !== interfaceId) {
-            await deleteOrganizationAiInterface(db, organizationId, interfaceId);
+            await deleteOrganizationAiInterface(
+              db,
+              organizationId,
+              interfaceId
+            );
             const winner = await getOrganizationAiInterfaceRow(
               db,
               organizationId,
@@ -1129,7 +1147,8 @@ aiInterfaceRoutes.post("/", zValidator("json", createSchema), async (c) => {
                     templateId: winner.templateId,
                     templateVersion: winner.templateVersion,
                     name: winner.name,
-                    provider: winner.provider as OrganizationAiInterface["provider"],
+                    provider:
+                      winner.provider as OrganizationAiInterface["provider"],
                     baseUrl: winner.baseUrl,
                     selectedModel: winner.selectedModel,
                     enabled: winner.enabled,
@@ -1260,543 +1279,534 @@ aiInterfaceRoutes.post("/", zValidator("json", createSchema), async (c) => {
   }
 });
 
-aiInterfaceRoutes.patch(
-  "/:id",
-  zValidator("json", updateSchema),
-  async (c) => {
-    const organizationId = c.get("organizationId")!;
-    const id = c.req.param("id");
-    const body = c.req.valid("json");
-    const db = createDatabase(c.env);
+aiInterfaceRoutes.patch("/:id", zValidator("json", updateSchema), async (c) => {
+  const organizationId = c.get("organizationId")!;
+  const id = c.req.param("id");
+  const body = c.req.valid("json");
+  const db = createDatabase(c.env);
 
-    try {
-      const existing = await getOrganizationAiInterfaceRow(
-        db,
-        organizationId,
-        id
+  try {
+    const existing = await getOrganizationAiInterfaceRow(
+      db,
+      organizationId,
+      id
+    );
+    if (!existing) {
+      return c.json({ error: "AI interface not found" }, 404);
+    }
+
+    const apiKeyEncrypted: string | undefined =
+      body.apiKey !== undefined
+        ? await encryptSecret(body.apiKey, c.env, organizationId)
+        : undefined;
+
+    let metadataUpdate: InterfaceMetadataDraft | undefined = body.metadata;
+    const catalogEntries = await listAggregateVolcanoCatalogEntries(db);
+
+    if (body.accessKeyId !== undefined || body.secretAccessKey !== undefined) {
+      return c.json({ error: "Credentials cannot be reconfigured" }, 400);
+    }
+
+    if (body.volcanoModelEnabled) {
+      const current = parseInterfaceMetadata(existing.metadata);
+      if (!isVolcanoMetadata(current)) {
+        return c.json({ error: "Volcano metadata not configured" }, 400);
+      }
+      metadataUpdate = mergeVolcanoModelEnabled(
+        current,
+        body.volcanoModelEnabled,
+        catalogEntries
       );
-      if (!existing) {
-        return c.json({ error: "AI interface not found" }, 404);
+    }
+
+    if (body.volcanoSupportsCharacterLibrary !== undefined) {
+      const parsed = parseInterfaceMetadata(
+        metadataUpdate ?? existing.metadata
+      );
+      if (!parsed || !isVolcanoMetadata(parsed)) {
+        return c.json({ error: "Volcano metadata not configured" }, 400);
       }
-
-      const apiKeyEncrypted: string | undefined =
-        body.apiKey !== undefined
-          ? await encryptSecret(body.apiKey, c.env, organizationId)
-          : undefined;
-
-      let metadataUpdate: InterfaceMetadataDraft | undefined = body.metadata;
-      const catalogEntries = await listAggregateVolcanoCatalogEntries(db);
-
-      if (body.accessKeyId !== undefined || body.secretAccessKey !== undefined) {
-        return c.json({ error: "Credentials cannot be reconfigured" }, 400);
-      }
-
-      if (body.volcanoModelEnabled) {
-        const current = parseInterfaceMetadata(existing.metadata);
-        if (!isVolcanoMetadata(current)) {
-          return c.json({ error: "Volcano metadata not configured" }, 400);
-        }
-        metadataUpdate = mergeVolcanoModelEnabled(
-          current,
-          body.volcanoModelEnabled,
-          catalogEntries
-        );
-      }
-
-      if (body.volcanoSupportsCharacterLibrary !== undefined) {
-        const parsed = parseInterfaceMetadata(
-          metadataUpdate ?? existing.metadata
-        );
-        if (!parsed || !isVolcanoMetadata(parsed)) {
-          return c.json({ error: "Volcano metadata not configured" }, 400);
-        }
-        let current = parsed;
-        if (
-          body.volcanoSupportsCharacterLibrary &&
-          !current.characterLibraryAssetGroupId
-        ) {
-          try {
-            current = {
-              ...current,
-              characterLibraryAssetGroupId: await ensureCharacterLibraryAssetGroup(
+      let current = parsed;
+      if (
+        body.volcanoSupportsCharacterLibrary &&
+        !current.characterLibraryAssetGroupId
+      ) {
+        try {
+          current = {
+            ...current,
+            characterLibraryAssetGroupId:
+              await ensureCharacterLibraryAssetGroup(
                 c.env,
                 db,
                 organizationId,
                 id
               ),
-            };
-          } catch (error) {
-            return c.json(
-              {
-                error:
-                  error instanceof Error
-                    ? error.message
-                    : "Failed to create asset group",
-              },
-              400
-            );
-          }
-        }
-        metadataUpdate = mergeVolcanoSupportsCharacterLibrary(
-          current,
-          body.volcanoSupportsCharacterLibrary
-        );
-      }
-
-      if (body.volcanoModelAlias) {
-        const current = parseInterfaceMetadata(
-          metadataUpdate ?? existing.metadata
-        );
-        if (!isVolcanoMetadata(current)) {
-          return c.json({ error: "Volcano metadata not configured" }, 400);
-        }
-        metadataUpdate = mergeVolcanoModelAlias(
-          current,
-          body.volcanoModelAlias,
-          catalogEntries
-        );
-      }
-
-      if (body.singleModelModelEnabled) {
-        const current = parseSingleModelMetadata(
-          metadataUpdate ?? parseInterfaceMetadata(existing.metadata)
-        );
-        if (!current) {
-          return c.json({ error: "Single-model metadata not configured" }, 400);
-        }
-        metadataUpdate = mergeSingleModelModelEnabledMetadata(
-          current,
-          body.singleModelModelEnabled
-        );
-      }
-
-      if (body.singleModelModelAlias) {
-        const current = parseSingleModelMetadata(
-          metadataUpdate ?? parseInterfaceMetadata(existing.metadata)
-        );
-        if (!current) {
-          return c.json({ error: "Single-model metadata not configured" }, 400);
-        }
-        metadataUpdate = mergeSingleModelModelAliasMetadata(
-          current,
-          body.singleModelModelAlias
-        );
-      }
-
-      if (body.singleModelUpstreamModelIds) {
-        for (const modelId of Object.values(body.singleModelUpstreamModelIds)) {
-          if (!modelId.trim()) {
-            return c.json({ error: "Model ID cannot be empty" }, 400);
-          }
-        }
-        const current = parseSingleModelMetadata(
-          metadataUpdate ?? parseInterfaceMetadata(existing.metadata)
-        );
-        if (!current) {
-          return c.json({ error: "Single-model metadata not configured" }, 400);
-        }
-        metadataUpdate = mergeSingleModelUpstreamModelIdsMetadata(
-          current,
-          body.singleModelUpstreamModelIds
-        );
-      }
-
-      if (body.singleModelEndpointRules !== undefined) {
-        let current = parseSingleModelMetadata(
-          metadataUpdate ?? parseInterfaceMetadata(existing.metadata)
-        );
-        if (!current) {
-          return c.json({ error: "Single-model metadata not configured" }, 400);
-        }
-        current = await ensureMigratedSingleModelMetadata(db, current);
-        const validationError = validateCustomSingleModelEndpointRules({
-          category: current.singleModelCategory ?? "video",
-          rules: body.singleModelEndpointRules,
-        });
-        if (validationError) {
-          return c.json({ error: validationError }, 400);
-        }
-        metadataUpdate = mergeSingleModelEndpointRulesMetadata(
-          current,
-          body.singleModelEndpointRules
-        );
-        const endpointRulesMetadata = parseSingleModelMetadata(metadataUpdate);
-        if (
-          body.singleModelEndpointRules.useOfficial === false &&
-          current.singleModelCategory === "video" &&
-          body.singleModelFormatTransformsByCanonicalId === undefined &&
-          endpointRulesMetadata &&
-          !hasRequiredSingleModelFormatTransforms(endpointRulesMetadata)
-        ) {
+          };
+        } catch (error) {
           return c.json(
             {
               error:
-                "Each enabled video model requires a format transform for custom endpoint rules",
+                error instanceof Error
+                  ? error.message
+                  : "Failed to create asset group",
             },
             400
           );
         }
       }
+      metadataUpdate = mergeVolcanoSupportsCharacterLibrary(
+        current,
+        body.volcanoSupportsCharacterLibrary
+      );
+    }
 
-      if (body.singleModelSupportsCharacterLibrary !== undefined) {
-        let current = parseSingleModelMetadata(
-          metadataUpdate ?? parseInterfaceMetadata(existing.metadata)
-        );
-        if (!current) {
-          return c.json({ error: "Single-model metadata not configured" }, 400);
+    if (body.volcanoModelAlias) {
+      const current = parseInterfaceMetadata(
+        metadataUpdate ?? existing.metadata
+      );
+      if (!isVolcanoMetadata(current)) {
+        return c.json({ error: "Volcano metadata not configured" }, 400);
+      }
+      metadataUpdate = mergeVolcanoModelAlias(
+        current,
+        body.volcanoModelAlias,
+        catalogEntries
+      );
+    }
+
+    if (body.singleModelModelEnabled) {
+      const current = parseSingleModelMetadata(
+        metadataUpdate ?? parseInterfaceMetadata(existing.metadata)
+      );
+      if (!current) {
+        return c.json({ error: "Single-model metadata not configured" }, 400);
+      }
+      metadataUpdate = mergeSingleModelModelEnabledMetadata(
+        current,
+        body.singleModelModelEnabled
+      );
+    }
+
+    if (body.singleModelModelAlias) {
+      const current = parseSingleModelMetadata(
+        metadataUpdate ?? parseInterfaceMetadata(existing.metadata)
+      );
+      if (!current) {
+        return c.json({ error: "Single-model metadata not configured" }, 400);
+      }
+      metadataUpdate = mergeSingleModelModelAliasMetadata(
+        current,
+        body.singleModelModelAlias
+      );
+    }
+
+    if (body.singleModelUpstreamModelIds) {
+      for (const modelId of Object.values(body.singleModelUpstreamModelIds)) {
+        if (!modelId.trim()) {
+          return c.json({ error: "Model ID cannot be empty" }, 400);
         }
-        if (
-          body.singleModelSupportsCharacterLibrary &&
-          !current.characterLibraryAssetGroupId
-        ) {
-          try {
-            current = {
-              ...current,
-              characterLibraryAssetGroupId: await ensureCharacterLibraryAssetGroup(
+      }
+      const current = parseSingleModelMetadata(
+        metadataUpdate ?? parseInterfaceMetadata(existing.metadata)
+      );
+      if (!current) {
+        return c.json({ error: "Single-model metadata not configured" }, 400);
+      }
+      metadataUpdate = mergeSingleModelUpstreamModelIdsMetadata(
+        current,
+        body.singleModelUpstreamModelIds
+      );
+    }
+
+    if (body.singleModelEndpointRules !== undefined) {
+      let current = parseSingleModelMetadata(
+        metadataUpdate ?? parseInterfaceMetadata(existing.metadata)
+      );
+      if (!current) {
+        return c.json({ error: "Single-model metadata not configured" }, 400);
+      }
+      current = await ensureMigratedSingleModelMetadata(db, current);
+      const validationError = validateCustomSingleModelEndpointRules({
+        category: current.singleModelCategory ?? "video",
+        rules: body.singleModelEndpointRules,
+      });
+      if (validationError) {
+        return c.json({ error: validationError }, 400);
+      }
+      metadataUpdate = mergeSingleModelEndpointRulesMetadata(
+        current,
+        body.singleModelEndpointRules
+      );
+      const endpointRulesMetadata = parseSingleModelMetadata(metadataUpdate);
+      if (
+        body.singleModelEndpointRules.useOfficial === false &&
+        current.singleModelCategory === "video" &&
+        body.singleModelFormatTransformsByCanonicalId === undefined &&
+        endpointRulesMetadata &&
+        !hasRequiredSingleModelFormatTransforms(endpointRulesMetadata)
+      ) {
+        return c.json(
+          {
+            error:
+              "Each enabled video model requires a format transform for custom endpoint rules",
+          },
+          400
+        );
+      }
+    }
+
+    if (body.singleModelSupportsCharacterLibrary !== undefined) {
+      let current = parseSingleModelMetadata(
+        metadataUpdate ?? parseInterfaceMetadata(existing.metadata)
+      );
+      if (!current) {
+        return c.json({ error: "Single-model metadata not configured" }, 400);
+      }
+      if (
+        body.singleModelSupportsCharacterLibrary &&
+        !current.characterLibraryAssetGroupId
+      ) {
+        try {
+          current = {
+            ...current,
+            characterLibraryAssetGroupId:
+              await ensureCharacterLibraryAssetGroup(
                 c.env,
                 db,
                 organizationId,
                 id
               ),
-            };
-          } catch (error) {
-            return c.json(
-              {
-                error:
-                  error instanceof Error
-                    ? error.message
-                    : "Failed to create asset group",
-              },
-              400
-            );
-          }
-        }
-        metadataUpdate = mergeSingleModelSupportsCharacterLibraryMetadata(
-          current,
-          body.singleModelSupportsCharacterLibrary
-        );
-      }
-
-      if (body.singleModelFormatTransformsByCanonicalId !== undefined) {
-        let current = parseSingleModelMetadata(
-          metadataUpdate ?? parseInterfaceMetadata(existing.metadata)
-        );
-        if (!current) {
-          return c.json({ error: "Single-model metadata not configured" }, 400);
-        }
-        current = await ensureMigratedSingleModelMetadata(db, current);
-        if (current.endpointRules?.useOfficial !== false) {
+          };
+        } catch (error) {
           return c.json(
-            { error: "Format transform requires custom endpoint rules" },
+            {
+              error:
+                error instanceof Error
+                  ? error.message
+                  : "Failed to create asset group",
+            },
             400
           );
         }
-        for (const transform of Object.values(
-          body.singleModelFormatTransformsByCanonicalId
-        )) {
-          if (!transform) {
+      }
+      metadataUpdate = mergeSingleModelSupportsCharacterLibraryMetadata(
+        current,
+        body.singleModelSupportsCharacterLibrary
+      );
+    }
+
+    if (body.singleModelFormatTransformsByCanonicalId !== undefined) {
+      let current = parseSingleModelMetadata(
+        metadataUpdate ?? parseInterfaceMetadata(existing.metadata)
+      );
+      if (!current) {
+        return c.json({ error: "Single-model metadata not configured" }, 400);
+      }
+      current = await ensureMigratedSingleModelMetadata(db, current);
+      if (current.endpointRules?.useOfficial !== false) {
+        return c.json(
+          { error: "Format transform requires custom endpoint rules" },
+          400
+        );
+      }
+      for (const transform of Object.values(
+        body.singleModelFormatTransformsByCanonicalId
+      )) {
+        if (!transform) {
+          continue;
+        }
+        const template = await getFormatTransformTemplateById(
+          db,
+          transform.sourceTemplateId
+        );
+        if (!template?.enabled || template.scope !== "platform") {
+          return c.json({ error: "Format transform template not found" }, 400);
+        }
+        if (
+          !isTransformMappingConfigComplete(
+            transform.upstreamParams,
+            transform.paramMappings
+          )
+        ) {
+          return c.json(
+            { error: "Format transform mapping configuration is incomplete" },
+            400
+          );
+        }
+      }
+      metadataUpdate = mergeSingleModelFormatTransformsMetadata(
+        current,
+        body.singleModelFormatTransformsByCanonicalId as NonNullable<
+          UpdateOrganizationAiInterfaceRequest["singleModelFormatTransformsByCanonicalId"]
+        >
+      );
+      const formatTransformsMetadata = parseSingleModelMetadata(metadataUpdate);
+      if (
+        current.singleModelCategory === "video" &&
+        formatTransformsMetadata &&
+        !hasRequiredSingleModelFormatTransforms(formatTransformsMetadata)
+      ) {
+        return c.json(
+          {
+            error:
+              "Each enabled video model requires a format transform for custom endpoint rules",
+          },
+          400
+        );
+      }
+    }
+
+    if (body.singleModelCapabilityLimitsByCanonicalId !== undefined) {
+      const current = parseSingleModelMetadata(
+        metadataUpdate ?? parseInterfaceMetadata(existing.metadata)
+      );
+      if (!current) {
+        return c.json({ error: "Single-model metadata not configured" }, 400);
+      }
+      const platformModels = await listPlatformAiModels(db, "video");
+      const platformRulesById = new Map(
+        platformModels.map((model) => [
+          model.canonicalId,
+          getPlatformVideoRules(model),
+        ])
+      );
+      for (const [canonicalId, limits] of Object.entries(
+        body.singleModelCapabilityLimitsByCanonicalId
+      )) {
+        if (!limits) {
+          continue;
+        }
+        const platformRules = platformRulesById.get(canonicalId);
+        if (!platformRules) {
+          return c.json({ error: `Unknown video model: ${canonicalId}` }, 400);
+        }
+        if (
+          !isCapabilityLimitsSubsetOfPlatform({
+            platformRules,
+            capabilityLimits: limits,
+          })
+        ) {
+          return c.json(
+            {
+              error:
+                "Capability limits must be a subset of platform model rules",
+            },
+            400
+          );
+        }
+      }
+      metadataUpdate = mergeSingleModelCapabilityLimitsMetadata(
+        current,
+        body.singleModelCapabilityLimitsByCanonicalId
+      );
+    }
+
+    if (body.singleModelModels !== undefined) {
+      const current = parseSingleModelMetadata(
+        metadataUpdate ?? parseInterfaceMetadata(existing.metadata)
+      );
+      if (!current) {
+        return c.json({ error: "Single-model metadata not configured" }, 400);
+      }
+      for (const config of Object.values(body.singleModelModels)) {
+        if (config.enabled && !config.upstreamModelId.trim()) {
+          return c.json({ error: "Model ID cannot be empty" }, 400);
+        }
+      }
+      const mergedSingleModelMetadata = mergeSingleModelModelsMetadata(
+        current,
+        body.singleModelModels as NonNullable<
+          UpdateOrganizationAiInterfaceRequest["singleModelModels"]
+        >
+      );
+      metadataUpdate = mergedSingleModelMetadata;
+      if (
+        mergedSingleModelMetadata.singleModelCategory === "video" &&
+        mergedSingleModelMetadata.endpointRules?.useOfficial === false &&
+        !hasRequiredSingleModelFormatTransforms(mergedSingleModelMetadata)
+      ) {
+        return c.json(
+          {
+            error:
+              "Each enabled video model requires a format transform for custom endpoint rules",
+          },
+          400
+        );
+      }
+      if (
+        mergedSingleModelMetadata.singleModelCategory === "video" &&
+        mergedSingleModelMetadata.endpointRules?.useOfficial === false
+      ) {
+        for (const config of Object.values(mergedSingleModelMetadata.models)) {
+          if (!config.enabled || config.modality !== "video") {
             continue;
           }
-          const template = await getFormatTransformTemplateById(
-            db,
-            transform.sourceTemplateId
-          );
-          if (!template?.enabled || template.scope !== "platform") {
-            return c.json({ error: "Format transform template not found" }, 400);
-          }
+          const transform = config.formatTransform;
           if (
+            transform &&
             !isTransformMappingConfigComplete(
               transform.upstreamParams,
               transform.paramMappings
             )
           ) {
             return c.json(
-              { error: "Format transform mapping configuration is incomplete" },
+              {
+                error: "Format transform mapping configuration is incomplete",
+              },
               400
             );
           }
         }
-        metadataUpdate = mergeSingleModelFormatTransformsMetadata(
-          current,
-          body.singleModelFormatTransformsByCanonicalId as NonNullable<
-            UpdateOrganizationAiInterfaceRequest["singleModelFormatTransformsByCanonicalId"]
-          >
+      }
+    }
+
+    if (body.apiKey !== undefined) {
+      const baseMetadata =
+        metadataUpdate ?? parseInterfaceMetadata(existing.metadata) ?? {};
+      metadataUpdate = mergeApiKeyHintIntoMetadata(
+        baseMetadata as Record<string, unknown>,
+        body.apiKey
+      );
+    }
+
+    if (body.tosStorage) {
+      const current = parseInterfaceMetadata(existing.metadata);
+      if (!isVolcanoMetadata(current)) {
+        return c.json({ error: "Volcano metadata not configured" }, 400);
+      }
+      const baseMetadata = isVolcanoMetadata(metadataUpdate)
+        ? metadataUpdate
+        : current;
+
+      let tosBucket = body.tosStorage.bucket;
+
+      if (body.tosStorage.enabled && body.tosStorage.createBucket) {
+        const credentials = await getVolcanoCredentials(
+          c.env,
+          organizationId,
+          existing.metadata
         );
-        const formatTransformsMetadata = parseSingleModelMetadata(metadataUpdate);
-        if (
-          current.singleModelCategory === "video" &&
-          formatTransformsMetadata &&
-          !hasRequiredSingleModelFormatTransforms(formatTransformsMetadata)
-        ) {
+        if (!credentials) {
+          return c.json({ error: "Volcano credentials not configured" }, 400);
+        }
+
+        const probe = await probeVolcanoTosServiceStatus({
+          accessKeyId: credentials.accessKeyId,
+          secretAccessKey: credentials.secretAccessKey,
+          region: body.tosStorage.region,
+        });
+        if (probe.status === "not_opened") {
           return c.json(
             {
-              error:
-                "Each enabled video model requires a format transform for custom endpoint rules",
+              error: probe.message ?? "The account does not open TOS service.",
+              code: VOLCANO_TOS_NOT_OPENED_CODE,
+            },
+            409
+          );
+        }
+        if (probe.status !== "opened") {
+          return c.json(
+            {
+              error: probe.message ?? "Failed to verify TOS access",
             },
             400
           );
         }
-      }
 
-      if (body.singleModelCapabilityLimitsByCanonicalId !== undefined) {
-        const current = parseSingleModelMetadata(
-          metadataUpdate ?? parseInterfaceMetadata(existing.metadata)
-        );
-        if (!current) {
-          return c.json({ error: "Single-model metadata not configured" }, 400);
-        }
-        const platformModels = await listPlatformAiModels(db, "video");
-        const platformRulesById = new Map(
-          platformModels.map((model) => [
-            model.canonicalId,
-            getPlatformVideoRules(model),
-          ])
-        );
-        for (const [canonicalId, limits] of Object.entries(
-          body.singleModelCapabilityLimitsByCanonicalId
-        )) {
-          if (!limits) {
-            continue;
-          }
-          const platformRules = platformRulesById.get(canonicalId);
-          if (!platformRules) {
-            return c.json({ error: `Unknown video model: ${canonicalId}` }, 400);
-          }
-          if (
-            !isCapabilityLimitsSubsetOfPlatform({
-              platformRules,
-              capabilityLimits: limits,
-            })
-          ) {
-            return c.json(
-              { error: "Capability limits must be a subset of platform model rules" },
-              400
-            );
-          }
-        }
-        metadataUpdate = mergeSingleModelCapabilityLimitsMetadata(
-          current,
-          body.singleModelCapabilityLimitsByCanonicalId
-        );
-      }
-
-      if (body.singleModelModels !== undefined) {
-        const current = parseSingleModelMetadata(
-          metadataUpdate ?? parseInterfaceMetadata(existing.metadata)
-        );
-        if (!current) {
-          return c.json({ error: "Single-model metadata not configured" }, 400);
-        }
-        for (const config of Object.values(body.singleModelModels)) {
-          if (config.enabled && !config.upstreamModelId.trim()) {
-            return c.json({ error: "Model ID cannot be empty" }, 400);
-          }
-        }
-        const mergedSingleModelMetadata = mergeSingleModelModelsMetadata(
-          current,
-          body.singleModelModels as NonNullable<
-            UpdateOrganizationAiInterfaceRequest["singleModelModels"]
-          >
-        );
-        metadataUpdate = mergedSingleModelMetadata;
-        if (
-          mergedSingleModelMetadata.singleModelCategory === "video" &&
-          mergedSingleModelMetadata.endpointRules?.useOfficial === false &&
-          !hasRequiredSingleModelFormatTransforms(mergedSingleModelMetadata)
-        ) {
-          return c.json(
-            {
-              error:
-                "Each enabled video model requires a format transform for custom endpoint rules",
-            },
-            400
-          );
-        }
-        if (
-          mergedSingleModelMetadata.singleModelCategory === "video" &&
-          mergedSingleModelMetadata.endpointRules?.useOfficial === false
-        ) {
-          for (const config of Object.values(mergedSingleModelMetadata.models)) {
-            if (!config.enabled || config.modality !== "video") {
-              continue;
-            }
-            const transform = config.formatTransform;
-            if (
-              transform &&
-              !isTransformMappingConfigComplete(
-                transform.upstreamParams,
-                transform.paramMappings
-              )
-            ) {
-              return c.json(
-                {
-                  error:
-                    "Format transform mapping configuration is incomplete",
-                },
-                400
-              );
-            }
-          }
-        }
-      }
-
-      if (body.apiKey !== undefined) {
-        const baseMetadata =
-          metadataUpdate ??
-          parseInterfaceMetadata(existing.metadata) ??
-          {};
-        metadataUpdate = mergeApiKeyHintIntoMetadata(
-          baseMetadata as Record<string, unknown>,
-          body.apiKey
-        );
-      }
-
-      if (body.tosStorage) {
-        const current = parseInterfaceMetadata(existing.metadata);
-        if (!isVolcanoMetadata(current)) {
-          return c.json({ error: "Volcano metadata not configured" }, 400);
-        }
-        const baseMetadata = isVolcanoMetadata(metadataUpdate)
-          ? metadataUpdate
-          : current;
-
-        let tosBucket = body.tosStorage.bucket;
-
-        if (body.tosStorage.enabled && body.tosStorage.createBucket) {
-          const credentials = await getVolcanoCredentials(
-            c.env,
+        const client = VolcengineTosClient.forRegion({
+          accessKeyId: credentials.accessKeyId,
+          secretAccessKey: credentials.secretAccessKey,
+          region: body.tosStorage.region,
+        });
+        try {
+          tosBucket = await ensureVolcanoTosBucketCreated({
+            client,
+            bucket: tosBucket,
             organizationId,
-            existing.metadata
-          );
-          if (!credentials) {
-            return c.json({ error: "Volcano credentials not configured" }, 400);
-          }
-
-          const probe = await probeVolcanoTosServiceStatus({
-            accessKeyId: credentials.accessKeyId,
-            secretAccessKey: credentials.secretAccessKey,
-            region: body.tosStorage.region,
           });
-          if (probe.status === "not_opened") {
+        } catch (error) {
+          if (isVolcanoTosNotOpenedError(error)) {
             return c.json(
               {
                 error:
-                  probe.message ??
-                  "The account does not open TOS service.",
+                  error instanceof Error
+                    ? error.message
+                    : "The account does not open TOS service.",
                 code: VOLCANO_TOS_NOT_OPENED_CODE,
               },
               409
             );
           }
-          if (probe.status !== "opened") {
-            return c.json(
-              {
-                error: probe.message ?? "Failed to verify TOS access",
-              },
-              400
-            );
-          }
-
-          const client = VolcengineTosClient.forRegion({
-            accessKeyId: credentials.accessKeyId,
-            secretAccessKey: credentials.secretAccessKey,
-            region: body.tosStorage.region,
-          });
-          try {
-            tosBucket = await ensureVolcanoTosBucketCreated({
-              client,
-              bucket: tosBucket,
-              organizationId,
-            });
-          } catch (error) {
-            if (isVolcanoTosNotOpenedError(error)) {
-              return c.json(
-                {
-                  error:
-                    error instanceof Error
-                      ? error.message
-                      : "The account does not open TOS service.",
-                  code: VOLCANO_TOS_NOT_OPENED_CODE,
-                },
-                409
-              );
-            }
-            throw error;
-          }
+          throw error;
         }
-
-        metadataUpdate = mergeVolcanoTosStorage(baseMetadata, {
-          enabled: body.tosStorage.enabled,
-          bucket: tosBucket,
-          region: body.tosStorage.region,
-          prefix: VOLCANO_TOS_DEFAULT_PREFIX,
-        });
       }
 
-      const mediaKitInput = body.mediaKit ?? body.mediaKitEnhance;
-      if (mediaKitInput) {
-        const current = parseInterfaceMetadata(existing.metadata);
-        if (!isVolcanoMetadata(current)) {
-          return c.json({ error: "Volcano metadata not configured" }, 400);
-        }
-        const baseMetadata = isVolcanoMetadata(metadataUpdate)
-          ? metadataUpdate
-          : current;
-        metadataUpdate = mergeVolcanoMediaKit(
-          baseMetadata,
-          normalizeMediaKitRequestBody(mediaKitInput)
-        );
-      }
-
-      if (body.mediaKitApiKey !== undefined) {
-        const current = parseInterfaceMetadata(existing.metadata);
-        if (!isVolcanoMetadata(current)) {
-          return c.json({ error: "Volcano metadata not configured" }, 400);
-        }
-        const baseMetadata = isVolcanoMetadata(metadataUpdate)
-          ? metadataUpdate
-          : current;
-        const trimmedKey = body.mediaKitApiKey.trim();
-        metadataUpdate = {
-          ...baseMetadata,
-          mediaKitApiKeyEncrypted:
-            trimmedKey.length > 0
-              ? await encryptSecret(trimmedKey, c.env, organizationId)
-              : undefined,
-        };
-      }
-
-      const iface = await updateOrganizationAiInterface(
-        db,
-        organizationId,
-        id,
-        {
-          name: body.name,
-          baseUrl: body.baseUrl,
-          selectedModel: body.selectedModel,
-          enabled: body.enabled,
-          isDefault: body.isDefault,
-          ...(apiKeyEncrypted ? { apiKeyEncrypted } : {}),
-          ...(metadataUpdate !== undefined
-            ? { metadata: serializeInterfaceMetadata(metadataUpdate) }
-            : {}),
-        }
-      );
-
-      if (body.tosStorage) {
-        await refreshOrgCloudStorageHealthAfterConfigChange(
-          c.env,
-          organizationId
-        );
-      }
-
-      return c.json({ interface: iface });
-    } catch (error) {
-      console.error("Error updating organization AI interface:", error);
-      return mapAiInterfaceError(c, error, "Failed to update AI interface");
+      metadataUpdate = mergeVolcanoTosStorage(baseMetadata, {
+        enabled: body.tosStorage.enabled,
+        bucket: tosBucket,
+        region: body.tosStorage.region,
+        prefix: VOLCANO_TOS_DEFAULT_PREFIX,
+      });
     }
+
+    const mediaKitInput = body.mediaKit ?? body.mediaKitEnhance;
+    if (mediaKitInput) {
+      const current = parseInterfaceMetadata(existing.metadata);
+      if (!isVolcanoMetadata(current)) {
+        return c.json({ error: "Volcano metadata not configured" }, 400);
+      }
+      const baseMetadata = isVolcanoMetadata(metadataUpdate)
+        ? metadataUpdate
+        : current;
+      metadataUpdate = mergeVolcanoMediaKit(
+        baseMetadata,
+        normalizeMediaKitRequestBody(mediaKitInput)
+      );
+    }
+
+    if (body.mediaKitApiKey !== undefined) {
+      const current = parseInterfaceMetadata(existing.metadata);
+      if (!isVolcanoMetadata(current)) {
+        return c.json({ error: "Volcano metadata not configured" }, 400);
+      }
+      const baseMetadata = isVolcanoMetadata(metadataUpdate)
+        ? metadataUpdate
+        : current;
+      const trimmedKey = body.mediaKitApiKey.trim();
+      metadataUpdate = {
+        ...baseMetadata,
+        mediaKitApiKeyEncrypted:
+          trimmedKey.length > 0
+            ? await encryptSecret(trimmedKey, c.env, organizationId)
+            : undefined,
+      };
+    }
+
+    const iface = await updateOrganizationAiInterface(db, organizationId, id, {
+      name: body.name,
+      baseUrl: body.baseUrl,
+      selectedModel: body.selectedModel,
+      enabled: body.enabled,
+      isDefault: body.isDefault,
+      ...(apiKeyEncrypted ? { apiKeyEncrypted } : {}),
+      ...(metadataUpdate !== undefined
+        ? { metadata: serializeInterfaceMetadata(metadataUpdate) }
+        : {}),
+    });
+
+    if (body.tosStorage) {
+      await refreshOrgCloudStorageHealthAfterConfigChange(
+        c.env,
+        organizationId
+      );
+    }
+
+    return c.json({ interface: iface });
+  } catch (error) {
+    console.error("Error updating organization AI interface:", error);
+    return mapAiInterfaceError(c, error, "Failed to update AI interface");
   }
-);
+});
 
 aiInterfaceRoutes.delete("/:id", async (c) => {
   const organizationId = c.get("organizationId")!;
@@ -1804,7 +1814,11 @@ aiInterfaceRoutes.delete("/:id", async (c) => {
   const db = createDatabase(c.env);
 
   try {
-    const existing = await getOrganizationAiInterfaceRow(db, organizationId, id);
+    const existing = await getOrganizationAiInterfaceRow(
+      db,
+      organizationId,
+      id
+    );
     if (!existing) {
       return c.json({ error: "AI interface not found" }, 404);
     }

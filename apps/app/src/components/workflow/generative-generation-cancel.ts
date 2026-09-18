@@ -8,9 +8,7 @@ import {
   readGenerativeProgressPhase,
   withGenerativeProgress,
 } from "./generative-progress-utils";
-import {
-  withAiVideoGeneratingFlag,
-} from "./ai-video-node-utils";
+import { withAiVideoGeneratingFlag } from "./ai-video-node-utils";
 
 export class GenerativeGenerationCancelledError extends Error {
   constructor() {
@@ -148,9 +146,9 @@ export async function cancelGenerativeGenerationForNode(params: {
   readonly modality: "video";
   readonly updateNodeData?: (
     nodeId: string,
-    updater: (current: {
+    updater: (current: { readonly metadata?: Record<string, string> }) => {
       readonly metadata?: Record<string, string>;
-    }) => { readonly metadata?: Record<string, string> }
+    }
   ) => void;
 }): Promise<void> {
   const phase = readGenerativeProgressPhase(params.metadata);

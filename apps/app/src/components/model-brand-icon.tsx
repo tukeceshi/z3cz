@@ -36,10 +36,7 @@ const BRAND_ICON_SVGS = {
   kimi: kimiIcon,
   minimax: minimaxIcon,
   openai: openaiIcon,
-} as const satisfies Record<
-  Exclude<ModelBrandKey, "volcano" | "tos">,
-  string
->;
+} as const satisfies Record<Exclude<ModelBrandKey, "volcano" | "tos">, string>;
 
 /** Icons available when configuring a model group logo. */
 export const GROUP_ICON_OPTIONS = [
@@ -152,7 +149,10 @@ export function resolveModelBrandKey(params: {
   if (presetId === "provider:claude") {
     return "claude";
   }
-  if (presetId === "provider:minimax-speech" || presetId === "provider:minimax-video") {
+  if (
+    presetId === "provider:minimax-speech" ||
+    presetId === "provider:minimax-video"
+  ) {
     return "minimax";
   }
   if (presetId === "provider:seedance") {
@@ -190,7 +190,11 @@ export function resolveModelBrandKey(params: {
   if (id.startsWith("claude-")) {
     return "claude";
   }
-  if (id.startsWith("minimax-speech-") || id.startsWith("minimax-h3") || id.startsWith("minimax-")) {
+  if (
+    id.startsWith("minimax-speech-") ||
+    id.startsWith("minimax-h3") ||
+    id.startsWith("minimax-")
+  ) {
     return "minimax";
   }
   if (

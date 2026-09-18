@@ -52,18 +52,19 @@ describe("generative-resource-ref-utils", () => {
         kind: "local" as const,
       },
     ];
+    expect(mapMediaResourceKinds(media, new Map([["res-1", "cloud"]]))).toEqual(
+      [
+        {
+          resourceId: "res-1",
+          mimeType: "image/png",
+          kind: "cloud",
+        },
+        media[1],
+      ]
+    );
     expect(
-      mapMediaResourceKinds(media, new Map([["res-1", "cloud"]]))
-    ).toEqual([
-      {
-        resourceId: "res-1",
-        mimeType: "image/png",
-        kind: "cloud",
-      },
-      media[1],
-    ]);
-    expect(
-      (applyResourceKind(media[0]!, "cloud") as unknown as { kind: string }).kind
+      (applyResourceKind(media[0]!, "cloud") as unknown as { kind: string })
+        .kind
     ).toBe("cloud");
   });
 });

@@ -20,7 +20,10 @@ import {
 describe("video-trim", () => {
   it("creates a default range within the video duration", () => {
     expect(createDefaultVideoTrimRange(30)).toEqual({ startSec: 0, endSec: 2 });
-    expect(createDefaultVideoTrimRange(1.5)).toEqual({ startSec: 0, endSec: 1.5 });
+    expect(createDefaultVideoTrimRange(1.5)).toEqual({
+      startSec: 0,
+      endSec: 1.5,
+    });
     expect(createDefaultVideoTrimRange(0.05)).toEqual({
       startSec: 0,
       endSec: VIDEO_TRIM_MIN_DURATION_SEC,
@@ -33,31 +36,35 @@ describe("video-trim", () => {
   });
 
   it("clamps ranges to minimum selection duration", () => {
-    expect(
-      clampVideoTrimRange({ startSec: 9.95, endSec: 10 }, 10)
-    ).toEqual({ startSec: 9.9, endSec: 10 });
+    expect(clampVideoTrimRange({ startSec: 9.95, endSec: 10 }, 10)).toEqual({
+      startSec: 9.9,
+      endSec: 10,
+    });
   });
 
   it("shifts a selection while preserving its duration", () => {
-    expect(
-      shiftVideoTrimRange({ startSec: 2, endSec: 6 }, 3, 20)
-    ).toEqual({ startSec: 5, endSec: 9 });
+    expect(shiftVideoTrimRange({ startSec: 2, endSec: 6 }, 3, 20)).toEqual({
+      startSec: 5,
+      endSec: 9,
+    });
     expect(videoTrimSelectionDurationSec({ startSec: 5, endSec: 9 })).toBe(4);
   });
 
   it("subtracts trim ranges in tenths to avoid float drift", () => {
-    expect(
-      videoTrimSelectionDurationSec({ startSec: 5.2, endSec: 9.2 })
-    ).toBe(4);
+    expect(videoTrimSelectionDurationSec({ startSec: 5.2, endSec: 9.2 })).toBe(
+      4
+    );
   });
 
   it("clamps shifted selections at timeline edges", () => {
-    expect(
-      shiftVideoTrimRange({ startSec: 2, endSec: 6 }, -5, 10)
-    ).toEqual({ startSec: 0, endSec: 4 });
-    expect(
-      shiftVideoTrimRange({ startSec: 6, endSec: 10 }, 5, 10)
-    ).toEqual({ startSec: 6, endSec: 10 });
+    expect(shiftVideoTrimRange({ startSec: 2, endSec: 6 }, -5, 10)).toEqual({
+      startSec: 0,
+      endSec: 4,
+    });
+    expect(shiftVideoTrimRange({ startSec: 6, endSec: 10 }, 5, 10)).toEqual({
+      startSec: 6,
+      endSec: 10,
+    });
   });
 
   it("respects retake minimum duration when shifting", () => {
@@ -76,12 +83,14 @@ describe("video-trim", () => {
       startSec: 0,
       endSec: 1.96,
     });
-    expect(
-      clampVideoTrimRange({ startSec: 0, endSec: 5.1 }, 5.07)
-    ).toEqual({ startSec: 0, endSec: 5.07 });
-    expect(
-      clampVideoTrimRange({ startSec: 0, endSec: 99 }, 5.07)
-    ).toEqual({ startSec: 0, endSec: 5.07 });
+    expect(clampVideoTrimRange({ startSec: 0, endSec: 5.1 }, 5.07)).toEqual({
+      startSec: 0,
+      endSec: 5.07,
+    });
+    expect(clampVideoTrimRange({ startSec: 0, endSec: 99 }, 5.07)).toEqual({
+      startSec: 0,
+      endSec: 5.07,
+    });
   });
 
   it("applies start edits while keeping end fixed", () => {
@@ -146,7 +155,10 @@ describe("video-trim", () => {
   });
 
   it("uses the full video duration when shorter than the retake minimum", () => {
-    expect(createDefaultVideoRetakeTrimRange(3)).toEqual({ startSec: 0, endSec: 3 });
+    expect(createDefaultVideoRetakeTrimRange(3)).toEqual({
+      startSec: 0,
+      endSec: 3,
+    });
     expect(createDefaultVideoRetakeTrimRange(1.5)).toEqual({
       startSec: 0,
       endSec: 1.5,
@@ -154,9 +166,10 @@ describe("video-trim", () => {
   });
 
   it("clamps retake selections to at least 4 seconds when possible", () => {
-    expect(
-      clampVideoRetakeTrimRange({ startSec: 0, endSec: 2 }, 30)
-    ).toEqual({ startSec: 0, endSec: SEEDANCE_2_5_VIDEO_EDIT_MIN_SEC });
+    expect(clampVideoRetakeTrimRange({ startSec: 0, endSec: 2 }, 30)).toEqual({
+      startSec: 0,
+      endSec: SEEDANCE_2_5_VIDEO_EDIT_MIN_SEC,
+    });
     expect(
       applyVideoTrimTimeFieldEdit({
         range: { startSec: 0, endSec: 8 },
@@ -169,9 +182,7 @@ describe("video-trim", () => {
   });
 
   it("splits a middle retake into three segments", () => {
-    expect(
-      splitVideoRetakeSegments({ startSec: 4, endSec: 10 }, 20)
-    ).toEqual([
+    expect(splitVideoRetakeSegments({ startSec: 4, endSec: 10 }, 20)).toEqual([
       { role: "keep", range: { startSec: 0, endSec: 4 } },
       { role: "retake", range: { startSec: 4, endSec: 10 } },
       { role: "keep", range: { startSec: 10, endSec: 20 } },
@@ -179,24 +190,20 @@ describe("video-trim", () => {
   });
 
   it("splits a start or end retake into two segments", () => {
-    expect(
-      splitVideoRetakeSegments({ startSec: 0, endSec: 6 }, 20)
-    ).toEqual([
+    expect(splitVideoRetakeSegments({ startSec: 0, endSec: 6 }, 20)).toEqual([
       { role: "retake", range: { startSec: 0, endSec: 6 } },
       { role: "keep", range: { startSec: 6, endSec: 20 } },
     ]);
-    expect(
-      splitVideoRetakeSegments({ startSec: 12, endSec: 20 }, 20)
-    ).toEqual([
+    expect(splitVideoRetakeSegments({ startSec: 12, endSec: 20 }, 20)).toEqual([
       { role: "keep", range: { startSec: 0, endSec: 12 } },
       { role: "retake", range: { startSec: 12, endSec: 20 } },
     ]);
   });
 
   it("keeps a full-video retake as one segment", () => {
-    expect(
-      splitVideoRetakeSegments({ startSec: 0, endSec: 20 }, 20)
-    ).toEqual([{ role: "retake", range: { startSec: 0, endSec: 20 } }]);
+    expect(splitVideoRetakeSegments({ startSec: 0, endSec: 20 }, 20)).toEqual([
+      { role: "retake", range: { startSec: 0, endSec: 20 } },
+    ]);
   });
 
   it("drops leftover head or tail shorter than the minimum keep duration", () => {

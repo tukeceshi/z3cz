@@ -74,7 +74,9 @@ export function VolcanoStorageDisableDialog({
     <Dialog open={open} onOpenChange={handleClose}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>{t("pages.aiInterfaces.tosStorage.disableTitle")}</DialogTitle>
+          <DialogTitle>
+            {t("pages.aiInterfaces.tosStorage.disableTitle")}
+          </DialogTitle>
         </DialogHeader>
         <p className="text-sm text-muted-foreground">
           {t("pages.aiInterfaces.tosStorage.disableStep2")}
@@ -108,7 +110,9 @@ export function VolcanoStorageDisableDialog({
             disabled={!understood || !noRunningTasks || isSaving}
             onClick={onConfirm}
           >
-            {isSaving ? t("common.saving") : t("pages.aiInterfaces.tosStorage.confirmDisable")}
+            {isSaving
+              ? t("common.saving")
+              : t("pages.aiInterfaces.tosStorage.confirmDisable")}
           </Button>
         </DialogFooter>
       </DialogContent>

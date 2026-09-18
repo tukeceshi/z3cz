@@ -57,7 +57,10 @@ export function applyWsMembershipHeaders(
   }
 
   headers.set(WS_ORG_ROLE_HEADER, membership.role);
-  headers.set(WS_ORG_PERMISSIONS_HEADER, JSON.stringify(membership.permissions));
+  headers.set(
+    WS_ORG_PERMISSIONS_HEADER,
+    JSON.stringify(membership.permissions)
+  );
 }
 
 export function readWsMembershipFromHeaders(

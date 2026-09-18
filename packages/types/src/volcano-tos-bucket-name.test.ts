@@ -22,9 +22,11 @@ describe("volcano-tos-bucket-name", () => {
   });
 
   it("never returns the bare prefix without org and suffix", () => {
-    expect(resolveNewVolcanoTosBucketName([], organizationId)).not.toBe("z3cz-com");
-    expect(resolveNewVolcanoTosBucketName([], organizationId).startsWith("z3cz-com-")).toBe(
-      true
+    expect(resolveNewVolcanoTosBucketName([], organizationId)).not.toBe(
+      "z3cz-com"
     );
+    expect(
+      resolveNewVolcanoTosBucketName([], organizationId).startsWith("z3cz-com-")
+    ).toBe(true);
   });
 });

@@ -18,7 +18,10 @@ function formatGb(value: number, locale: string): string {
   return `${value.toLocaleString(locale, { maximumFractionDigits: 2 })} GB`;
 }
 
-export function VolcanoTosUsageMeter({ label, usage }: VolcanoTosUsageMeterProps) {
+export function VolcanoTosUsageMeter({
+  label,
+  usage,
+}: VolcanoTosUsageMeterProps) {
   const { t, locale } = useTranslation();
 
   if (!usage || usage.quota <= 0) {

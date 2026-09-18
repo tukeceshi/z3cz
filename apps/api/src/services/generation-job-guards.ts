@@ -85,7 +85,6 @@ export async function findGenerationJobByClientRequestId(
   return existing;
 }
 
-
 export function buildImageGenerateResponseFromJob(
   job: GenerationJobRecord
 ): GenerateAiImageResponse {
@@ -148,9 +147,7 @@ export function buildVideoSubmitResponseFromJob(
   job: GenerationJobRecord
 ): SubmitAiVideoResponse {
   const upstreamTaskId =
-    job.upstreamTaskId ??
-    job.resultJson?.upstreamTaskId ??
-    job.id;
+    job.upstreamTaskId ?? job.resultJson?.upstreamTaskId ?? job.id;
 
   return {
     taskId: upstreamTaskId,

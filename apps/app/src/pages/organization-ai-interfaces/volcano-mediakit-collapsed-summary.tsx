@@ -57,7 +57,9 @@ export function VolcanoMediaKitStatusDetail({
   if (videoModes.length > 0) {
     summaries.push(
       formatFeatureSummary({
-        sectionLabel: t("pages.aiInterfaces.mediaKitEnhance.videoEnhanceSection"),
+        sectionLabel: t(
+          "pages.aiInterfaces.mediaKitEnhance.videoEnhanceSection"
+        ),
         modeLabels: videoModes.map((mode) =>
           t(VOLCANO_MEDIKIT_VIDEO_ENHANCE_MODE_LABEL_KEYS[mode])
         ),
@@ -69,7 +71,9 @@ export function VolcanoMediaKitStatusDetail({
   if (subtitleModes.length > 0) {
     summaries.push(
       formatFeatureSummary({
-        sectionLabel: t("pages.aiInterfaces.mediaKitEnhance.subtitleEraseSection"),
+        sectionLabel: t(
+          "pages.aiInterfaces.mediaKitEnhance.subtitleEraseSection"
+        ),
         modeLabels: subtitleModes.map((mode) =>
           t(VOLCANO_MEDIKIT_SUBTITLE_ERASE_MODE_LABEL_KEYS[mode])
         ),

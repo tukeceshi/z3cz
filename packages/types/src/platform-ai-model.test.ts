@@ -34,7 +34,9 @@ function imageGenerationFieldsWithCount(): readonly UpstreamParamProfileField[] 
     (field) => field.name === "generate_count"
   );
   if (!generateCount) {
-    throw new Error("generate_count missing from IMAGE_GENERATION_FIELD_CATALOG");
+    throw new Error(
+      "generate_count missing from IMAGE_GENERATION_FIELD_CATALOG"
+    );
   }
   return [...DEFAULT_IMAGE_GENERATION_FIELDS, generateCount];
 }
@@ -49,7 +51,9 @@ describe("formatAiTextReferenceBlock", () => {
 
 describe("buildAiTextUserPrompt", () => {
   it("uses question only when there are no references", () => {
-    expect(buildAiTextUserPrompt({ question: " summarize " })).toBe("summarize");
+    expect(buildAiTextUserPrompt({ question: " summarize " })).toBe(
+      "summarize"
+    );
   });
 
   it("combines references with the user question", () => {
@@ -161,7 +165,9 @@ describe("sanitizeImageGenerationParams", () => {
   });
 
   it("uses admin defaults when stored params are missing", () => {
-    expect(sanitizeImageGenerationParams(DEFAULT_IMAGE_GENERATION_FIELDS)).toEqual({
+    expect(
+      sanitizeImageGenerationParams(DEFAULT_IMAGE_GENERATION_FIELDS)
+    ).toEqual({
       size: "auto",
       ratio: "auto",
       watermark: false,
@@ -194,10 +200,14 @@ describe("sanitizeImageGenerationParams", () => {
     } as const satisfies UpstreamParamProfileField;
 
     expect(
-      sanitizeImageGenerationParams([generateCountField], { generate_count: 16 })
+      sanitizeImageGenerationParams([generateCountField], {
+        generate_count: 16,
+      })
     ).toEqual({ generate_count: 1 });
     expect(
-      sanitizeImageGenerationParams([generateCountField], { generate_count: 12 })
+      sanitizeImageGenerationParams([generateCountField], {
+        generate_count: 12,
+      })
     ).toEqual({ generate_count: 12 });
   });
 
@@ -211,7 +221,9 @@ describe("sanitizeImageGenerationParams", () => {
     } as const satisfies UpstreamParamProfileField;
 
     expect(
-      sanitizeImageGenerationParams([numericField], { "voice_setting.speed": 1.5 })
+      sanitizeImageGenerationParams([numericField], {
+        "voice_setting.speed": 1.5,
+      })
     ).toEqual({ "voice_setting.speed": 1.5 });
   });
 });
@@ -295,7 +307,10 @@ describe("buildVolcanoImageGenerationBody", () => {
       params: mergeImageGenerationParams(generationFields, {
         generate_count: 3,
       }),
-      countPolicy: { enabled: false, effectMode: "sequential_image_generation" },
+      countPolicy: {
+        enabled: false,
+        effectMode: "sequential_image_generation",
+      },
     });
     expect(body.sequential_image_generation).toBe("disabled");
     expect(body.sequential_image_generation_options).toBeUndefined();
@@ -514,10 +529,9 @@ describe("buildVolcanoVideoGenerationBody", () => {
         "https://example.com/b.jpg",
       ],
     });
-    expect(body.content?.slice(1).map((entry) => (entry as { role?: string }).role)).toEqual([
-      "first_frame",
-      "last_frame",
-    ]);
+    expect(
+      body.content?.slice(1).map((entry) => (entry as { role?: string }).role)
+    ).toEqual(["first_frame", "last_frame"]);
   });
 
   it("maps reference audio urls into content", () => {
@@ -730,7 +744,9 @@ describe("normalizeVideoModelParameterRules", () => {
     expect(normalized.maxAudioReferenceBytes).toBe(15 * 1024 * 1024);
     expect(normalized.maxAudioReferenceSeconds).toBe(15);
     expect(
-      normalized.generationFields.some((field) => field.name === "reference_mode")
+      normalized.generationFields.some(
+        (field) => field.name === "reference_mode"
+      )
     ).toBe(true);
     expect(
       normalized.generationFields.some((field) => field.name === "web_search")

@@ -16,7 +16,9 @@ describe("canvas-media-tier", () => {
   });
   it("computes on-screen short edge from zoom", () => {
     expect(computeCanvasScreenShortEdge(1, 1)).toBe(MEDIA_CARD_SHORT_SIDE_PX);
-    expect(computeCanvasScreenShortEdge(0.5, 1)).toBe(MEDIA_CARD_SHORT_SIDE_PX / 2);
+    expect(computeCanvasScreenShortEdge(0.5, 1)).toBe(
+      MEDIA_CARD_SHORT_SIDE_PX / 2
+    );
     expect(computeCanvasScreenShortEdge(0.1, 1)).toBeCloseTo(
       MEDIA_CARD_SHORT_SIDE_PX * 0.1
     );

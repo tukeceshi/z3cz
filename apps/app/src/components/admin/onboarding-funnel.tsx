@@ -136,7 +136,9 @@ export function OnboardingFunnel({
     <Card>
       <CardHeader>
         <CardTitle>{t("admin.userDetail.funnel.title")}</CardTitle>
-        <CardDescription>{t("admin.userDetail.funnel.description")}</CardDescription>
+        <CardDescription>
+          {t("admin.userDetail.funnel.description")}
+        </CardDescription>
       </CardHeader>
       <CardContent>
         <ol className="space-y-4">

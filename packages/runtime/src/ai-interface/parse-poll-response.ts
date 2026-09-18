@@ -73,8 +73,12 @@ export function extractPollErrorMessage(
     readErrorMessage(inner?.error),
     readErrorMessage(nested?.error),
     readErrorMessage(record.error),
-    typeof nested?.fail_reason === "string" ? nested.fail_reason.trim() : undefined,
-    typeof record.fail_reason === "string" ? record.fail_reason.trim() : undefined,
+    typeof nested?.fail_reason === "string"
+      ? nested.fail_reason.trim()
+      : undefined,
+    typeof record.fail_reason === "string"
+      ? record.fail_reason.trim()
+      : undefined,
   ];
   for (const candidate of candidates) {
     if (candidate) {
@@ -99,7 +103,9 @@ export function parseOfficialVolcanoPollBody(
     (typeof asRecord(level?.content)?.video_url === "string"
       ? String(asRecord(level?.content)?.video_url).trim()
       : "") ||
-    (typeof level?.video_url === "string" ? String(level.video_url).trim() : "") ||
+    (typeof level?.video_url === "string"
+      ? String(level.video_url).trim()
+      : "") ||
     (typeof level?.result_url === "string"
       ? String(level.result_url).trim()
       : "");
@@ -130,7 +136,10 @@ export function parsePollResponse(
   pollMapping: TransformPollMapping
 ): VolcanoVideoPollResult {
   const statusRaw = getValueByDotPath(body, pollMapping.statusKey);
-  const status = String(statusRaw ?? "").trim().toLowerCase() || readVideoPollStatus(body);
+  const status =
+    String(statusRaw ?? "")
+      .trim()
+      .toLowerCase() || readVideoPollStatus(body);
   const failedValues = new Set([
     ...pollMapping.failedValues.map((value) => value.trim().toLowerCase()),
     ...VIDEO_POLL_FAILED_STATUSES,

@@ -80,7 +80,8 @@ export function FormatMappingSettingsDialog({
     setPollMapping(resolveTransformPollMapping(value?.pollMapping));
   }, [open, value]);
 
-  const normalizedPresetId = normalizeFormatTransformProvider(singleModelPresetId);
+  const normalizedPresetId =
+    normalizeFormatTransformProvider(singleModelPresetId);
 
   const groupFormatTemplates = formatTemplates.filter(
     (template) =>
@@ -116,12 +117,16 @@ export function FormatMappingSettingsDialog({
     }
 
     if (mappingTemplateId !== sourceTemplateId) {
-      appToast.error("pages.aiInterfaces.singleModel.applyFormatTemplateRequired");
+      appToast.error(
+        "pages.aiInterfaces.singleModel.applyFormatTemplateRequired"
+      );
       return;
     }
 
     if (!isTransformMappingConfigComplete(upstreamParams, paramMappings)) {
-      appToast.error("pages.aiInterfaces.singleModel.formatTransformIncomplete");
+      appToast.error(
+        "pages.aiInterfaces.singleModel.formatTransformIncomplete"
+      );
       return;
     }
 

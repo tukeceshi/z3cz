@@ -1,5 +1,8 @@
 import type { WorkflowFolder, WorkflowWithMetadata } from "@dafthunk/types";
-import { isCloudObjectReference, WORKFLOW_SCHEME_BASIC_CANVAS_ID } from "@dafthunk/types";
+import {
+  isCloudObjectReference,
+  WORKFLOW_SCHEME_BASIC_CANVAS_ID,
+} from "@dafthunk/types";
 import FolderPlus from "lucide-react/icons/folder-plus";
 import MoreHorizontal from "lucide-react/icons/more-horizontal";
 import PlusCircle from "lucide-react/icons/plus-circle";
@@ -57,9 +60,7 @@ import {
   updateWorkflowListMetadata,
   useWorkflows,
 } from "@/services/workflow-service";
-import {
-  prefetchWorkflowEditorSession,
-} from "@/utils/workflow-editor-prefetch";
+import { prefetchWorkflowEditorSession } from "@/utils/workflow-editor-prefetch";
 import { formatRelativeDate } from "@/utils/date";
 
 interface WorkflowLibraryViewProps {
@@ -78,7 +79,9 @@ type LibraryEntry =
   | { kind: "folder"; item: WorkflowFolder }
   | { kind: "workflow"; item: WorkflowWithMetadata };
 
-export function WorkflowLibraryView({ folderId = null }: WorkflowLibraryViewProps) {
+export function WorkflowLibraryView({
+  folderId = null,
+}: WorkflowLibraryViewProps) {
   const { t } = useTranslation();
   const perms = useOrgPermissions();
   const navigate = useNavigate();
@@ -93,21 +96,14 @@ export function WorkflowLibraryView({ folderId = null }: WorkflowLibraryViewProp
   const listFolderId = isRoot ? null : folderId;
 
   const { folder, folderError, isFolderLoading } = useWorkflowFolder(
-    isRoot ? undefined : folderId ?? undefined
+    isRoot ? undefined : (folderId ?? undefined)
   );
-  const {
-    folders,
-    foldersError,
-    isFoldersLoading,
-    mutateFolders,
-  } = useWorkflowFolders();
-  const {
-    workflows,
-    workflowsError,
-    isWorkflowsLoading,
-    mutateWorkflows,
-  } = useWorkflows(listFolderId);
-  const { configured: cloudStorageConfigured } = useOrgCloudStorageConfigured(orgId);
+  const { folders, foldersError, isFoldersLoading, mutateFolders } =
+    useWorkflowFolders();
+  const { workflows, workflowsError, isWorkflowsLoading, mutateWorkflows } =
+    useWorkflows(listFolderId);
+  const { configured: cloudStorageConfigured } =
+    useOrgCloudStorageConfigured(orgId);
 
   const [searchQuery, setSearchQuery] = useState("");
   const [isCreatingWorkflow, setIsCreatingWorkflow] = useState(false);
@@ -256,11 +252,7 @@ export function WorkflowLibraryView({ folderId = null }: WorkflowLibraryViewProp
         await updateWorkflowFolder(renameTarget.item.id, { name }, orgId);
         await mutateFolders();
       } else {
-        await updateWorkflowListMetadata(
-          renameTarget.item.id,
-          { name },
-          orgId
-        );
+        await updateWorkflowListMetadata(renameTarget.item.id, { name }, orgId);
         await mutateWorkflows();
       }
       setRenameTarget(null);
@@ -549,9 +541,7 @@ export function WorkflowLibraryView({ folderId = null }: WorkflowLibraryViewProp
               setWorkflowToDelete(null);
             }
           }}
-          workflowName={
-            workflowToDelete.name || t("pages.workflows.untitled")
-          }
+          workflowName={workflowToDelete.name || t("pages.workflows.untitled")}
           isDeleting={isDeletingWorkflow}
           onConfirm={handleDeleteWorkflow}
         />
@@ -622,11 +612,7 @@ function LibraryItemCard({
   const { t, locale } = useTranslation();
 
   return (
-    <div
-      className="group"
-      onMouseEnter={onPrefetch}
-      onFocus={onPrefetch}
-    >
+    <div className="group" onMouseEnter={onPrefetch} onFocus={onPrefetch}>
       <button
         type="button"
         onClick={onOpen}
@@ -726,7 +712,11 @@ function DeleteWorkflowConfirmDialog({
           >
             {t("common.cancel")}
           </Button>
-          <Button variant="destructive" disabled={isDeleting} onClick={onConfirm}>
+          <Button
+            variant="destructive"
+            disabled={isDeleting}
+            onClick={onConfirm}
+          >
             {isDeleting ? <Spinner className="mr-2 h-4 w-4" /> : null}
             {t("adminWorkflowSchemes.delete")}
           </Button>

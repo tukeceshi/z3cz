@@ -115,9 +115,9 @@ describe("shouldSubmitAgentChatOnEnter", () => {
   });
 
   it("does not submit on Shift+Enter", () => {
-    expect(
-      shouldSubmitAgentChatOnEnter({ key: "Enter", shiftKey: true })
-    ).toBe(false);
+    expect(shouldSubmitAgentChatOnEnter({ key: "Enter", shiftKey: true })).toBe(
+      false
+    );
   });
 
   it("does not submit while composing", () => {
@@ -159,24 +159,26 @@ describe("groupAgentChatTurns", () => {
       { id: "a2", role: "assistant", content: "run" },
     ]);
     expect(turns).toHaveLength(1);
-    expect(executeTraceTitle(turns[0]?.answer ?? { thinking: "", tools: [], talk: "" })).toBe(
-      "run"
-    );
+    expect(
+      executeTraceTitle(
+        turns[0]?.answer ?? { thinking: "", tools: [], talk: "" }
+      )
+    ).toBe("run");
     expect(turns[0]?.executed).toBe(true);
   });
 });
 
 describe("isAgentThinkingLive", () => {
   it("is live while streaming before this step talks", () => {
-    expect(
-      isAgentThinkingLive({ streaming: true, hasStepTalk: false })
-    ).toBe(true);
-    expect(
-      isAgentThinkingLive({ streaming: true, hasStepTalk: true })
-    ).toBe(false);
-    expect(
-      isAgentThinkingLive({ streaming: false, hasStepTalk: false })
-    ).toBe(false);
+    expect(isAgentThinkingLive({ streaming: true, hasStepTalk: false })).toBe(
+      true
+    );
+    expect(isAgentThinkingLive({ streaming: true, hasStepTalk: true })).toBe(
+      false
+    );
+    expect(isAgentThinkingLive({ streaming: false, hasStepTalk: false })).toBe(
+      false
+    );
   });
 });
 
@@ -264,11 +266,7 @@ describe("estimateAgentContextUsedTokens", () => {
   it("sums message and draft lengths, skipping empty content", () => {
     expect(
       estimateAgentContextUsedTokens(
-        [
-          { content: "hello" },
-          { content: "" },
-          { content: "world" },
-        ],
+        [{ content: "hello" }, { content: "" }, { content: "world" }],
         "!!"
       )
     ).toBe(12);
@@ -386,9 +384,11 @@ describe("executeTraceTitle", () => {
         content: `${"<<<THINK>>>"}\n动手\n${"<<<TALK>>>"}\n已经改好`,
       },
     ]);
-    expect(executeTraceTitle(turns[0]?.answer ?? { thinking: "", tools: [], talk: "" })).toBe(
-      "已经改好"
-    );
+    expect(
+      executeTraceTitle(
+        turns[0]?.answer ?? { thinking: "", tools: [], talk: "" }
+      )
+    ).toBe("已经改好");
   });
 
   it("is empty until a talk exists", () => {
@@ -396,9 +396,11 @@ describe("executeTraceTitle", () => {
       { id: "u1", role: "user", content: "hi" },
       { id: "a1", role: "assistant", content: `${"<<<THINK>>>"}\n还在想` },
     ]);
-    expect(executeTraceTitle(turns[0]?.answer ?? { thinking: "", tools: [], talk: "" })).toBe(
-      ""
-    );
+    expect(
+      executeTraceTitle(
+        turns[0]?.answer ?? { thinking: "", tools: [], talk: "" }
+      )
+    ).toBe("");
   });
 });
 

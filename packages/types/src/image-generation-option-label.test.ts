@@ -8,15 +8,15 @@ import {
 
 describe("formatImageGenerationOptionLabel", () => {
   it("shows smart label for auto size and ratio", () => {
-    expect(
-      formatImageGenerationOptionLabel("size", "auto", "智能")
-    ).toBe("智能");
-    expect(
-      formatImageGenerationOptionLabel("ratio", "auto", "智能")
-    ).toBe("智能");
-    expect(
-      formatImageGenerationOptionLabel("ratio", "adaptive", "Auto")
-    ).toBe("Auto");
+    expect(formatImageGenerationOptionLabel("size", "auto", "智能")).toBe(
+      "智能"
+    );
+    expect(formatImageGenerationOptionLabel("ratio", "auto", "智能")).toBe(
+      "智能"
+    );
+    expect(formatImageGenerationOptionLabel("ratio", "adaptive", "Auto")).toBe(
+      "Auto"
+    );
     expect(
       formatImageGenerationOptionLabel("aspect_ratio", "adaptive", "Auto")
     ).toBe("Auto");
@@ -28,10 +28,15 @@ describe("formatImageGenerationOptionLabel", () => {
 
   it("localizes optimize prompt mode options", () => {
     expect(
-      formatImageGenerationOptionLabel("optimize_prompt_mode", "standard", "智能", {
-        optimizePromptStandard: "标准模式",
-        optimizePromptFast: "快速(质量降低)",
-      })
+      formatImageGenerationOptionLabel(
+        "optimize_prompt_mode",
+        "standard",
+        "智能",
+        {
+          optimizePromptStandard: "标准模式",
+          optimizePromptFast: "快速(质量降低)",
+        }
+      )
     ).toBe("标准模式");
     expect(
       formatImageGenerationOptionLabel("optimize_prompt_mode", "fast", "智能", {

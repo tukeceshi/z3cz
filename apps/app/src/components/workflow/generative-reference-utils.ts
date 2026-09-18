@@ -5,7 +5,10 @@ import {
   AI_VIDEO_NODE_TYPE,
   isWorkflowMediaValue,
 } from "@dafthunk/types";
-import type { Edge as ReactFlowEdge, Node as ReactFlowNode } from "@xyflow/react";
+import type {
+  Edge as ReactFlowEdge,
+  Node as ReactFlowNode,
+} from "@xyflow/react";
 
 import { readAiAudioCardAudios } from "./ai-audio-node-utils";
 import { readAiImageCardPrimaryImage } from "./ai-image-node-utils";
@@ -98,7 +101,10 @@ export function collectGenerativeReferenceChips(params: {
     readonly sourceHandle?: string | null;
     readonly targetHandle?: string | null;
   }[];
-  readonly nodes: readonly Pick<ReactFlowNode<WorkflowNodeType>, "id" | "data">[];
+  readonly nodes: readonly Pick<
+    ReactFlowNode<WorkflowNodeType>,
+    "id" | "data"
+  >[];
   readonly classifyKind: (
     nodeType: string | undefined
   ) => AiTextReferenceKind | null;

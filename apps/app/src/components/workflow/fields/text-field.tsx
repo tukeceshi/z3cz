@@ -39,7 +39,11 @@ export function TextField({
       <Textarea
         value={stringValue}
         onChange={(e) => onChange(e.target.value || undefined)}
-        placeholder={connected ? t("workflow.fields.connected") : t("workflow.fields.enterText")}
+        placeholder={
+          connected
+            ? t("workflow.fields.connected")
+            : t("workflow.fields.enterText")
+        }
         className="resize-y rounded-md border border-neutral-300 dark:border-neutral-700"
         disabled={disabled}
         readOnly={disabled}

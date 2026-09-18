@@ -49,7 +49,9 @@ describe("readTextCardUploadFile", () => {
       )
     ).toEqual({ ok: false, error: "unsupported" });
     expect(
-      await readTextCardUploadFile(fileFromString("empty.txt", "   \n", "text/plain"))
+      await readTextCardUploadFile(
+        fileFromString("empty.txt", "   \n", "text/plain")
+      )
     ).toEqual({ ok: false, error: "empty_file" });
   });
 

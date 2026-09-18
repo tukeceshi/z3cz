@@ -44,7 +44,9 @@ function stringField(value: unknown): string {
 }
 
 function numberField(value: unknown): number | undefined {
-  return typeof value === "number" && Number.isFinite(value) ? value : undefined;
+  return typeof value === "number" && Number.isFinite(value)
+    ? value
+    : undefined;
 }
 
 function parseImportMode(value: unknown): AgentCanvasImportMode | undefined {
@@ -194,16 +196,16 @@ function unwrapDocument(document: unknown): {
   const stickerSource = isRecord(graph) ? graph.stickers : document.stickers;
   const groupSource = isRecord(graph) ? graph.groups : document.groups;
   return {
-    title: stringField(document.title) || (isRecord(graph) ? stringField(graph.title) : ""),
+    title:
+      stringField(document.title) ||
+      (isRecord(graph) ? stringField(graph.title) : ""),
     graph,
     stickerCount: Array.isArray(stickerSource) ? stickerSource.length : 0,
     groupCount: Array.isArray(groupSource) ? groupSource.length : 0,
   };
 }
 
-function adaptQuantvNodes(
-  items: readonly unknown[]
-): {
+function adaptQuantvNodes(items: readonly unknown[]): {
   readonly nodes: AgentImportNodeInput[];
   readonly skippedUnknown: number;
   readonly foreignModel: boolean;
@@ -217,7 +219,9 @@ function adaptQuantvNodes(
       skippedUnknown += 1;
       continue;
     }
-    const mode = modeFromKindOrType(stringField(item.kind) || stringField(item.type));
+    const mode = modeFromKindOrType(
+      stringField(item.kind) || stringField(item.type)
+    );
     if (!mode) {
       skippedUnknown += 1;
       continue;
@@ -248,9 +252,7 @@ function adaptQuantvNodes(
   return { nodes, skippedUnknown, foreignModel };
 }
 
-function adaptLocalPlanNodes(
-  items: readonly unknown[]
-): {
+function adaptLocalPlanNodes(items: readonly unknown[]): {
   readonly nodes: AgentImportNodeInput[];
   readonly skippedUnknown: number;
 } {
@@ -277,9 +279,7 @@ function adaptLocalPlanNodes(
     seen.add(id);
     const meta = isRecord(item.meta) ? item.meta : undefined;
     const position = isRecord(item.position) ? item.position : undefined;
-    const url =
-      stringField(item.url) ||
-      mediaUrlFromMeta(meta);
+    const url = stringField(item.url) || mediaUrlFromMeta(meta);
     const x = numberField(item.x) ?? numberField(position?.x);
     const y = numberField(item.y) ?? numberField(position?.y);
     const prompt =
@@ -292,7 +292,8 @@ function adaptLocalPlanNodes(
       name: stringField(item.name) || stringField(item.title),
       prompt,
       url,
-      mimeType: stringField(item.mimeType) || (url ? mimeTypeFromUrl(url, mode) : ""),
+      mimeType:
+        stringField(item.mimeType) || (url ? mimeTypeFromUrl(url, mode) : ""),
       ...(x !== undefined ? { x } : {}),
       ...(y !== undefined ? { y } : {}),
     });
@@ -372,7 +373,9 @@ function skipMessages(params: {
 }
 
 function looksLikeQuantvNodes(items: readonly unknown[]): boolean {
-  return items.some((item) => isRecord(item) && stringField(item.kind).length > 0);
+  return items.some(
+    (item) => isRecord(item) && stringField(item.kind).length > 0
+  );
 }
 
 export function adaptCanvasImportDocument(

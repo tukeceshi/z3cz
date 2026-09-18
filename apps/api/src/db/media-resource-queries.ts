@@ -1,4 +1,8 @@
-import type { CloudAccelerationStatus, MediaResourceKind, MediaResourceRecord } from "@dafthunk/types";
+import type {
+  CloudAccelerationStatus,
+  MediaResourceKind,
+  MediaResourceRecord,
+} from "@dafthunk/types";
 
 import type { Database } from "../db";
 import { mediaResources } from "../db/schema";

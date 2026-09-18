@@ -156,7 +156,12 @@ export function AiTextHistoryOverlay({
               {t("workflow.aiTextPanel.historyCount", { count: total })}
             </p>
           </div>
-          <div className={cn("min-h-0 flex-1 space-y-1.5 overflow-y-auto p-2", STUDIO_SCROLL)}>
+          <div
+            className={cn(
+              "min-h-0 flex-1 space-y-1.5 overflow-y-auto p-2",
+              STUDIO_SCROLL
+            )}
+          >
             {history.items.length === 0 ? (
               <p className="px-2 py-4 text-xs text-muted-foreground">
                 {t("workflow.aiTextPanel.historyEmpty")}
@@ -195,7 +200,8 @@ export function AiTextHistoryOverlay({
                       <span className="line-clamp-3 text-xs leading-snug text-foreground">
                         {itemLoading
                           ? t("workflow.aiTextPanel.historyLoadingItem")
-                          : excerpt || t("workflow.aiTextPanel.historyEmptyItem")}
+                          : excerpt ||
+                            t("workflow.aiTextPanel.historyEmptyItem")}
                       </span>
                       {isCurrent ? (
                         <span className="mt-1 block text-[10px] text-muted-foreground">
@@ -225,7 +231,12 @@ export function AiTextHistoryOverlay({
               <XIcon className="h-4 w-4" />
             </Button>
           </div>
-          <div className={cn("min-h-0 flex-1 overflow-y-auto px-5 py-4", STUDIO_SCROLL)}>
+          <div
+            className={cn(
+              "min-h-0 flex-1 overflow-y-auto px-5 py-4",
+              STUDIO_SCROLL
+            )}
+          >
             {previewItem ? (
               previewLoading ? (
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -247,11 +258,7 @@ export function AiTextHistoryOverlay({
             <Button type="button" variant="outline" onClick={onClose}>
               {t("common.cancel")}
             </Button>
-            <Button
-              type="button"
-              disabled={!previewItem}
-              onClick={handleApply}
-            >
+            <Button type="button" disabled={!previewItem} onClick={handleApply}>
               {t("workflow.aiTextPanel.historyApply")}
             </Button>
           </div>

@@ -13,10 +13,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import {
-  getDashboardPath,
-  isSafeAppPath,
-} from "@/utils/auth-navigation";
+import { getDashboardPath, isSafeAppPath } from "@/utils/auth-navigation";
 import { scheduleConsolePrefetch } from "@/utils/console-prefetch";
 
 export function LoginPage() {
@@ -74,13 +71,17 @@ export function LoginPage() {
       <div className="flex min-h-svh flex-col items-center justify-center bg-muted/50 p-6 md:p-10">
         <Card className="w-full max-w-md">
           <CardHeader>
-            <CardTitle>{t("auth.subAccountInviteActiveSessionTitle")}</CardTitle>
+            <CardTitle>
+              {t("auth.subAccountInviteActiveSessionTitle")}
+            </CardTitle>
             <CardDescription>
               {t("auth.subAccountInviteActiveSessionDescription")}
             </CardDescription>
           </CardHeader>
           <CardContent className="flex flex-col gap-3">
-            <Button onClick={() => void logout()}>{t("userMenu.logout")}</Button>
+            <Button onClick={() => void logout()}>
+              {t("userMenu.logout")}
+            </Button>
             <Button variant="outline" asChild>
               <a href="/">{t("common.cancel")}</a>
             </Button>

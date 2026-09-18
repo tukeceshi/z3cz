@@ -16,7 +16,8 @@ export function GenerativeCloudAccelerationCardOffer({
   className,
 }: GenerativeCloudAccelerationCardOfferProps) {
   const session = useSyncExternalStore(
-    (listener) => subscribeGenerativeCloudAccelerationCardSession(nodeId, listener),
+    (listener) =>
+      subscribeGenerativeCloudAccelerationCardSession(nodeId, listener),
     () => getGenerativeCloudAccelerationCardSession(nodeId),
     () => undefined
   );

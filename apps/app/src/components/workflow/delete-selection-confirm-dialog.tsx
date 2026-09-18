@@ -52,7 +52,9 @@ export function DeleteSelectionConfirmDialog({
         }}
       >
         <AlertDialogHeader>
-          <AlertDialogTitle>{t("workflow.canvas.deleteConfirmTitle")}</AlertDialogTitle>
+          <AlertDialogTitle>
+            {t("workflow.canvas.deleteConfirmTitle")}
+          </AlertDialogTitle>
           <AlertDialogDescription>{description}</AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>

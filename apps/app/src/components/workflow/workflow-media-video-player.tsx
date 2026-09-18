@@ -353,10 +353,17 @@ export function WorkflowMediaVideoPlayer({
     if (!isCardVariant || !initialHovered || externalPlaybackControl) return;
     setIsHovered(true);
     tryCardAutoplay();
-  }, [externalPlaybackControl, initialHovered, isCardVariant, src, tryCardAutoplay]);
+  }, [
+    externalPlaybackControl,
+    initialHovered,
+    isCardVariant,
+    src,
+    tryCardAutoplay,
+  ]);
 
   const handleCardMouseLeave = useCallback(() => {
-    if (!isCardVariant || !canHoverVideoPlayback() || externalPlaybackControl) return;
+    if (!isCardVariant || !canHoverVideoPlayback() || externalPlaybackControl)
+      return;
     setIsHovered(false);
     setIsVolumeHovered(false);
     resetVideoToStart();
@@ -494,7 +501,12 @@ export function WorkflowMediaVideoPlayer({
     (clientX: number) => {
       const video = videoRef.current;
       const track = progressTrackRef.current;
-      if (!video || !track || !Number.isFinite(video.duration) || video.duration <= 0) {
+      if (
+        !video ||
+        !track ||
+        !Number.isFinite(video.duration) ||
+        video.duration <= 0
+      ) {
         return;
       }
 

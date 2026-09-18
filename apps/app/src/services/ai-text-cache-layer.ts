@@ -86,14 +86,13 @@ export async function readyAiTextStaging(
   params: LoadAiTextBodyFromCacheParams
 ): Promise<ReadyAiTextStagingResult> {
   const mediaId = mediaIdFromReference(params.reference);
-  const existing =
-    mediaId
-      ? getAiTextDisplay({
-          organizationId: params.organizationId,
-          workflowId: params.workflowId,
-          mediaId,
-        })
-      : null;
+  const existing = mediaId
+    ? getAiTextDisplay({
+        organizationId: params.organizationId,
+        workflowId: params.workflowId,
+        mediaId,
+      })
+    : null;
   if (existing?.state !== "ready") {
     markDisplayState(params, "loading");
   }
@@ -104,9 +103,7 @@ export async function readyAiTextStaging(
     workflowId: params.workflowId,
     value: params.reference,
   });
-  const trimmed = body?.trim()
-    ? normalizeTableMarkdownForDisplay(body)
-    : "";
+  const trimmed = body?.trim() ? normalizeTableMarkdownForDisplay(body) : "";
 
   if (trimmed) {
     hangAiTextExcerptFromKnownText({ ...params, body: trimmed });

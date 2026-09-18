@@ -428,9 +428,7 @@ export async function refreshCharacterResourceImportStatus(
     entry.interfaceId
   );
   if (!context) {
-    throw new Error(
-      "未找到可用的 AI 接口凭据（独立 API Key 或火山 AK/SK）"
-    );
+    throw new Error("未找到可用的 AI 接口凭据（独立 API Key 或火山 AK/SK）");
   }
 
   const invocationId = await findInvocationIdByResource(
@@ -474,7 +472,9 @@ export async function refreshCharacterResourceImportStatus(
         status: state.status === "failed" ? "failed" : "completed",
         content: `asset:${state.assetId} ${state.status}`,
         error:
-          state.status === "failed" ? "upstream asset import failed" : undefined,
+          state.status === "failed"
+            ? "upstream asset import failed"
+            : undefined,
       }
     );
   }

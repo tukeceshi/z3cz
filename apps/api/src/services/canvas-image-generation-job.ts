@@ -196,161 +196,163 @@ export async function runCanvasImageGenerationJob(params: {
 }): Promise<void> {
   const db = createDatabase(params.env);
   try {
-  const upstreamLog = createUpstreamRequestLogger(db, {
-    organizationId: params.organizationId,
-    interfaceId: params.interfaceId,
-    invocationId: params.invocationId,
-    generationJobId: params.jobId,
-    operation: "submit",
-  });
-
-  const result = await withOrgApiForwarding(
-    {
-      db,
-      env: params.env,
+    const upstreamLog = createUpstreamRequestLogger(db, {
       organizationId: params.organizationId,
-      aiInterfaceId: params.interfaceId,
-    },
-    () =>
-      executeVolcanoImageGeneration({
-    apiKey: params.apiKey,
-    baseUrl: params.baseUrl,
-    providerModelId: params.providerModelId,
-    prompt: params.prompt,
-    parameterRules: params.parameterRules,
-    generationParams: params.generationParams,
-    referenceImageUrls: params.referenceImageUrls,
-    referenceImageInline: params.referenceImageInline,
-    storageMode: "ephemeral",
-    organizationId: params.organizationId,
-    workflowId: params.workflowId,
-    upstreamLog,
-    useFullSubmitUrl: params.useFullSubmitUrl,
-      })
-  );
-
-  if (result.status === "failed") {
-    await markResourcesFailed(db, {
-      organizationId: params.organizationId,
-      resourceIds: params.resourceIds,
-    });
-    await updateGenerationJob(db, {
-      id: params.jobId,
-      organizationId: params.organizationId,
-      status: "failed",
-      expectedStatuses: ["generating"],
-      failureReason: result.error ?? "Generation failed",
-    });
-    await finalizeAiModelInvocation(db, {
-      id: params.invocationId,
-      organizationId: params.organizationId,
-      status: "failed",
-      error: result.error ?? "Generation failed",
-    });
-    return;
-  }
-
-  const ephemeralImages = (result.images ?? []).filter(isEphemeralMediaReference);
-  if (ephemeralImages.length === 0) {
-    await markResourcesFailed(db, {
-      organizationId: params.organizationId,
-      resourceIds: params.resourceIds,
-    });
-    await updateGenerationJob(db, {
-      id: params.jobId,
-      organizationId: params.organizationId,
-      status: "failed",
-      expectedStatuses: ["generating"],
-      failureReason: "Expected ephemeral upstream image URLs",
-    });
-    await finalizeAiModelInvocation(db, {
-      id: params.invocationId,
-      organizationId: params.organizationId,
-      status: "failed",
-      error: "Expected ephemeral upstream image URLs",
-    });
-    return;
-  }
-
-  const boundImages = bindEphemeralImagesToResourceIds(
-    ephemeralImages,
-    params.resourceIds
-  );
-  const unusedIds = params.resourceIds.slice(boundImages.length);
-  const expiresAt = createEphemeralMediaExpiresAt();
-
-  await upsertMediaResources(db, [
-    ...boundImages.map((image) => ({
-      id: image.mediaId,
-      organizationId: params.organizationId,
-      kind: "ephemeral" as const,
-      mimeType: image.mimeType,
-      upstreamUrl: image.url,
-      expiresAt: image.expiresAt ?? expiresAt,
-      generating: false,
-      failed: false,
-      modelCanonicalId: params.modelCanonicalId,
-    })),
-    ...unusedIds.map((id) => ({
-      id,
-      organizationId: params.organizationId,
-      kind: "ephemeral" as const,
-      mimeType: PLACEHOLDER_IMAGE_MIME,
-      generating: false,
-      failed: false,
-      modelCanonicalId: params.modelCanonicalId,
-    })),
-  ]);
-
-  const usedResourceIds = boundImages.map((image) => image.mediaId);
-
-  if (params.storageMode === "cloud") {
-    const { readyAt, resultJson } = buildReadyToPersistJobPayload({
-      images: boundImages,
-      mediaKind: "ai-image",
-      aiInterfaceId: params.interfaceId,
+      interfaceId: params.interfaceId,
       invocationId: params.invocationId,
-      requestSnapshot: result.requestSnapshot,
+      generationJobId: params.jobId,
+      operation: "submit",
     });
+
+    const result = await withOrgApiForwarding(
+      {
+        db,
+        env: params.env,
+        organizationId: params.organizationId,
+        aiInterfaceId: params.interfaceId,
+      },
+      () =>
+        executeVolcanoImageGeneration({
+          apiKey: params.apiKey,
+          baseUrl: params.baseUrl,
+          providerModelId: params.providerModelId,
+          prompt: params.prompt,
+          parameterRules: params.parameterRules,
+          generationParams: params.generationParams,
+          referenceImageUrls: params.referenceImageUrls,
+          referenceImageInline: params.referenceImageInline,
+          storageMode: "ephemeral",
+          organizationId: params.organizationId,
+          workflowId: params.workflowId,
+          upstreamLog,
+          useFullSubmitUrl: params.useFullSubmitUrl,
+        })
+    );
+
+    if (result.status === "failed") {
+      await markResourcesFailed(db, {
+        organizationId: params.organizationId,
+        resourceIds: params.resourceIds,
+      });
+      await updateGenerationJob(db, {
+        id: params.jobId,
+        organizationId: params.organizationId,
+        status: "failed",
+        expectedStatuses: ["generating"],
+        failureReason: result.error ?? "Generation failed",
+      });
+      await finalizeAiModelInvocation(db, {
+        id: params.invocationId,
+        organizationId: params.organizationId,
+        status: "failed",
+        error: result.error ?? "Generation failed",
+      });
+      return;
+    }
+
+    const ephemeralImages = (result.images ?? []).filter(
+      isEphemeralMediaReference
+    );
+    if (ephemeralImages.length === 0) {
+      await markResourcesFailed(db, {
+        organizationId: params.organizationId,
+        resourceIds: params.resourceIds,
+      });
+      await updateGenerationJob(db, {
+        id: params.jobId,
+        organizationId: params.organizationId,
+        status: "failed",
+        expectedStatuses: ["generating"],
+        failureReason: "Expected ephemeral upstream image URLs",
+      });
+      await finalizeAiModelInvocation(db, {
+        id: params.invocationId,
+        organizationId: params.organizationId,
+        status: "failed",
+        error: "Expected ephemeral upstream image URLs",
+      });
+      return;
+    }
+
+    const boundImages = bindEphemeralImagesToResourceIds(
+      ephemeralImages,
+      params.resourceIds
+    );
+    const unusedIds = params.resourceIds.slice(boundImages.length);
+    const expiresAt = createEphemeralMediaExpiresAt();
+
+    await upsertMediaResources(db, [
+      ...boundImages.map((image) => ({
+        id: image.mediaId,
+        organizationId: params.organizationId,
+        kind: "ephemeral" as const,
+        mimeType: image.mimeType,
+        upstreamUrl: image.url,
+        expiresAt: image.expiresAt ?? expiresAt,
+        generating: false,
+        failed: false,
+        modelCanonicalId: params.modelCanonicalId,
+      })),
+      ...unusedIds.map((id) => ({
+        id,
+        organizationId: params.organizationId,
+        kind: "ephemeral" as const,
+        mimeType: PLACEHOLDER_IMAGE_MIME,
+        generating: false,
+        failed: false,
+        modelCanonicalId: params.modelCanonicalId,
+      })),
+    ]);
+
+    const usedResourceIds = boundImages.map((image) => image.mediaId);
+
+    if (params.storageMode === "cloud") {
+      const { readyAt, resultJson } = buildReadyToPersistJobPayload({
+        images: boundImages,
+        mediaKind: "ai-image",
+        aiInterfaceId: params.interfaceId,
+        invocationId: params.invocationId,
+        requestSnapshot: result.requestSnapshot,
+      });
+      const updated = await updateGenerationJob(db, {
+        id: params.jobId,
+        organizationId: params.organizationId,
+        status: "ready_to_persist",
+        expectedStatuses: ["generating"],
+        readyAt,
+        resultJson: {
+          ...resultJson,
+          placeholderResourceIds: usedResourceIds,
+        },
+      });
+      if (updated) {
+        await syncGenerationJobInvocation(db, updated);
+      }
+      return;
+    }
+
     const updated = await updateGenerationJob(db, {
       id: params.jobId,
       organizationId: params.organizationId,
-      status: "ready_to_persist",
+      status: "succeeded",
       expectedStatuses: ["generating"],
-      readyAt,
       resultJson: {
-        ...resultJson,
         placeholderResourceIds: usedResourceIds,
+        finalMedia: boundImages,
+        invocationId: params.invocationId,
+        requestSnapshot: result.requestSnapshot,
       },
+    });
+    await finalizeAiModelInvocation(db, {
+      id: params.invocationId,
+      organizationId: params.organizationId,
+      status: "completed",
+      content: `${boundImages.length} image(s)`,
+      error: null,
     });
     if (updated) {
       await syncGenerationJobInvocation(db, updated);
     }
-    return;
-  }
-
-  const updated = await updateGenerationJob(db, {
-    id: params.jobId,
-    organizationId: params.organizationId,
-    status: "succeeded",
-    expectedStatuses: ["generating"],
-    resultJson: {
-      placeholderResourceIds: usedResourceIds,
-      finalMedia: boundImages,
-      invocationId: params.invocationId,
-      requestSnapshot: result.requestSnapshot,
-    },
-  });
-  await finalizeAiModelInvocation(db, {
-    id: params.invocationId,
-    organizationId: params.organizationId,
-    status: "completed",
-    content: `${boundImages.length} image(s)`,
-    error: null,
-  });
-  if (updated) {
-    await syncGenerationJobInvocation(db, updated);
-  }
   } catch (error) {
     const message =
       error instanceof Error ? error.message : "Image generation failed";

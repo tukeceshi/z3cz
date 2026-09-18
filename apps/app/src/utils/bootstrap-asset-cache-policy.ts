@@ -4,10 +4,7 @@ export function shouldSeedBootstrapAssetCache(assetPath: string): boolean {
 }
 
 export function shouldInterceptBootstrapAssetFetch(pathname: string): boolean {
-  if (
-    !pathname.startsWith("/assets/") &&
-    !pathname.startsWith("/landing/")
-  ) {
+  if (!pathname.startsWith("/assets/") && !pathname.startsWith("/landing/")) {
     return false;
   }
   return shouldSeedBootstrapAssetCache(pathname);

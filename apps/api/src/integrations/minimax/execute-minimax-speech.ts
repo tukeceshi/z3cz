@@ -54,9 +54,7 @@ function buildVoiceSetting(
     const leaf = field.apiName.slice("voice_setting.".length);
     const raw = params?.[field.name];
     const value =
-      raw === undefined || raw === null || raw === ""
-        ? field.default
-        : raw;
+      raw === undefined || raw === null || raw === "" ? field.default : raw;
 
     if (value === undefined || value === null || value === "") {
       continue;
@@ -136,7 +134,9 @@ export async function executeMinimaxSpeech(
     return {
       status: "failed",
       error:
-        error instanceof Error ? error.message : "MiniMax speech generation failed",
+        error instanceof Error
+          ? error.message
+          : "MiniMax speech generation failed",
     };
   } finally {
     clearTimeout(timeout);

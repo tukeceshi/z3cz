@@ -89,4 +89,3 @@ export interface Table {
   schema: Schema;
   data: Record<string, unknown>[];
 }
-

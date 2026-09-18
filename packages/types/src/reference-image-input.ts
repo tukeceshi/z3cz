@@ -4,7 +4,9 @@ export interface ReferenceImageInline {
   readonly data: string;
 }
 
-export function formatReferenceImageInline(inline: ReferenceImageInline): string {
+export function formatReferenceImageInline(
+  inline: ReferenceImageInline
+): string {
   return `data:${inline.mimeType};base64,${inline.data}`;
 }
 

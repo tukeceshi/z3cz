@@ -13,7 +13,9 @@ import { buildDependencies } from "./cloudflare-runtime-dependencies";
 
 export { WorkerRuntime } from "@dafthunk/runtime";
 
-export async function createWorkerRuntime(env: Bindings): Promise<WorkerRuntime<Bindings>> {
+export async function createWorkerRuntime(
+  env: Bindings
+): Promise<WorkerRuntime<Bindings>> {
   const noopMonitoring = { async sendUpdate() {} };
   return new WorkerRuntime(env, await buildDependencies(env, noopMonitoring));
 }

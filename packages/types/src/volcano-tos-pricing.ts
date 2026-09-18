@@ -13,33 +13,34 @@ export interface VolcanoTosRegionPricingRow {
 }
 
 /** Per-region TOS list prices (standard storage capacity + public egress only). */
-export const VOLCANO_TOS_REGION_PRICING: readonly VolcanoTosRegionPricingRow[] = [
-  {
-    region: "cn-guangzhou",
-    standardStorageLabel: "0.099 元/GiB/月",
-    publicEgressLabel: "0.50 元/GB",
-  },
-  {
-    region: "cn-beijing",
-    standardStorageLabel: "0.099 元/GiB/月",
-    publicEgressLabel: "0.50 元/GB",
-  },
-  {
-    region: "cn-shanghai",
-    standardStorageLabel: "0.099 元/GiB/月",
-    publicEgressLabel: "0.50 元/GB",
-  },
-  {
-    region: "ap-southeast-1",
-    standardStorageLabel: "0.136 元/GiB/月",
-    publicEgressLabel: "0.75 元/GB",
-  },
-  {
-    region: "ap-southeast-3",
-    standardStorageLabel: "0.156 元/GiB/月",
-    publicEgressLabel: "0.75 元/GB",
-  },
-] as const;
+export const VOLCANO_TOS_REGION_PRICING: readonly VolcanoTosRegionPricingRow[] =
+  [
+    {
+      region: "cn-guangzhou",
+      standardStorageLabel: "0.099 元/GiB/月",
+      publicEgressLabel: "0.50 元/GB",
+    },
+    {
+      region: "cn-beijing",
+      standardStorageLabel: "0.099 元/GiB/月",
+      publicEgressLabel: "0.50 元/GB",
+    },
+    {
+      region: "cn-shanghai",
+      standardStorageLabel: "0.099 元/GiB/月",
+      publicEgressLabel: "0.50 元/GB",
+    },
+    {
+      region: "ap-southeast-1",
+      standardStorageLabel: "0.136 元/GiB/月",
+      publicEgressLabel: "0.75 元/GB",
+    },
+    {
+      region: "ap-southeast-3",
+      standardStorageLabel: "0.156 元/GiB/月",
+      publicEgressLabel: "0.75 元/GB",
+    },
+  ] as const;
 
 export interface VolcanoTosRegionPricingSnapshot {
   readonly docUrl: string;

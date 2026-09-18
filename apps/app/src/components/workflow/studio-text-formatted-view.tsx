@@ -60,7 +60,11 @@ export function StudioTextFormattedView({
   );
 
   const handleTableChange = useCallback(
-    (tableIndex: number, tableMarkdown: string, originalTableMarkdown: string) => {
+    (
+      tableIndex: number,
+      tableMarkdown: string,
+      originalTableMarkdown: string
+    ) => {
       applySegmentEdits({
         tableUpdates: new Map([
           [

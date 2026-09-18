@@ -18,7 +18,9 @@ describe("classifyTextCardUploadFile", () => {
       )
     ).toBe("text");
     expect(
-      classifyTextCardUploadFile(new File(["x"], "outline.markdown", { type: "" }))
+      classifyTextCardUploadFile(
+        new File(["x"], "outline.markdown", { type: "" })
+      )
     ).toBe("text");
   });
 
@@ -40,22 +42,24 @@ describe("classifyTextCardUploadFile", () => {
       classifyTextCardUploadFile(new File(["x"], "legacy.doc", { type: "" }))
     ).toBe("legacy-doc");
     expect(
-      classifyTextCardUploadFile(new File(["x"], "photo.png", { type: "image/png" }))
+      classifyTextCardUploadFile(
+        new File(["x"], "photo.png", { type: "image/png" })
+      )
     ).toBe("unsupported");
   });
 });
 
 describe("canTextCardUpload", () => {
   it("allows upload only on empty idle cards", () => {
-    expect(
-      canTextCardUpload({ hasOutput: false, isGenerating: false })
-    ).toBe(true);
-    expect(
-      canTextCardUpload({ hasOutput: true, isGenerating: false })
-    ).toBe(false);
-    expect(
-      canTextCardUpload({ hasOutput: false, isGenerating: true })
-    ).toBe(false);
+    expect(canTextCardUpload({ hasOutput: false, isGenerating: false })).toBe(
+      true
+    );
+    expect(canTextCardUpload({ hasOutput: true, isGenerating: false })).toBe(
+      false
+    );
+    expect(canTextCardUpload({ hasOutput: false, isGenerating: true })).toBe(
+      false
+    );
     expect(
       canTextCardUpload({
         hasOutput: false,

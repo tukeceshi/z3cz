@@ -3,12 +3,8 @@ import { useCallback, useRef, useState } from "react";
 
 import type { ObjectReference } from "@dafthunk/types";
 
-import {
-  readSkipDetachWithRecordsConfirm,
-} from "@/components/workflow/detach-confirm-preference";
-import {
-  filterNodesWithCanvasRecords,
-} from "@/components/workflow/node-has-canvas-records";
+import { readSkipDetachWithRecordsConfirm } from "@/components/workflow/detach-confirm-preference";
+import { filterNodesWithCanvasRecords } from "@/components/workflow/node-has-canvas-records";
 import {
   canvasJsonEquals,
   captureCanvasJson,
@@ -44,9 +40,7 @@ export interface UseGraphHistoryProps {
   readonly setEdges: React.Dispatch<
     React.SetStateAction<Edge<WorkflowEdgeType>[]>
   >;
-  readonly requestDetachConfirm: (
-    pending: PendingDetachConfirm
-  ) => void;
+  readonly requestDetachConfirm: (pending: PendingDetachConfirm) => void;
 }
 
 export interface UseGraphHistoryReturn {
@@ -261,10 +255,7 @@ export function useGraphHistory({
         nodesRef.current,
         nodeIds
       );
-      if (
-        nodesWithRecords.length === 0 ||
-        readSkipDetachWithRecordsConfirm()
-      ) {
+      if (nodesWithRecords.length === 0 || readSkipDetachWithRecordsConfirm()) {
         proceed();
         return;
       }

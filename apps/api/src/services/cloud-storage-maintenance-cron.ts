@@ -2,9 +2,7 @@ import { CLOUD_STORAGE_HEALTH_CHECK_TTL_MS } from "@dafthunk/types";
 
 import type { Bindings } from "../context";
 import { createDatabase } from "../db";
-import {
-  listOrganizationIdsNeedingCloudStorageHealthRefresh,
-} from "../db/cloud-storage-health-queries";
+import { listOrganizationIdsNeedingCloudStorageHealthRefresh } from "../db/cloud-storage-health-queries";
 import {
   listGenerationJobsNeedingReconciliation,
   listOrganizationIdsWithActiveGenerationJobs,
@@ -35,9 +33,7 @@ export async function runCloudStorageMaintenanceCron(
     }
   }
 
-  const staleBefore = new Date(
-    Date.now() - CLOUD_STORAGE_HEALTH_CHECK_TTL_MS
-  );
+  const staleBefore = new Date(Date.now() - CLOUD_STORAGE_HEALTH_CHECK_TTL_MS);
   const [staleHealthOrgIds, activeJobOrgIds] = await Promise.all([
     listOrganizationIdsNeedingCloudStorageHealthRefresh(db, {
       staleBefore,
@@ -46,9 +42,10 @@ export async function runCloudStorageMaintenanceCron(
     listOrganizationIdsWithActiveGenerationJobs(db, MAX_HEALTH_ORGS_PER_CRON),
   ]);
 
-  const orgIds = [
-    ...new Set([...staleHealthOrgIds, ...activeJobOrgIds]),
-  ].slice(0, MAX_HEALTH_ORGS_PER_CRON);
+  const orgIds = [...new Set([...staleHealthOrgIds, ...activeJobOrgIds])].slice(
+    0,
+    MAX_HEALTH_ORGS_PER_CRON
+  );
 
   for (const organizationId of orgIds) {
     try {

@@ -5,7 +5,9 @@ export interface ParsedMarkdownTable {
 
 export function isTableRow(line: string): boolean {
   const trimmed = line.trim();
-  return trimmed.length >= 2 && trimmed.startsWith("|") && trimmed.endsWith("|");
+  return (
+    trimmed.length >= 2 && trimmed.startsWith("|") && trimmed.endsWith("|")
+  );
 }
 
 export function isTableSeparator(line: string): boolean {

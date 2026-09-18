@@ -1,7 +1,4 @@
-import type {
-  ReferenceImageInline,
-  WorkflowMediaValue,
-} from "@dafthunk/types";
+import type { ReferenceImageInline, WorkflowMediaValue } from "@dafthunk/types";
 
 export interface ResolvedReferencesForGenerate {
   readonly referenceImageUrls: readonly string[];

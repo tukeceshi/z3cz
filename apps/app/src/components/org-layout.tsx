@@ -124,7 +124,9 @@ function filterSidebarGroupsByPermissions(
   const canAccessItem = (itemId: string): boolean => {
     switch (itemId) {
       case "dashboard":
-        return canViewWorkflows(organization) || canAccessModelCalls(organization);
+        return (
+          canViewWorkflows(organization) || canAccessModelCalls(organization)
+        );
       case "workflows":
         return canViewWorkflows(organization);
       case "model-calls":

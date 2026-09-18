@@ -1,8 +1,5 @@
 import { VOLCANO_DEFAULT_PROJECT_NAME } from "./constants";
-import {
-  callVolcengineArkApi,
-  type VolcengineCredentials,
-} from "./client";
+import { callVolcengineArkApi, type VolcengineCredentials } from "./client";
 
 export type VolcanoAssetStatus = "pending" | "active" | "failed";
 

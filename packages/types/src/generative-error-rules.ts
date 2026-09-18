@@ -27,8 +27,7 @@ export interface MatchedGenerativeErrorRule {
   readonly i18nKey?: string;
 }
 
-const UPSTREAM_HTTP_ERROR_PREFIX =
-  /^Upstream request failed \(\d+\):\s*/iu;
+const UPSTREAM_HTTP_ERROR_PREFIX = /^Upstream request failed \(\d+\):\s*/iu;
 
 export const GENERATIVE_ERROR_RULES: readonly GenerativeErrorRule[] = [
   {
@@ -66,8 +65,7 @@ export const GENERATIVE_ERROR_RULES: readonly GenerativeErrorRule[] = [
   },
   {
     id: "quota",
-    pattern:
-      /quota|额度|资源包|insufficientquota|exceeded.*limit|用量.*用尽/iu,
+    pattern: /quota|额度|资源包|insufficientquota|exceeded.*limit|用量.*用尽/iu,
     zh: "免费额度或资源包已用尽。",
     en: "Free quota or resource package has been used up.",
     appliesTo: "all",

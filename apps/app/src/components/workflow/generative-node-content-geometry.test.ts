@@ -12,9 +12,18 @@ import {
   GENERATIVE_NODE_TITLE_OFFSET_PX,
   snapGenerativeContentBorderPoint,
 } from "./generative-node-content-geometry";
-import { AI_IMAGE_CARD_HEIGHT_PX, AI_IMAGE_CARD_WIDTH_PX } from "./ai-image-node-utils";
-import { AI_TEXT_CARD_HEIGHT_PX, AI_TEXT_CARD_WIDTH_PX } from "./ai-text-node-utils";
-import { AI_VIDEO_CARD_HEIGHT_PX, AI_VIDEO_CARD_WIDTH_PX } from "./ai-video-node-utils";
+import {
+  AI_IMAGE_CARD_HEIGHT_PX,
+  AI_IMAGE_CARD_WIDTH_PX,
+} from "./ai-image-node-utils";
+import {
+  AI_TEXT_CARD_HEIGHT_PX,
+  AI_TEXT_CARD_WIDTH_PX,
+} from "./ai-text-node-utils";
+import {
+  AI_VIDEO_CARD_HEIGHT_PX,
+  AI_VIDEO_CARD_WIDTH_PX,
+} from "./ai-video-node-utils";
 
 describe("generative-node-content-geometry", () => {
   it("documents floating title offset outside the content card", () => {
@@ -114,11 +123,15 @@ describe("generative-node-content-geometry", () => {
       internals: { positionAbsolute: { x: 1032, y: -1176 } },
     } as unknown as InternalNode<Node>;
 
-    expect(resolveGenerativeLayoutContentSize(AI_VIDEO_NODE_TYPE, source)).toEqual({
+    expect(
+      resolveGenerativeLayoutContentSize(AI_VIDEO_NODE_TYPE, source)
+    ).toEqual({
       width: 468,
       height: 264,
     });
-    expect(resolveGenerativeLayoutContentSize(AI_VIDEO_NODE_TYPE, target)).toEqual({
+    expect(
+      resolveGenerativeLayoutContentSize(AI_VIDEO_NODE_TYPE, target)
+    ).toEqual({
       width: AI_VIDEO_CARD_WIDTH_PX,
       height: AI_VIDEO_CARD_HEIGHT_PX,
     });

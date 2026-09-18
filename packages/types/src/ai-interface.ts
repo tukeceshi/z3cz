@@ -10,7 +10,10 @@ import type {
 import type { NodeType } from "./workflow";
 import type { VolcanoActivationProbeResult } from "./volcano-activation";
 import type { VolcanoSetupStatus } from "./volcano-setup";
-import type { VolcanoInterfaceMetadata, VolcanoTosStorageConfig } from "./volcano-snapshot";
+import type {
+  VolcanoInterfaceMetadata,
+  VolcanoTosStorageConfig,
+} from "./volcano-snapshot";
 import type { VolcanoMediaKitConfig } from "./volcano-mediakit-enhance";
 
 export const AI_INTERFACE_NODE_TYPE = "ai-interface" as const;
@@ -56,11 +59,7 @@ export const ALL_AI_INTERFACE_PROVIDERS: readonly AiInterfaceProvider[] = [
 
 export type AiInterfaceExecutionMode = "sync";
 
-export type AiInterfaceFieldType =
-  | "string"
-  | "number"
-  | "boolean"
-  | "json";
+export type AiInterfaceFieldType = "string" | "number" | "boolean" | "json";
 
 export interface AiInterfaceFieldSpec {
   readonly name: string;
@@ -127,13 +126,21 @@ export interface AiInterfaceSourceSpec {
       readonly label: string;
     }[];
     readonly fields: readonly AiInterfaceFieldSpec[];
-    readonly outputs: readonly { readonly name: string; readonly type: string }[];
+    readonly outputs: readonly {
+      readonly name: string;
+      readonly type: string;
+    }[];
     readonly configInputs: readonly string[];
   };
 }
 
 export interface AiInterfaceBodySlot {
-  readonly kind: "field" | "const" | "model" | "openai-messages" | "anthropic-messages";
+  readonly kind:
+    | "field"
+    | "const"
+    | "model"
+    | "openai-messages"
+    | "anthropic-messages";
   readonly to: string;
   readonly from?: string;
   readonly value?: unknown;
@@ -194,7 +201,10 @@ export interface OrganizationAiInterface {
   readonly isDefault: boolean;
   readonly hasApiKey: boolean;
   readonly apiKeyHint?: string | null;
-  readonly metadata?: VolcanoInterfaceMetadata | Readonly<Record<string, unknown>> | null;
+  readonly metadata?:
+    | VolcanoInterfaceMetadata
+    | Readonly<Record<string, unknown>>
+    | null;
   readonly volcanoSetupStatus?: VolcanoSetupStatus | null;
   readonly createdAt: string;
   readonly updatedAt: string;
@@ -252,7 +262,10 @@ export interface UpdateOrganizationAiInterfaceRequest {
     Record<string, SingleModelCapabilityLimits | null>
   >;
   readonly singleModelModels?: Readonly<
-    Record<string, import("./single-model-interface-metadata").SingleModelModelConfig>
+    Record<
+      string,
+      import("./single-model-interface-metadata").SingleModelModelConfig
+    >
   >;
   readonly tosStorage?: VolcanoTosStorageConfig & {
     readonly createBucket?: boolean;

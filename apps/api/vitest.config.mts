@@ -9,7 +9,10 @@ const emptyStub = resolve(__dirname, "test/stubs/empty-module.ts");
 export default defineConfig({
   resolve: {
     alias: {
-      "@dafthunk/types": resolve(__dirname, "../../packages/types/src/index.ts"),
+      "@dafthunk/types": resolve(
+        __dirname,
+        "../../packages/types/src/index.ts"
+      ),
       // Stub packages that can't be resolved in workerd test environment.
       // These are transitively imported but not exercised in tests.
       "@cloudflare/sandbox": emptyStub,

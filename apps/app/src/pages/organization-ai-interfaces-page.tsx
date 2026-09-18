@@ -62,9 +62,7 @@ const emptyForm = (): InterfaceFormState => ({
   isDefault: false,
 });
 
-function formFromInterface(
-  iface: OrganizationAiInterface
-): InterfaceFormState {
+function formFromInterface(iface: OrganizationAiInterface): InterfaceFormState {
   return {
     name: iface.name,
     apiKey: "",
@@ -236,7 +234,9 @@ function OrganizationAiInterfacesPageContent() {
               <TableHead>{t("common.name")}</TableHead>
               <TableHead>{t("pages.aiInterfaces.provider")}</TableHead>
               <TableHead>{t("pages.aiInterfaces.status")}</TableHead>
-              <TableHead className="text-right">{t("common.actions")}</TableHead>
+              <TableHead className="text-right">
+                {t("common.actions")}
+              </TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -359,7 +359,9 @@ function OrganizationAiInterfacesPageContent() {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="iface-model">{t("pages.aiInterfaces.model")}</Label>
+              <Label htmlFor="iface-model">
+                {t("pages.aiInterfaces.model")}
+              </Label>
               <Input
                 id="iface-model"
                 value={form.selectedModel}

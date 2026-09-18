@@ -66,7 +66,8 @@ describe("useGenerativeParamsEditor", () => {
   });
 
   it("debounces node params on popover close and defaults after node write", () => {
-    const { result, updateNodeData, onGenerativeDefaultChange } = renderEditor();
+    const { result, updateNodeData, onGenerativeDefaultChange } =
+      renderEditor();
 
     act(() => {
       result.current.popover.onOpenChange(true);

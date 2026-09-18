@@ -61,10 +61,7 @@ function resolveBusyOverlayLabel(params: {
   readonly metadata: Record<string, string> | undefined;
   readonly progressNowMs: number;
   readonly uploading: boolean;
-  readonly t: (
-    key: string,
-    values?: Record<string, string | number>
-  ) => string;
+  readonly t: (key: string, values?: Record<string, string | number>) => string;
 }): string | null {
   const progressPhase = readGenerativeProgressPhase(params.metadata);
   const modalityBusy = readModalityBusy(params.modality, params.metadata);
@@ -190,7 +187,10 @@ export function GenerativeBusyOverlay({
         className
       )}
     >
-      <LoaderIcon className="h-5 w-5 animate-spin text-yellow-500" aria-hidden />
+      <LoaderIcon
+        className="h-5 w-5 animate-spin text-yellow-500"
+        aria-hidden
+      />
       {showCancel ? (
         <button
           type="button"
@@ -208,7 +208,12 @@ export function GenerativeBusyOverlay({
         </button>
       ) : null}
       {label ? (
-        <p className={cn("max-w-[90%] px-3 text-center", GENERATIVE_CARD_STATE_LABEL_CLASS)}>
+        <p
+          className={cn(
+            "max-w-[90%] px-3 text-center",
+            GENERATIVE_CARD_STATE_LABEL_CLASS
+          )}
+        >
           {label}
         </p>
       ) : null}
@@ -366,7 +371,10 @@ export function WorkflowNodeGenerativeBusyOverlay({
         roundedClass
       )}
     >
-      <LoaderIcon className="h-5 w-5 animate-spin text-yellow-500" aria-hidden />
+      <LoaderIcon
+        className="h-5 w-5 animate-spin text-yellow-500"
+        aria-hidden
+      />
       {showCancel ? (
         <button
           type="button"
@@ -384,7 +392,12 @@ export function WorkflowNodeGenerativeBusyOverlay({
         </button>
       ) : null}
       {label ? (
-        <p className={cn("max-w-[90%] px-3 text-center", GENERATIVE_CARD_STATE_LABEL_CLASS)}>
+        <p
+          className={cn(
+            "max-w-[90%] px-3 text-center",
+            GENERATIVE_CARD_STATE_LABEL_CLASS
+          )}
+        >
           {label}
         </p>
       ) : null}

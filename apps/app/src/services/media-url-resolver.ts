@@ -6,7 +6,10 @@ import {
   workflowMediaMimeType as readWorkflowMediaMimeType,
 } from "@dafthunk/types";
 
-import { getCachedMediaBlobUrl, cacheMediaFromUrl } from "@/services/ai-media-cache-service";
+import {
+  getCachedMediaBlobUrl,
+  cacheMediaFromUrl,
+} from "@/services/ai-media-cache-service";
 import { mediaUrlSupportsBrowserCache } from "@/services/media-cache-fetch-utils";
 import {
   resolveMediaCacheFetchUrl,
@@ -56,8 +59,7 @@ export async function resolveMediaDisplayUrl(params: {
   if (!fetchUrl) return null;
 
   const shouldWarm = params.warmCache !== false;
-  const nodeType =
-    params.nodeType ?? inferMediaNodeType(params.media);
+  const nodeType = params.nodeType ?? inferMediaNodeType(params.media);
 
   if (shouldWarm && nodeType && !isMediaExpired(params.media)) {
     const cacheFetchUrl = resolveMediaCacheFetchUrl(

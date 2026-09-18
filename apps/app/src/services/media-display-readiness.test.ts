@@ -73,7 +73,9 @@ describe("resolveMediaDisplay", () => {
       l: "blob:l",
     };
 
-    expect(resolveMediaDisplay({ media, urlSet, size: "thumb", stale: false })).toEqual({
+    expect(
+      resolveMediaDisplay({ media, urlSet, size: "thumb", stale: false })
+    ).toEqual({
       phase: "ready",
       displayUrl: "blob:s",
     });

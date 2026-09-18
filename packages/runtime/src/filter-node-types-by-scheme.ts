@@ -24,7 +24,8 @@ export function filterNodeTypesByScheme(
       return allNodeTypes;
     }
     return allNodeTypes.filter(
-      (nodeType) => alwaysInclude.has(nodeType.type) || !exclude.has(nodeType.type)
+      (nodeType) =>
+        alwaysInclude.has(nodeType.type) || !exclude.has(nodeType.type)
     );
   }
 

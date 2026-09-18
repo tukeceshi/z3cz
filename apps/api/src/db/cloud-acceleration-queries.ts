@@ -51,7 +51,10 @@ export async function listActiveAiInterfaceCloudAccelerations(
     .from(aiInterfaceCloudAcceleration)
     .innerJoin(
       organizationAiInterfaces,
-      eq(aiInterfaceCloudAcceleration.aiInterfaceId, organizationAiInterfaces.id)
+      eq(
+        aiInterfaceCloudAcceleration.aiInterfaceId,
+        organizationAiInterfaces.id
+      )
     )
     .where(
       and(
@@ -140,16 +143,13 @@ export async function enableAlwaysAiInterfaceCloudAcceleration(
     readonly organizationId: string;
     readonly aiInterfaceId: string;
   }
-): Promise<
-  | {
-      readonly id: string;
-      readonly organizationId: string;
-      readonly aiInterfaceId: string;
-      readonly interfaceName: string;
-      readonly enabledAt: string;
-    }
-  | null
-> {
+): Promise<{
+  readonly id: string;
+  readonly organizationId: string;
+  readonly aiInterfaceId: string;
+  readonly interfaceName: string;
+  readonly enabledAt: string;
+} | null> {
   const [iface] = await db
     .select({
       id: organizationAiInterfaces.id,

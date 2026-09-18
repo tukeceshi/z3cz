@@ -52,7 +52,10 @@ export function CanvasFileDropPreview({ preview }: CanvasFileDropPreviewProps) {
           baseCenter: preview.baseCenter,
           fileIndex: item.fileIndex,
         });
-        const position = resolveCanvasFileDropNodePosition(center, item.cardSize);
+        const position = resolveCanvasFileDropNodePosition(
+          center,
+          item.cardSize
+        );
         const left = position.x * zoom + translateX;
         const top = position.y * zoom + translateY;
 

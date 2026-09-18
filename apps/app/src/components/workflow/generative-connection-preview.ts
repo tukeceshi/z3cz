@@ -1,14 +1,15 @@
-import { AI_AUDIO_NODE_TYPE, AI_IMAGE_NODE_TYPE, AI_TEXT_NODE_TYPE, AI_VIDEO_NODE_TYPE } from "@dafthunk/types";
+import {
+  AI_AUDIO_NODE_TYPE,
+  AI_IMAGE_NODE_TYPE,
+  AI_TEXT_NODE_TYPE,
+  AI_VIDEO_NODE_TYPE,
+} from "@dafthunk/types";
 import type { Connection, InternalNode, Node } from "@xyflow/react";
 
 import { buildGenerativeReferenceConnectionFromCardDrop } from "./generative-reference-connection";
-import {
-  isIncomingAiImageReferenceConnection,
-} from "./ai-image-reference-policy";
+import { isIncomingAiImageReferenceConnection } from "./ai-image-reference-policy";
 import { snapAiImageReferenceBorderPoint } from "./ai-image-connection-utils";
-import {
-  isIncomingAiVideoReferenceConnection,
-} from "./ai-video-reference-policy";
+import { isIncomingAiVideoReferenceConnection } from "./ai-video-reference-policy";
 import { snapAiVideoReferenceBorderPoint } from "./ai-video-connection-utils";
 import {
   AI_IMAGE_PROMPT_HANDLE_ID,
@@ -20,9 +21,7 @@ import {
   AI_VIDEO_PROMPT_HANDLE_ID,
   AI_VIDEO_REFERENCE_HANDLE_ID,
 } from "./ai-video-node-utils";
-import {
-  isIncomingAiTextReferenceConnection,
-} from "./ai-text-reference-policy";
+import { isIncomingAiTextReferenceConnection } from "./ai-text-reference-policy";
 import {
   nodeIdUnderFlowPointerForPreview,
   snapAiTextKeywordsBorderPoint,
@@ -76,7 +75,9 @@ function connectionPointer(
   return connection.pointer ?? connection.to;
 }
 
-function readNodeType(node: InternalNode<Node> | undefined): string | undefined {
+function readNodeType(
+  node: InternalNode<Node> | undefined
+): string | undefined {
   return (node?.data as { nodeType?: string } | undefined)?.nodeType;
 }
 
@@ -90,7 +91,9 @@ function isGenerativeNodeType(nodeType: string | undefined): boolean {
 }
 
 /** Dragging from another node's input toward a generative card's right output. */
-function isIncomingGenerativeOutputPick(connection: FlowConnectionLike): boolean {
+function isIncomingGenerativeOutputPick(
+  connection: FlowConnectionLike
+): boolean {
   const fromHandle = connection.fromHandle;
   if (!connection.fromNode || !fromHandle) return false;
   if (fromHandle.type !== "target") return false;
@@ -230,7 +233,11 @@ export function resolveGenerativeCardSnapUnderPointer(
   nodeLookup: Map<string, InternalNode<Node>>,
   context: AiTextConnectionContext
 ): GenerativePreviewSnap | null {
-  if (!connection.inProgress || !connection.fromNode || !connection.fromHandle) {
+  if (
+    !connection.inProgress ||
+    !connection.fromNode ||
+    !connection.fromHandle
+  ) {
     return null;
   }
 
@@ -281,7 +288,11 @@ export function resolveGenerativePreviewConnection(
     targetHandle?: string | null;
   }[]
 ): GenerativePreviewConnection | null {
-  if (!connection.inProgress || !connection.fromNode || !connection.fromHandle) {
+  if (
+    !connection.inProgress ||
+    !connection.fromNode ||
+    !connection.fromHandle
+  ) {
     return null;
   }
 

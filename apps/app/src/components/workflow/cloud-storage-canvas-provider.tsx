@@ -77,7 +77,8 @@ export function CloudStorageCanvasProvider({
       setPollingMode("recover");
       recoverAttemptsRef.current = 0;
       corsEnsureInFlightRef.current = false;
-      const nextAutoFixState = source === "cors_upload" ? "fixing_cors" : "idle";
+      const nextAutoFixState =
+        source === "cors_upload" ? "fixing_cors" : "idle";
       autoFixStateRef.current = nextAutoFixState;
       setAutoFixState(nextAutoFixState);
     },
@@ -200,7 +201,10 @@ export function CloudStorageCanvasProvider({
           }
         }
 
-        if (status.health?.status === "healthy" && !status.blocksGenerativeMedia) {
+        if (
+          status.health?.status === "healthy" &&
+          !status.blocksGenerativeMedia
+        ) {
           setPollingMode("idle");
           autoFixStateRef.current = "idle";
           setAutoFixState("idle");

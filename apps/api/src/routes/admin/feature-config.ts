@@ -58,7 +58,9 @@ adminFeatureConfigRoutes.patch(
       });
     } catch (error) {
       const message =
-        error instanceof Error ? error.message : "Failed to update feature config";
+        error instanceof Error
+          ? error.message
+          : "Failed to update feature config";
       console.error("Error updating feature config:", error);
       return c.json({ error: message }, 400);
     }

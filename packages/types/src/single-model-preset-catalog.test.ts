@@ -8,9 +8,9 @@ import {
 describe("single-model-preset-catalog", () => {
   it("groups independent presets without brand-provider models", () => {
     const grouped = getSingleModelPresetsByCategory();
-    expect(grouped.text.some((entry) => entry.id === "preset:deepseek-v4-pro")).toBe(
-      false
-    );
+    expect(
+      grouped.text.some((entry) => entry.id === "preset:deepseek-v4-pro")
+    ).toBe(false);
     expect(
       grouped.text.some((entry) => entry.id === "preset:deepseek-v4-flash")
     ).toBe(false);
@@ -29,48 +29,56 @@ describe("single-model-preset-catalog", () => {
     expect(grouped.text.some((entry) => entry.id === "preset:kimi-k2.5")).toBe(
       false
     );
-    expect(grouped.text.some((entry) => entry.id === "preset:gpt-5-6-sol")).toBe(
-      false
-    );
-    expect(grouped.text.some((entry) => entry.id === "preset:gpt-5-6-terra")).toBe(
-      false
-    );
-    expect(grouped.text.some((entry) => entry.id === "preset:gpt-5-6-luna")).toBe(
-      false
-    );
-    expect(grouped.image.some((entry) => entry.id === "preset:gpt-image-2")).toBe(
-      false
-    );
     expect(
-      grouped.image.some((entry) => entry.id === "preset:gemini-3-1-flash-image")
+      grouped.text.some((entry) => entry.id === "preset:gpt-5-6-sol")
     ).toBe(false);
     expect(
-      grouped.image.some((entry) => entry.id === "preset:gemini-3-1-flash-lite-image")
+      grouped.text.some((entry) => entry.id === "preset:gpt-5-6-terra")
+    ).toBe(false);
+    expect(
+      grouped.text.some((entry) => entry.id === "preset:gpt-5-6-luna")
+    ).toBe(false);
+    expect(
+      grouped.image.some((entry) => entry.id === "preset:gpt-image-2")
+    ).toBe(false);
+    expect(
+      grouped.image.some(
+        (entry) => entry.id === "preset:gemini-3-1-flash-image"
+      )
+    ).toBe(false);
+    expect(
+      grouped.image.some(
+        (entry) => entry.id === "preset:gemini-3-1-flash-lite-image"
+      )
     ).toBe(false);
     expect(
       grouped.image.some((entry) => entry.id === "preset:gemini-3-pro-image")
     ).toBe(false);
-    expect(grouped.text.some((entry) => entry.id === "preset:gemini-3-5-flash")).toBe(
-      false
-    );
-    expect(grouped.text.some((entry) => entry.id === "preset:gemini-3-6-flash")).toBe(
-      false
-    );
-    expect(grouped.text.some((entry) => entry.id === "preset:gemini-3-5-flash-lite")).toBe(
-      false
-    );
-    expect(grouped.video.some((entry) => entry.id === "preset:doubao-seedance-2")).toBe(
-      false
-    );
     expect(
-      grouped.video.some((entry) => entry.id === "preset:doubao-seedance-2-fast")
+      grouped.text.some((entry) => entry.id === "preset:gemini-3-5-flash")
     ).toBe(false);
     expect(
-      grouped.video.some((entry) => entry.id === "preset:doubao-seedance-2-mini")
+      grouped.text.some((entry) => entry.id === "preset:gemini-3-6-flash")
     ).toBe(false);
-    expect(grouped.video.some((entry) => entry.id === "preset:veo-3-1-generate")).toBe(
-      false
-    );
+    expect(
+      grouped.text.some((entry) => entry.id === "preset:gemini-3-5-flash-lite")
+    ).toBe(false);
+    expect(
+      grouped.video.some((entry) => entry.id === "preset:doubao-seedance-2")
+    ).toBe(false);
+    expect(
+      grouped.video.some(
+        (entry) => entry.id === "preset:doubao-seedance-2-fast"
+      )
+    ).toBe(false);
+    expect(
+      grouped.video.some(
+        (entry) => entry.id === "preset:doubao-seedance-2-mini"
+      )
+    ).toBe(false);
+    expect(
+      grouped.video.some((entry) => entry.id === "preset:veo-3-1-generate")
+    ).toBe(false);
     expect(
       grouped.video.some((entry) => entry.id === "preset:veo-3-1-fast-generate")
     ).toBe(false);
@@ -120,9 +128,7 @@ describe("single-model-preset-catalog", () => {
   it("exposes API paths per modality category", () => {
     expect(getSingleModelApiPath("text")).toBe("/chat/completions");
     expect(getSingleModelApiPath("image")).toBe("/images/generations");
-    expect(getSingleModelApiPath("video")).toBe(
-      "/contents/generations/tasks"
-    );
+    expect(getSingleModelApiPath("video")).toBe("/contents/generations/tasks");
     expect(getSingleModelApiPath("audio")).toBe("/v1/t2a_v2");
     expect(getSingleModelApiPath("storage")).toBeUndefined();
   });

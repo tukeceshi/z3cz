@@ -1,6 +1,4 @@
-import {
-  MEDIA_CARD_SHORT_SIDE_PX,
-} from "@/components/workflow/media-card-size";
+import { MEDIA_CARD_SHORT_SIDE_PX } from "@/components/workflow/media-card-size";
 import type { MediaDisplaySize } from "@/services/media-display-size";
 
 /** Must match MEDIA_CARD_SHORT_SIDE_PX in media-card-size. */
@@ -10,11 +8,12 @@ const CARD_SHORT_SIDE_PX = MEDIA_CARD_SHORT_SIDE_PX;
 export type CanvasMediaTier = "s" | "m" | "l";
 
 /** Short-edge pixel sizes for generated thumbs. */
-export const CANVAS_TIER_SHORT_EDGE: Readonly<Record<CanvasMediaTier, number>> = {
-  s: 80,
-  m: MEDIA_CARD_SHORT_SIDE_PX,
-  l: MEDIA_CARD_SHORT_SIDE_PX * 2,
-} as const;
+export const CANVAS_TIER_SHORT_EDGE: Readonly<Record<CanvasMediaTier, number>> =
+  {
+    s: 80,
+    m: MEDIA_CARD_SHORT_SIDE_PX,
+    l: MEDIA_CARD_SHORT_SIDE_PX * 2,
+  } as const;
 
 /** @deprecated Use CANVAS_TIER_SHORT_EDGE. */
 export const CANVAS_TIER_MAX_WIDTH = CANVAS_TIER_SHORT_EDGE;
@@ -99,7 +98,9 @@ export function pickCanvasMediaTierWithHysteresis(
   return ratio < CANVAS_TIER_RATIO.s - h ? "s" : "l";
 }
 
-export function canvasTierToDisplaySize(tier: CanvasMediaTier): MediaDisplaySize {
+export function canvasTierToDisplaySize(
+  tier: CanvasMediaTier
+): MediaDisplaySize {
   if (tier === "s") return "canvas-s";
   if (tier === "m") return "canvas-m";
   return "canvas-l";

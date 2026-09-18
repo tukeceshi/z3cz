@@ -76,9 +76,7 @@ import {
   listPresetAvailableModels,
   useApiPresetChannelIdMap,
 } from "./use-preset-channel-model-ids";
-import {
-  SingleModelEndpointUrlFields,
-} from "./single-model-endpoint-url-preview";
+import { SingleModelEndpointUrlFields } from "./single-model-endpoint-url-preview";
 
 interface SingleModelConfigDialogProps {
   readonly organizationId: string;
@@ -145,10 +143,9 @@ export function SingleModelConfigDialog({
     open ? organizationId : undefined
   );
 
-  const endpointRulesCategory =
-    isSingleModelProviderMetadata(iface.metadata)
-      ? iface.metadata.singleModelCategory ?? "text"
-      : "text";
+  const endpointRulesCategory = isSingleModelProviderMetadata(iface.metadata)
+    ? (iface.metadata.singleModelCategory ?? "text")
+    : "text";
 
   const isMultiModelProvider =
     isSingleModelProviderMetadata(iface.metadata) &&
@@ -162,8 +159,10 @@ export function SingleModelConfigDialog({
       iface.metadata.singleModelPresetId === NANO_BANANA_PROVIDER_CARD_ID ||
       iface.metadata.singleModelPresetId === VEO_PROVIDER_CARD_ID ||
       iface.metadata.singleModelPresetId === GROK_PROVIDER_CARD_ID ||
-      iface.metadata.singleModelPresetId === GROK_IMAGINE_IMAGE_PROVIDER_CARD_ID ||
-      iface.metadata.singleModelPresetId === GROK_IMAGINE_VIDEO_PROVIDER_CARD_ID ||
+      iface.metadata.singleModelPresetId ===
+        GROK_IMAGINE_IMAGE_PROVIDER_CARD_ID ||
+      iface.metadata.singleModelPresetId ===
+        GROK_IMAGINE_VIDEO_PROVIDER_CARD_ID ||
       iface.metadata.singleModelPresetId === CLAUDE_PROVIDER_CARD_ID ||
       iface.metadata.singleModelPresetId === SEEDANCE_PROVIDER_CARD_ID ||
       iface.metadata.singleModelPresetId === SEEDREAM_PROVIDER_CARD_ID ||
@@ -327,9 +326,8 @@ export function SingleModelConfigDialog({
         ...(apiKey.trim() ? { apiKey: apiKey.trim() } : {}),
         ...(isSingleModelProviderMetadata(iface.metadata)
           ? {
-              singleModelModels: buildSingleModelModelsMapFromInstances(
-                preparedInstances
-              ),
+              singleModelModels:
+                buildSingleModelModelsMapFromInstances(preparedInstances),
             }
           : {}),
         singleModelEndpointRules: endpointRules ?? {},
@@ -368,7 +366,9 @@ export function SingleModelConfigDialog({
       }
     } catch (error) {
       appToast.errorRaw(
-        error instanceof Error ? error.message : t("pages.aiInterfaces.saveFailed")
+        error instanceof Error
+          ? error.message
+          : t("pages.aiInterfaces.saveFailed")
       );
     } finally {
       setCharacterLibrarySaving(false);
@@ -493,7 +493,9 @@ export function SingleModelConfigDialog({
                 availableModels={modelPoolOptions}
                 instances={modelInstances}
                 onChange={(instances) => setModelInstances([...instances])}
-                modelColumnLabel={t("pages.aiInterfaces.singleModel.modelColumn")}
+                modelColumnLabel={t(
+                  "pages.aiInterfaces.singleModel.modelColumn"
+                )}
                 modelIdLabel={t("pages.aiInterfaces.singleModel.modelId")}
                 addModelLabel={t("pages.aiInterfaces.singleModel.addModel")}
                 showCapabilitySettings={isVideoCategory}

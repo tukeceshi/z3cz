@@ -100,7 +100,9 @@ function canEnableOAuth(form: OAuthFormState): boolean {
   return hasClientId && hasSecret;
 }
 
-function buildEmailUpdate(form: EmailFormState): UpdateAuthConfigRequest["email"] {
+function buildEmailUpdate(
+  form: EmailFormState
+): UpdateAuthConfigRequest["email"] {
   return {
     requireVerificationOnRegister: form.requireVerificationOnRegister,
     smtpHost: form.smtpHost.trim(),
@@ -133,8 +135,12 @@ export function AdminLoginMethodsPage() {
   const { t } = useTranslation();
   const appToast = useAppToast();
   const setBreadcrumbs = useBreadcrumbsSetter();
-  const { authConfig, authConfigError, isAuthConfigLoading, refreshAuthConfig } =
-    useAdminAuthConfig();
+  const {
+    authConfig,
+    authConfigError,
+    isAuthConfigLoading,
+    refreshAuthConfig,
+  } = useAdminAuthConfig();
 
   const [emailForm, setEmailForm] = useState<EmailFormState | null>(null);
   const [githubForm, setGithubForm] = useState<OAuthFormState | null>(null);
@@ -218,7 +224,9 @@ export function AdminLoginMethodsPage() {
               <Mail className="size-4" />
               {t("loginMethods.email.title")}
             </CardTitle>
-            <CardDescription>{t("loginMethods.email.description")}</CardDescription>
+            <CardDescription>
+              {t("loginMethods.email.description")}
+            </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <p className="text-sm text-muted-foreground">
@@ -252,7 +260,9 @@ export function AdminLoginMethodsPage() {
                   value={emailForm.smtpHost}
                   onChange={(event) =>
                     setEmailForm((current) =>
-                      current ? { ...current, smtpHost: event.target.value } : current
+                      current
+                        ? { ...current, smtpHost: event.target.value }
+                        : current
                     )
                   }
                 />
@@ -268,7 +278,9 @@ export function AdminLoginMethodsPage() {
                   value={emailForm.smtpPort}
                   onChange={(event) =>
                     setEmailForm((current) =>
-                      current ? { ...current, smtpPort: event.target.value } : current
+                      current
+                        ? { ...current, smtpPort: event.target.value }
+                        : current
                     )
                   }
                 />
@@ -283,7 +295,9 @@ export function AdminLoginMethodsPage() {
                   value={emailForm.smtpUser}
                   onChange={(event) =>
                     setEmailForm((current) =>
-                      current ? { ...current, smtpUser: event.target.value } : current
+                      current
+                        ? { ...current, smtpUser: event.target.value }
+                        : current
                     )
                   }
                 />
@@ -341,7 +355,9 @@ export function AdminLoginMethodsPage() {
               <KeyRound className="size-4" />
               {t("loginMethods.github.title")}
             </CardTitle>
-            <CardDescription>{t("loginMethods.github.description")}</CardDescription>
+            <CardDescription>
+              {t("loginMethods.github.description")}
+            </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-2">
@@ -354,7 +370,9 @@ export function AdminLoginMethodsPage() {
                 value={githubForm.clientId}
                 onChange={(event) =>
                   setGithubForm((current) =>
-                    current ? { ...current, clientId: event.target.value } : current
+                    current
+                      ? { ...current, clientId: event.target.value }
+                      : current
                   )
                 }
               />
@@ -368,7 +386,9 @@ export function AdminLoginMethodsPage() {
                 name="auth_config_github_client_secret"
                 value={githubForm.clientSecret}
                 placeholder={
-                  githubForm.clientSecretConfigured ? AUTH_CONFIG_SECRET_MASK : undefined
+                  githubForm.clientSecretConfigured
+                    ? AUTH_CONFIG_SECRET_MASK
+                    : undefined
                 }
                 onChange={(event) =>
                   setGithubForm((current) =>
@@ -380,7 +400,9 @@ export function AdminLoginMethodsPage() {
               />
             </div>
             <div className="flex items-center justify-between rounded-lg border px-4 py-3">
-              <p className="text-sm font-medium">{t("loginMethods.oauth.enable")}</p>
+              <p className="text-sm font-medium">
+                {t("loginMethods.oauth.enable")}
+              </p>
               <Switch
                 checked={githubForm.enabled}
                 disabled={!githubReady}
@@ -400,7 +422,9 @@ export function AdminLoginMethodsPage() {
               <KeyRound className="size-4" />
               {t("loginMethods.google.title")}
             </CardTitle>
-            <CardDescription>{t("loginMethods.google.description")}</CardDescription>
+            <CardDescription>
+              {t("loginMethods.google.description")}
+            </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-2">
@@ -413,7 +437,9 @@ export function AdminLoginMethodsPage() {
                 value={googleForm.clientId}
                 onChange={(event) =>
                   setGoogleForm((current) =>
-                    current ? { ...current, clientId: event.target.value } : current
+                    current
+                      ? { ...current, clientId: event.target.value }
+                      : current
                   )
                 }
               />
@@ -427,7 +453,9 @@ export function AdminLoginMethodsPage() {
                 name="auth_config_google_client_secret"
                 value={googleForm.clientSecret}
                 placeholder={
-                  googleForm.clientSecretConfigured ? AUTH_CONFIG_SECRET_MASK : undefined
+                  googleForm.clientSecretConfigured
+                    ? AUTH_CONFIG_SECRET_MASK
+                    : undefined
                 }
                 onChange={(event) =>
                   setGoogleForm((current) =>
@@ -439,7 +467,9 @@ export function AdminLoginMethodsPage() {
               />
             </div>
             <div className="flex items-center justify-between rounded-lg border px-4 py-3">
-              <p className="text-sm font-medium">{t("loginMethods.oauth.enable")}</p>
+              <p className="text-sm font-medium">
+                {t("loginMethods.oauth.enable")}
+              </p>
               <Switch
                 checked={googleForm.enabled}
                 disabled={!googleReady}

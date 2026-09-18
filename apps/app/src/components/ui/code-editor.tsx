@@ -112,7 +112,8 @@ export function CodeEditor({
     });
 
     viewRef.current = view;
-    const scrollerClasses = scrollerClassName?.split(/\s+/).filter(Boolean) ?? [];
+    const scrollerClasses =
+      scrollerClassName?.split(/\s+/).filter(Boolean) ?? [];
     for (const className of scrollerClasses) {
       view.scrollDOM.classList.add(className);
     }

@@ -85,30 +85,27 @@ export function SubtitleEraseSessionProvider({
     );
   }, []);
 
-  const setRegions = useCallback(
-    (next: readonly VideoSubtitleEraseRect[]) => {
-      const normalized = next.map(clampVideoSubtitleEraseRect);
-      setSession((current) => {
-        if (!current) {
-          return current;
-        }
-        const refined = current.draftConfig.mode === "refined";
-        return {
-          ...current,
-          regions: normalized,
-          draftConfig: refined
-            ? {
-                ...current.draftConfig,
-                ...(normalized.length > 0
-                  ? { eraseRatioLocation: normalized }
-                  : { eraseRatioLocation: undefined }),
-              }
-            : current.draftConfig,
-        };
-      });
-    },
-    []
-  );
+  const setRegions = useCallback((next: readonly VideoSubtitleEraseRect[]) => {
+    const normalized = next.map(clampVideoSubtitleEraseRect);
+    setSession((current) => {
+      if (!current) {
+        return current;
+      }
+      const refined = current.draftConfig.mode === "refined";
+      return {
+        ...current,
+        regions: normalized,
+        draftConfig: refined
+          ? {
+              ...current.draftConfig,
+              ...(normalized.length > 0
+                ? { eraseRatioLocation: normalized }
+                : { eraseRatioLocation: undefined }),
+            }
+          : current.draftConfig,
+      };
+    });
+  }, []);
 
   const isSubtitleEraseActiveForNode = useCallback(
     (nodeId: string) => session?.sourceNodeId === nodeId,

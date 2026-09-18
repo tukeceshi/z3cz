@@ -61,7 +61,9 @@ describe("extractUrlReadable", () => {
       "fetch",
       vi.fn(
         async () =>
-          new Response("x".repeat(WEB_READ_SOURCE_MAX_CHARS + 1), { status: 200 })
+          new Response("x".repeat(WEB_READ_SOURCE_MAX_CHARS + 1), {
+            status: 200,
+          })
       )
     );
     await expect(extractUrlReadable("https://example.com/a")).resolves.toEqual({

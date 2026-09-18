@@ -52,7 +52,10 @@ interface MediaIntrinsicSize {
   readonly height: number;
 }
 
-function readMediaIntrinsicSize(width: number, height: number): MediaIntrinsicSize | null {
+function readMediaIntrinsicSize(
+  width: number,
+  height: number
+): MediaIntrinsicSize | null {
   if (width <= 0 || height <= 0) {
     return null;
   }
@@ -126,7 +129,10 @@ function GenerativeHistoryMediaFrame({
   }, [containerWidth, naturalSize]);
 
   return (
-    <div ref={containerRef} className={cn("flex w-full justify-center", className)}>
+    <div
+      ref={containerRef}
+      className={cn("flex w-full justify-center", className)}
+    >
       {displaySize ? (
         <div
           className={cn(
@@ -174,7 +180,9 @@ export function GenerativeHistoryImagePreview({
   onLightboxOpenChange,
 }: {
   readonly value: MediaReference | WorkflowMediaValue;
-  readonly createObjectUrl?: (ref: import("@dafthunk/types").ObjectReference) => string;
+  readonly createObjectUrl?: (
+    ref: import("@dafthunk/types").ObjectReference
+  ) => string;
   readonly className?: string;
   readonly onLightboxOpenChange?: (open: boolean) => void;
 }) {
@@ -191,12 +199,11 @@ export function GenerativeHistoryImagePreview({
     nodeType: "ai-image",
   });
   const [imgError, setImgError] = useState(false);
-  const [naturalSize, setNaturalSize] = useState<MediaIntrinsicSize | null>(null);
-  const {
-    triggerRef,
-    handlePreviewClick,
-    handlePreviewDoubleClick,
-  } = useStudioImageZoomTrigger();
+  const [naturalSize, setNaturalSize] = useState<MediaIntrinsicSize | null>(
+    null
+  );
+  const { triggerRef, handlePreviewClick, handlePreviewDoubleClick } =
+    useStudioImageZoomTrigger();
 
   useEffect(() => {
     setImgError(false);
@@ -287,7 +294,9 @@ export function GenerativeHistoryVideoPreview({
     nodeType: "ai-video",
   });
   const [mediaError, setMediaError] = useState(false);
-  const [naturalSize, setNaturalSize] = useState<MediaIntrinsicSize | null>(null);
+  const [naturalSize, setNaturalSize] = useState<MediaIntrinsicSize | null>(
+    null
+  );
   const [videoLightboxOpen, setVideoLightboxOpen] = useState(false);
 
   useEffect(() => {
@@ -432,7 +441,9 @@ export function GenerativeHistoryMediaPreview({
 }: {
   readonly mediaKind: GenerativeHistoryMediaKind;
   readonly value: MediaReference | WorkflowMediaValue;
-  readonly createObjectUrl?: (ref: import("@dafthunk/types").ObjectReference) => string;
+  readonly createObjectUrl?: (
+    ref: import("@dafthunk/types").ObjectReference
+  ) => string;
   readonly className?: string;
   readonly onLightboxOpenChange?: (open: boolean) => void;
 }) {

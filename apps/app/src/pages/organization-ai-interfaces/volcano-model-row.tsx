@@ -29,7 +29,8 @@ function activationBadgeVariant(
 ): "default" | "secondary" | "destructive" | "outline" {
   if (status === "open") return "default";
   if (status === "invalid_model_id") return "destructive";
-  if (status === "not_open" || status === "service_not_open") return "secondary";
+  if (status === "not_open" || status === "service_not_open")
+    return "secondary";
   return "outline";
 }
 
@@ -94,7 +95,10 @@ export function VolcanoModelRow({
               </Badge>
             ) : null}
             {!isWizard && pricingRow && pricingDocUrl ? (
-              <VolcanoPricingPopover pricing={pricingRow} docUrl={pricingDocUrl} />
+              <VolcanoPricingPopover
+                pricing={pricingRow}
+                docUrl={pricingDocUrl}
+              />
             ) : null}
           </div>
           <span className="text-muted-foreground block text-xs font-mono">

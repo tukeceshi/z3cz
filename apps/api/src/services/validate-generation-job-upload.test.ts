@@ -54,16 +54,14 @@ describe("validateGenerationJobUploadMedia", () => {
 
     expect(result).toHaveLength(1);
     expect(
-      result[0] &&
-        "storageBackend" in result[0] &&
-        result[0].storageBackend
+      result[0] && "storageBackend" in result[0] && result[0].storageBackend
     ).toBe("volcengine_tos");
   });
 
   it("rejects count mismatches", () => {
-    expect(() =>
-      validateGenerationJobUploadMedia(buildJob(), [])
-    ).toThrow(GenerationJobUploadValidationError);
+    expect(() => validateGenerationJobUploadMedia(buildJob(), [])).toThrow(
+      GenerationJobUploadValidationError
+    );
   });
 
   it("rejects ephemeral references", () => {

@@ -131,9 +131,7 @@ export function collectVolcanoInterfaces(
   interfaces: Awaited<ReturnType<typeof listOrganizationAiInterfaces>>
 ): VolcanoInterfaceCandidate[] {
   return interfaces
-    .filter(
-      (row) => row.enabled && isVolcanoAiInterfaceProvider(row.provider)
-    )
+    .filter((row) => row.enabled && isVolcanoAiInterfaceProvider(row.provider))
     .flatMap((row) => {
       const metadata = parseInterfaceMetadata(row.metadata);
       if (!isVolcanoMetadata(metadata)) return [];
@@ -209,9 +207,7 @@ export async function listOrgTextModelOptions(
       baseUrl: baseUrlByInterfaceId.get(binding.interfaceId) ?? null,
     }),
     parameterRules: getTextParameterRules(
-      platformModels.find(
-        (model) => model.canonicalId === binding.canonicalId
-      )!
+      platformModels.find((model) => model.canonicalId === binding.canonicalId)!
     ),
   }));
 }

@@ -82,9 +82,7 @@ export function AdminApiForwardingDetailPage() {
       return;
     }
 
-    if (
-      !isTransformMappingConfigComplete(upstreamParams, paramMappings)
-    ) {
+    if (!isTransformMappingConfigComplete(upstreamParams, paramMappings)) {
       toast.error(t("adminApiForwarding.createWizard.mappingValidation"));
       return;
     }
@@ -106,7 +104,9 @@ export function AdminApiForwardingDetailPage() {
       await refreshTemplate();
     } catch (error) {
       toast.error(
-        error instanceof Error ? error.message : t("adminApiForwarding.saveError")
+        error instanceof Error
+          ? error.message
+          : t("adminApiForwarding.saveError")
       );
     } finally {
       setIsSaving(false);

@@ -17,7 +17,10 @@ export function isTosStorageEnabled(
     return true;
   }
 
-  const metadata = iface.metadata as VolcanoInterfaceMetadata | null | undefined;
+  const metadata = iface.metadata as
+    | VolcanoInterfaceMetadata
+    | null
+    | undefined;
   const config = metadata?.tosStorage;
   if (config?.enabled !== true) {
     return false;
@@ -34,7 +37,10 @@ export function resolveMediaKitSnapshot(
     return snapshot.mediaKit;
   }
 
-  const metadata = iface.metadata as VolcanoInterfaceMetadata | null | undefined;
+  const metadata = iface.metadata as
+    | VolcanoInterfaceMetadata
+    | null
+    | undefined;
   if (metadata?.credentialMode === "volcengine_iam") {
     return buildVolcanoMediaKitSnapshot({ metadata });
   }
@@ -53,13 +59,17 @@ export function resolveMediaKitEnhanceSnapshot(
 export function countNotOpenModelsFromMetadata(
   iface: OrganizationAiInterface
 ): number {
-  const metadata = iface.metadata as VolcanoInterfaceMetadata | null | undefined;
+  const metadata = iface.metadata as
+    | VolcanoInterfaceMetadata
+    | null
+    | undefined;
   const cache = metadata?.modelActivationCache;
   if (!cache) {
     return 0;
   }
 
   return Object.values(cache).filter(
-    (entry) => entry.status === "not_open" || entry.status === "service_not_open"
+    (entry) =>
+      entry.status === "not_open" || entry.status === "service_not_open"
   ).length;
 }

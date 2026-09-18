@@ -1,9 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import {
-  formatVideoFrameSuffix,
-  formatVideoTime,
-} from "./capture-video-frame";
+import { formatVideoFrameSuffix, formatVideoTime } from "./capture-video-frame";
 import { resolveVideoFrameAiImageNodeName } from "./create-ai-image-node-from-video-frame";
 
 describe("formatVideoTime", () => {

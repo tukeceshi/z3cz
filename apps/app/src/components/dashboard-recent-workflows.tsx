@@ -43,7 +43,9 @@ export function DashboardRecentWorkflows({
       {workflows.length === 0 && !perms.canEditWorkflows ? (
         <div className="py-12 text-center text-muted-foreground">
           <Wand className="mx-auto mb-4 h-12 w-12 opacity-50" />
-          <p className="text-sm">{t("pages.dashboard.recentWorkflows.empty")}</p>
+          <p className="text-sm">
+            {t("pages.dashboard.recentWorkflows.empty")}
+          </p>
         </div>
       ) : (
         <div className="grid grid-cols-2 gap-2 md:grid-cols-3 md:gap-4 lg:grid-cols-4">

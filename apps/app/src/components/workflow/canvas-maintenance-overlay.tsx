@@ -20,8 +20,7 @@ export function CanvasMaintenanceOverlay({
 }: CanvasMaintenanceOverlayProps) {
   const { t } = useTranslation();
   const [isSpinning, setIsSpinning] = useState(false);
-  const description =
-    message?.trim() || t("maintenance.canvasDefaultMessage");
+  const description = message?.trim() || t("maintenance.canvasDefaultMessage");
 
   const handleRefreshClick = useCallback(() => {
     if (isSpinning) {

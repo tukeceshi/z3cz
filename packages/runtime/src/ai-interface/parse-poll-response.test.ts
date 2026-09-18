@@ -10,7 +10,10 @@ import {
 describe("getValueByDotPath", () => {
   it("reads nested paths", () => {
     expect(
-      getValueByDotPath({ content: { video_url: "https://example.com/a.mp4" } }, "content.video_url")
+      getValueByDotPath(
+        { content: { video_url: "https://example.com/a.mp4" } },
+        "content.video_url"
+      )
     ).toBe("https://example.com/a.mp4");
   });
 });

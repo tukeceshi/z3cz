@@ -9,19 +9,25 @@ import type {
 } from "@dafthunk/types";
 import useSWR from "swr";
 
-import { createDefaultTransformPollMapping, DEFAULT_FORMAT_TRANSFORM_PROVIDER } from "@dafthunk/types";
+import {
+  createDefaultTransformPollMapping,
+  DEFAULT_FORMAT_TRANSFORM_PROVIDER,
+} from "@dafthunk/types";
 
 import { makeRequest } from "./utils";
 
 const ADMIN_ENDPOINT = "/admin/format-templates";
 
 export function useAdminFormatTransformTemplates() {
-  const { data, error, isLoading, mutate } = useSWR(ADMIN_ENDPOINT, async () => {
-    const response = await makeRequest<{ templates: FormatTransformTemplate[] }>(
-      ADMIN_ENDPOINT
-    );
-    return response.templates;
-  });
+  const { data, error, isLoading, mutate } = useSWR(
+    ADMIN_ENDPOINT,
+    async () => {
+      const response = await makeRequest<{
+        templates: FormatTransformTemplate[];
+      }>(ADMIN_ENDPOINT);
+      return response.templates;
+    }
+  );
 
   return {
     templates: data ?? [],
@@ -93,10 +99,11 @@ export interface FormatTransformCreateFormState {
   readonly pollMapping: TransformPollMapping;
 }
 
-export const emptyFormatTransformCreateForm = (): FormatTransformCreateFormState => ({
-  name: "",
-  provider: DEFAULT_FORMAT_TRANSFORM_PROVIDER,
-  upstreamParams: [],
-  paramMappings: [],
-  pollMapping: createDefaultTransformPollMapping(),
-});
+export const emptyFormatTransformCreateForm =
+  (): FormatTransformCreateFormState => ({
+    name: "",
+    provider: DEFAULT_FORMAT_TRANSFORM_PROVIDER,
+    upstreamParams: [],
+    paramMappings: [],
+    pollMapping: createDefaultTransformPollMapping(),
+  });

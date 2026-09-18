@@ -27,7 +27,8 @@ export async function callVolcengineMonitorApi<T>(params: {
   body?: Record<string, unknown>;
   region?: string;
 }): Promise<T> {
-  const region = params.region ?? params.credentials.region ?? VOLCANO_DEFAULT_REGION;
+  const region =
+    params.region ?? params.credentials.region ?? VOLCANO_DEFAULT_REGION;
   const signed = await signVolcengineRequest({
     accessKeyId: params.credentials.accessKeyId.trim(),
     secretAccessKey: params.credentials.secretAccessKey.trim(),

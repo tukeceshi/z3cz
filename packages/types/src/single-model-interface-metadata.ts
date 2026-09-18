@@ -107,11 +107,9 @@ export const KIMI_CANONICAL_IDS = MOONSHOT_BRAND_ONLY_CANONICAL_IDS;
 
 export type KimiCanonicalId = (typeof KIMI_CANONICAL_IDS)[number];
 
-export const KIMI_DEFAULT_ENDPOINT_URL =
-  "https://api.moonshot.cn/v1" as const;
+export const KIMI_DEFAULT_ENDPOINT_URL = "https://api.moonshot.cn/v1" as const;
 
-export const KIMI_OVERSEAS_ENDPOINT_URL =
-  "https://api.moonshot.ai/v1" as const;
+export const KIMI_OVERSEAS_ENDPOINT_URL = "https://api.moonshot.ai/v1" as const;
 
 export const KIMI_ENDPOINT_REGION_HINTS = [
   { region: "domestic" as const, url: KIMI_DEFAULT_ENDPOINT_URL },
@@ -124,8 +122,7 @@ export const OPENAI_CANONICAL_IDS = OPENAI_BRAND_ONLY_CANONICAL_IDS;
 
 export type OpenAiCanonicalId = (typeof OPENAI_CANONICAL_IDS)[number];
 
-export const OPENAI_DEFAULT_ENDPOINT_URL =
-  "https://api.openai.com/v1" as const;
+export const OPENAI_DEFAULT_ENDPOINT_URL = "https://api.openai.com/v1" as const;
 
 /** OpenAI 官方 API 模型 id。 */
 export const OPENAI_DEFAULT_UPSTREAM_MODEL_IDS: Readonly<
@@ -140,7 +137,8 @@ export const OPENAI_IMAGE_PROVIDER_CARD_ID = "provider:openai-image" as const;
 
 export const OPENAI_IMAGE_CANONICAL_IDS = OPENAI_IMAGE_BRAND_ONLY_CANONICAL_IDS;
 
-export type OpenAiImageCanonicalId = (typeof OPENAI_IMAGE_CANONICAL_IDS)[number];
+export type OpenAiImageCanonicalId =
+  (typeof OPENAI_IMAGE_CANONICAL_IDS)[number];
 
 export const OPENAI_IMAGE_DEFAULT_ENDPOINT_URL = OPENAI_DEFAULT_ENDPOINT_URL;
 
@@ -229,7 +227,8 @@ export const GROK_IMAGINE_IMAGE_CANONICAL_IDS =
 export type GrokImagineImageCanonicalId =
   (typeof GROK_IMAGINE_IMAGE_CANONICAL_IDS)[number];
 
-export const GROK_IMAGINE_IMAGE_DEFAULT_ENDPOINT_URL = GROK_DEFAULT_ENDPOINT_URL;
+export const GROK_IMAGINE_IMAGE_DEFAULT_ENDPOINT_URL =
+  GROK_DEFAULT_ENDPOINT_URL;
 
 /** xAI Grok Imagine 官方生图 API 模型 id。 */
 export const GROK_IMAGINE_IMAGE_DEFAULT_UPSTREAM_MODEL_IDS: Readonly<
@@ -248,7 +247,8 @@ export const GROK_IMAGINE_VIDEO_CANONICAL_IDS =
 export type GrokImagineVideoCanonicalId =
   (typeof GROK_IMAGINE_VIDEO_CANONICAL_IDS)[number];
 
-export const GROK_IMAGINE_VIDEO_DEFAULT_ENDPOINT_URL = GROK_DEFAULT_ENDPOINT_URL;
+export const GROK_IMAGINE_VIDEO_DEFAULT_ENDPOINT_URL =
+  GROK_DEFAULT_ENDPOINT_URL;
 
 /** xAI Grok Imagine Video 官方视频 API 模型 id。 */
 export const GROK_IMAGINE_VIDEO_DEFAULT_UPSTREAM_MODEL_IDS: Readonly<
@@ -295,8 +295,7 @@ export const MINIMAX_SPEECH_DEFAULT_UPSTREAM_MODEL_IDS: Readonly<
   "minimax-speech-2-8-turbo": "speech-2.8-turbo",
 } as const;
 
-export const MINIMAX_VIDEO_PROVIDER_CARD_ID =
-  "provider:minimax-video" as const;
+export const MINIMAX_VIDEO_PROVIDER_CARD_ID = "provider:minimax-video" as const;
 
 export const MINIMAX_VIDEO_CANONICAL_IDS =
   MINIMAX_VIDEO_BRAND_ONLY_CANONICAL_IDS;
@@ -309,8 +308,7 @@ export const MINIMAX_VIDEO_DEFAULT_ENDPOINT_URL =
 
 export const MINIMAX_VIDEO_SUBMIT_PATH = "/v2/video_generation" as const;
 
-export const MINIMAX_VIDEO_POLL_PATH =
-  "/v2/query/video_generation" as const;
+export const MINIMAX_VIDEO_POLL_PATH = "/v2/query/video_generation" as const;
 
 /** MiniMax 官方视频 API 模型 id。 */
 export const MINIMAX_VIDEO_DEFAULT_UPSTREAM_MODEL_IDS: Readonly<
@@ -411,13 +409,17 @@ export function isGrokCanonicalId(value: string): value is GrokCanonicalId {
 export function isGrokImagineImageCanonicalId(
   value: string
 ): value is GrokImagineImageCanonicalId {
-  return (GROK_IMAGINE_IMAGE_CANONICAL_IDS as readonly string[]).includes(value);
+  return (GROK_IMAGINE_IMAGE_CANONICAL_IDS as readonly string[]).includes(
+    value
+  );
 }
 
 export function isGrokImagineVideoCanonicalId(
   value: string
 ): value is GrokImagineVideoCanonicalId {
-  return (GROK_IMAGINE_VIDEO_CANONICAL_IDS as readonly string[]).includes(value);
+  return (GROK_IMAGINE_VIDEO_CANONICAL_IDS as readonly string[]).includes(
+    value
+  );
 }
 
 export function isClaudeCanonicalId(value: string): value is ClaudeCanonicalId {
@@ -463,9 +465,7 @@ export function isLegacySingleModelMetadata(
   );
 }
 
-export function readSingleModelPresetId(
-  metadata: unknown
-): string | undefined {
+export function readSingleModelPresetId(metadata: unknown): string | undefined {
   if (!metadata || typeof metadata !== "object") {
     return undefined;
   }
@@ -703,9 +703,7 @@ export function listEnabledVideoModelInstanceIds(
   metadata: SingleModelProviderMetadata
 ): string[] {
   return listSingleModelMetadataEntries(metadata)
-    .filter(
-      ({ config }) => config.enabled && config.modality === "video"
-    )
+    .filter(({ config }) => config.enabled && config.modality === "video")
     .map(({ instanceId }) => instanceId);
 }
 
@@ -713,9 +711,7 @@ export function listEnabledVideoModelCanonicalIds(
   metadata: SingleModelProviderMetadata
 ): string[] {
   return listSingleModelMetadataEntries(metadata)
-    .filter(
-      ({ config }) => config.enabled && config.modality === "video"
-    )
+    .filter(({ config }) => config.enabled && config.modality === "video")
     .map(({ canonicalId }) => canonicalId);
 }
 
@@ -809,7 +805,10 @@ export function readSingleModelCapabilityLimits(
   if (!isSingleModelProviderMetadata(metadata)) {
     return null;
   }
-  const found = findEnabledSingleModelInstanceByCanonicalId(metadata, canonicalId);
+  const found = findEnabledSingleModelInstanceByCanonicalId(
+    metadata,
+    canonicalId
+  );
   const limits = found?.config.capabilityLimits;
   if (!limits) {
     return null;
@@ -829,7 +828,8 @@ export function mergeSingleModelCapabilityLimits(
 
   const models = { ...metadata.models };
   const hasLimits =
-    capabilityLimits != null && capabilityLimitsHasStoredValues(capabilityLimits);
+    capabilityLimits != null &&
+    capabilityLimitsHasStoredValues(capabilityLimits);
 
   if (!hasLimits) {
     const { capabilityLimits: _removed, ...rest } = existing;

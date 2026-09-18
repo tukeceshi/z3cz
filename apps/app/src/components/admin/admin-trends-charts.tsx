@@ -93,9 +93,7 @@ export function AdminTrendsCharts({
       <Card>
         <CardHeader>
           <CardTitle>{t("admin.trends.title")}</CardTitle>
-          <CardDescription>
-            {t("admin.trends.loadError")}
-          </CardDescription>
+          <CardDescription>{t("admin.trends.loadError")}</CardDescription>
         </CardHeader>
         <CardContent className="text-sm text-muted-foreground">
           {error.message}

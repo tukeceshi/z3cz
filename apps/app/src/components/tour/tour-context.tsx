@@ -75,7 +75,13 @@ export function TourProvider({ children }: TourProviderProps) {
       }, 500);
       return () => clearTimeout(timer);
     }
-  }, [profile, workflows, isWorkflowsLoading, hasAutoStarted, siteSettings.newUserTourEnabled]);
+  }, [
+    profile,
+    workflows,
+    isWorkflowsLoading,
+    hasAutoStarted,
+    siteSettings.newUserTourEnabled,
+  ]);
 
   const completeTour = useCallback(async () => {
     setIsActive(false);

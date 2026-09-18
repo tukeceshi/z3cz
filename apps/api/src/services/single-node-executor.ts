@@ -1,5 +1,8 @@
 import type { RuntimeParams } from "@dafthunk/runtime";
-import type { WorkflowExecution, WorkflowExecutionStatus } from "@dafthunk/types";
+import type {
+  WorkflowExecution,
+  WorkflowExecutionStatus,
+} from "@dafthunk/types";
 
 import type { Bindings } from "../context";
 import { CloudflareExecutionStore } from "../runtime/cloudflare-execution-store";
@@ -19,7 +22,9 @@ function sleep(ms: number): Promise<void> {
 }
 
 function toWorkflowExecution(
-  record: NonNullable<Awaited<ReturnType<CloudflareExecutionStore["getWithData"]>>>
+  record: NonNullable<
+    Awaited<ReturnType<CloudflareExecutionStore["getWithData"]>>
+  >
 ): WorkflowExecution {
   return {
     id: record.id,

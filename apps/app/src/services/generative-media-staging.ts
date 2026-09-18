@@ -8,7 +8,10 @@ import {
   cacheMediaFromBlob,
 } from "@/services/ai-media-cache-service";
 import { resolveStagingCardLayout } from "@/services/staging-card-layout";
-import { findStableBlobUrlForMediaId, createStableBlobUrl } from "@/services/media-display-blob-url-registry";
+import {
+  findStableBlobUrlForMediaId,
+  createStableBlobUrl,
+} from "@/services/media-display-blob-url-registry";
 import { registerWorkflowMediaFullUrl } from "@/services/workflow-media-address-catalog";
 
 const LEGACY_DB_NAME = "dafthunk-local-media-staging";
@@ -211,7 +214,8 @@ export async function blobToBase64(blob: Blob): Promise<string> {
       const commaIndex = result.indexOf(",");
       resolve(commaIndex >= 0 ? result.slice(commaIndex + 1) : result);
     };
-    reader.onerror = () => reject(reader.error ?? new Error("FileReader failed"));
+    reader.onerror = () =>
+      reject(reader.error ?? new Error("FileReader failed"));
     reader.readAsDataURL(blob);
   });
 }
@@ -240,7 +244,9 @@ function openLegacyDb(): Promise<IDBDatabase> {
   });
 }
 
-function readAllLegacyRecords(db: IDBDatabase): Promise<LegacyLocalMediaRecord[]> {
+function readAllLegacyRecords(
+  db: IDBDatabase
+): Promise<LegacyLocalMediaRecord[]> {
   return new Promise((resolve, reject) => {
     const tx = db.transaction(LEGACY_STORE_NAME, "readonly");
     const request = tx.objectStore(LEGACY_STORE_NAME).getAll();

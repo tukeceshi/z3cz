@@ -109,5 +109,4 @@ export function buildPlatformAiModelChannelSeed(): readonly PlatformAiModelChann
   return rows;
 }
 
-export const PLATFORM_AI_MODEL_CHANNEL_SEED =
-  buildPlatformAiModelChannelSeed();
+export const PLATFORM_AI_MODEL_CHANNEL_SEED = buildPlatformAiModelChannelSeed();

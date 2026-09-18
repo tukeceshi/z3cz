@@ -13,13 +13,8 @@ describe("readStudioMediaCardState", () => {
   });
 
   it("returns generating key when image is generating", () => {
-    const state = readStudioMediaCardState(
-      { aiImageGenerating: "1" },
-      false
-    );
-    expect(state.placeholderKey).toBe(
-      "workflow.aiImagePanel.cardGenerating"
-    );
+    const state = readStudioMediaCardState({ aiImageGenerating: "1" }, false);
+    expect(state.placeholderKey).toBe("workflow.aiImagePanel.cardGenerating");
     expect(state.isBusy).toBe(true);
   });
 
@@ -28,9 +23,7 @@ describe("readStudioMediaCardState", () => {
       { genProgressPhase: "cancelled" },
       false
     );
-    expect(state.placeholderKey).toBe(
-      "workflow.aiImagePanel.cardCancelled"
-    );
+    expect(state.placeholderKey).toBe("workflow.aiImagePanel.cardCancelled");
     expect(state.isBusy).toBe(true);
   });
 
@@ -39,9 +32,7 @@ describe("readStudioMediaCardState", () => {
       { genProgressPhase: "uploading" },
       true
     );
-    expect(state.placeholderKey).toBe(
-      "workflow.aiVideoPanel.cardUploading"
-    );
+    expect(state.placeholderKey).toBe("workflow.aiVideoPanel.cardUploading");
     expect(state.isBusy).toBe(true);
   });
 
@@ -49,9 +40,7 @@ describe("readStudioMediaCardState", () => {
     const state = readStudioMediaCardState(undefined, false, [
       { resourceId: "res-1", generating: true },
     ]);
-    expect(state.placeholderKey).toBe(
-      "workflow.aiImagePanel.cardGenerating"
-    );
+    expect(state.placeholderKey).toBe("workflow.aiImagePanel.cardGenerating");
     expect(state.isBusy).toBe(true);
   });
 
@@ -70,9 +59,7 @@ describe("readStudioMediaCardState", () => {
       false,
       [{ resourceId: "res-1", generating: true }]
     );
-    expect(state.placeholderKey).toBe(
-      "workflow.aiImagePanel.cardDownloading"
-    );
+    expect(state.placeholderKey).toBe("workflow.aiImagePanel.cardDownloading");
     expect(state.isBusy).toBe(true);
   });
 

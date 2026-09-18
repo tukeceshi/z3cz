@@ -13,10 +13,7 @@ import {
   UpdateWorkflowResponse,
   WorkflowWithMetadata,
 } from "@dafthunk/types";
-import {
-  Connection,
-  Edge as ReactFlowEdge,
-} from "@xyflow/react";
+import { Connection, Edge as ReactFlowEdge } from "@xyflow/react";
 import useSWR, { type SWRConfiguration } from "swr";
 
 import { useAuth } from "@/components/auth-context";
@@ -36,7 +33,9 @@ export type ConnectionValidationResult =
 /**
  * Hook to list workflows for the current organization (optionally scoped to a folder).
  */
-export const useWorkflows = (folderId?: string | null): {
+export const useWorkflows = (
+  folderId?: string | null
+): {
   workflows: WorkflowWithMetadata[];
   workflowsError: Error | null;
   isWorkflowsLoading: boolean;
@@ -50,9 +49,7 @@ export const useWorkflows = (folderId?: string | null): {
       ? ""
       : `?folderId=${folderId === null ? "root" : encodeURIComponent(folderId)}`;
 
-  const swrKey = orgId
-    ? `/${orgId}${API_ENDPOINT_BASE}${folderQuery}`
-    : null;
+  const swrKey = orgId ? `/${orgId}${API_ENDPOINT_BASE}${folderQuery}` : null;
 
   const { data, error, isLoading, mutate } = useSWR(
     swrKey,

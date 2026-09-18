@@ -24,10 +24,7 @@ function notifyAiTextDisplayChanged(): void {
   window.dispatchEvent(new CustomEvent(AI_TEXT_DISPLAY_EVENT));
 }
 
-function writeDisplay(
-  key: string,
-  next: AiTextDisplay
-): void {
+function writeDisplay(key: string, next: AiTextDisplay): void {
   const existing = hungDisplays.get(key);
   if (
     existing &&
@@ -54,8 +51,7 @@ export function hangAiTextDisplay(params: {
     : "";
   const excerpt = (params.excerpt ?? excerptFromBody).trim();
   const state =
-    params.state ??
-    (excerpt || params.body?.trim() ? "ready" : "empty");
+    params.state ?? (excerpt || params.body?.trim() ? "ready" : "empty");
 
   writeDisplay(
     displayKey(params.organizationId, params.workflowId, params.mediaId),
@@ -112,7 +108,9 @@ export function getAiTextDisplay(params: {
   );
 }
 
-export function findAiTextDisplayForMediaId(mediaId: string): AiTextDisplay | null {
+export function findAiTextDisplayForMediaId(
+  mediaId: string
+): AiTextDisplay | null {
   for (const [key, display] of hungDisplays.entries()) {
     if (key.endsWith(`:${mediaId}`)) {
       return display;

@@ -36,9 +36,7 @@ export function CreativeStudioTextRow({
     outputs: node.data.outputs,
     nodeData: node.data,
   });
-  const previewText = resolvedText.displayExcerpt
-    .replace(/\s+/g, " ")
-    .trim();
+  const previewText = resolvedText.displayExcerpt.replace(/\s+/g, " ").trim();
   const modelLabel = readStudioModelLabel(node.data);
   const metaTags = modelLabel ? [modelLabel] : [];
   const isRenaming = isListNodeRenaming(node.id);
@@ -77,7 +75,10 @@ export function CreativeStudioTextRow({
             </p>
           ) : resolvedText.loading ? (
             <div className="flex h-full items-center justify-center text-muted-foreground/50">
-              <LoaderIcon className="h-5 w-5 animate-spin opacity-40" aria-hidden />
+              <LoaderIcon
+                className="h-5 w-5 animate-spin opacity-40"
+                aria-hidden
+              />
             </div>
           ) : (
             <div className="flex h-full items-center justify-center text-muted-foreground/50">

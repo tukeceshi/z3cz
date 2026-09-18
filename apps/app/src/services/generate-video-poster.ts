@@ -3,9 +3,7 @@ import { CANVAS_TIER_SHORT_EDGE } from "@/services/canvas-media-tier";
 const DEFAULT_POSTER_SHORT_EDGE = CANVAS_TIER_SHORT_EDGE.s;
 const POSTER_JPEG_QUALITY = 0.75;
 
-function loadVideoMetadata(
-  blob: Blob
-): Promise<{
+function loadVideoMetadata(blob: Blob): Promise<{
   readonly video: HTMLVideoElement;
   readonly width: number;
   readonly height: number;
@@ -74,8 +72,12 @@ export async function generateVideoPoster(
     return null;
   }
 
-  const { video, width: naturalWidth, height: naturalHeight, objectUrl } =
-    loaded;
+  const {
+    video,
+    width: naturalWidth,
+    height: naturalHeight,
+    objectUrl,
+  } = loaded;
 
   const { width: drawWidth, height: drawHeight } = scaleToShortEdge(
     naturalWidth,

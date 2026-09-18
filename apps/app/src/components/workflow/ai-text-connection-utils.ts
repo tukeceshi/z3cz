@@ -1,4 +1,8 @@
-import { AI_TEXT_NODE_TYPE, AI_IMAGE_NODE_TYPE, AI_VIDEO_NODE_TYPE } from "@dafthunk/types";
+import {
+  AI_TEXT_NODE_TYPE,
+  AI_IMAGE_NODE_TYPE,
+  AI_VIDEO_NODE_TYPE,
+} from "@dafthunk/types";
 import {
   type Edge as ReactFlowEdge,
   type InternalNode,
@@ -29,9 +33,7 @@ import {
   isIncomingAiTextReferenceConnection,
 } from "./ai-text-reference-policy";
 import { nodeIdUnderPanePointer } from "./connection-pane-hit-test";
-import {
-  snapGenerativeContentBorderPoint,
-} from "./generative-node-content-geometry";
+import { snapGenerativeContentBorderPoint } from "./generative-node-content-geometry";
 import {
   snapAiVideoOutputBorderPoint,
   snapAiVideoReferenceBorderPoint,
@@ -76,7 +78,10 @@ export type { AiTextConnectionContext };
 interface FlowConnection {
   readonly inProgress: boolean;
   readonly fromNode: InternalNode<Node> | null;
-  readonly fromHandle: { readonly type: string; readonly id?: string | null } | null;
+  readonly fromHandle: {
+    readonly type: string;
+    readonly id?: string | null;
+  } | null;
   readonly to: { readonly x: number; readonly y: number } | null;
   readonly toNode?: InternalNode<Node> | null;
   readonly pointer?: { readonly x: number; readonly y: number } | null;
@@ -118,12 +123,7 @@ function workflowParameterTypesConnect(
   outputType: string,
   inputType: string
 ): boolean {
-  const blobTypes = new Set([
-    "image",
-    "audio",
-    "video",
-    "document",
-  ]);
+  const blobTypes = new Set(["image", "audio", "video", "document"]);
   const exactMatch = outputType === inputType;
   const anyTypeMatch = outputType === "any" || inputType === "any";
   const blobCompatible =
@@ -230,15 +230,12 @@ export function findAiTextConnectionTargetNodeId(
   const pointer = connectionPointer(connection);
   if (!pointer) return null;
 
-  const resolveTarget = (targetId: string | null | undefined): string | null => {
+  const resolveTarget = (
+    targetId: string | null | undefined
+  ): string | null => {
     if (!targetId || targetId === connection.fromNode?.id) return null;
     if (
-      !isAiTextValidHighlightTarget(
-        connection,
-        targetId,
-        nodeLookup,
-        edges
-      )
+      !isAiTextValidHighlightTarget(connection, targetId, nodeLookup, edges)
     ) {
       return null;
     }
@@ -317,14 +314,8 @@ export function resolveWorkflowEdgeHandles(params: {
   readonly dataTargetHandle?: string | null;
 }): { sourceHandle?: string; targetHandle?: string } {
   return {
-    sourceHandle:
-      params.sourceHandle ??
-      params.dataSourceHandle ??
-      undefined,
-    targetHandle:
-      params.targetHandle ??
-      params.dataTargetHandle ??
-      undefined,
+    sourceHandle: params.sourceHandle ?? params.dataSourceHandle ?? undefined,
+    targetHandle: params.targetHandle ?? params.dataTargetHandle ?? undefined,
   };
 }
 
@@ -483,14 +474,16 @@ export function isAiTextInboundReferenceEdge(params: {
   return isAiTextAllowedReferenceNodeType(sourceType);
 }
 
-export function snapAiTextKeywordsBorderPoint(
-  node: InternalNode<Node>
-): { x: number; y: number } {
+export function snapAiTextKeywordsBorderPoint(node: InternalNode<Node>): {
+  x: number;
+  y: number;
+} {
   return snapGenerativeContentBorderPoint(node, "left");
 }
 
-export function snapAiTextOutputBorderPoint(
-  node: InternalNode<Node>
-): { x: number; y: number } {
+export function snapAiTextOutputBorderPoint(node: InternalNode<Node>): {
+  x: number;
+  y: number;
+} {
   return snapGenerativeContentBorderPoint(node, "right");
 }

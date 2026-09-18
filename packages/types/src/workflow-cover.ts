@@ -126,7 +126,9 @@ function isWideLayoutNode(node: Node): boolean {
   return isWideLayoutSize(layout);
 }
 
-function firstCoverCandidateFromNode(node: Node): WorkflowCoverCandidate | null {
+function firstCoverCandidateFromNode(
+  node: Node
+): WorkflowCoverCandidate | null {
   if (node.type === AI_IMAGE_NODE_TYPE) {
     const fromImageNode = collectImageNodeCandidates(node.inputs);
     return fromImageNode[0] ?? null;

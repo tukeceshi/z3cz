@@ -84,8 +84,14 @@ export function getSubAccountInvitationEmail(
   text: string;
   html: string;
 } {
-  const { organizationName, inviterName, invitationId, expiresAt, appUrl, websiteUrl } =
-    params;
+  const {
+    organizationName,
+    inviterName,
+    invitationId,
+    expiresAt,
+    appUrl,
+    websiteUrl,
+  } = params;
   const registerUrl = `${appUrl}/login?subAccountInvitation=${invitationId}`;
   const expiresFormatted = expiresAt.toLocaleDateString("en-US", {
     month: "long",

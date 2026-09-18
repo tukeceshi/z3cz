@@ -1,8 +1,4 @@
-import {
-  type ComponentType,
-  Suspense,
-  lazy,
-} from "react";
+import { type ComponentType, Suspense, lazy } from "react";
 
 import {
   RoutePageFallback,

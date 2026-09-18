@@ -13,7 +13,11 @@ export function buildAiTextExcerpt(text: string): string {
 }
 
 export function inferAiTextMimeType(text: string): string {
-  if (/^#{1,6}\s/m.test(text) || /\*\*[^*]+\*\*/.test(text) || /^\s*[-*]\s/m.test(text)) {
+  if (
+    /^#{1,6}\s/m.test(text) ||
+    /\*\*[^*]+\*\*/.test(text) ||
+    /^\s*[-*]\s/m.test(text)
+  ) {
     return AI_TEXT_MARKDOWN_MIME;
   }
   return AI_TEXT_PLAIN_MIME;

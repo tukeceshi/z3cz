@@ -103,7 +103,10 @@ class VolcanoVideoUpstreamPollProvider implements UpstreamPollProvider {
           failureReason: pollResult.error ?? "Video poll failed",
         });
       }
-      return { status: "failed", error: pollResult.error ?? "Video poll failed" };
+      return {
+        status: "failed",
+        error: pollResult.error ?? "Video poll failed",
+      };
     }
 
     if (pollResult.status === "pending") {
@@ -232,7 +235,10 @@ class VeoVideoUpstreamPollProvider implements UpstreamPollProvider {
           failureReason: pollResult.error ?? "Video poll failed",
         });
       }
-      return { status: "failed", error: pollResult.error ?? "Video poll failed" };
+      return {
+        status: "failed",
+        error: pollResult.error ?? "Video poll failed",
+      };
     }
 
     if (pollResult.status === "pending") {
@@ -362,7 +368,10 @@ class GrokVideoUpstreamPollProvider implements UpstreamPollProvider {
           failureReason: pollResult.error ?? "Video poll failed",
         });
       }
-      return { status: "failed", error: pollResult.error ?? "Video poll failed" };
+      return {
+        status: "failed",
+        error: pollResult.error ?? "Video poll failed",
+      };
     }
 
     if (pollResult.status === "pending") {
@@ -492,7 +501,10 @@ class MinimaxVideoUpstreamPollProvider implements UpstreamPollProvider {
           failureReason: pollResult.error ?? "Video poll failed",
         });
       }
-      return { status: "failed", error: pollResult.error ?? "Video poll failed" };
+      return {
+        status: "failed",
+        error: pollResult.error ?? "Video poll failed",
+      };
     }
 
     if (pollResult.status === "pending") {

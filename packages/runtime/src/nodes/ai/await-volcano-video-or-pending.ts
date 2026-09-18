@@ -1,4 +1,9 @@
-import type { NodeExecution, ParameterValue, TransformPollMapping, UpstreamPollContinuation } from "@dafthunk/types";
+import type {
+  NodeExecution,
+  ParameterValue,
+  TransformPollMapping,
+  UpstreamPollContinuation,
+} from "@dafthunk/types";
 
 import type { NodeContext } from "../../node-types";
 import {
@@ -29,7 +34,10 @@ function clampContinuationTimeout(
   continuation: UpstreamPollContinuation
 ): UpstreamPollContinuation {
   const deadline = Date.parse(continuation.timeoutAt);
-  const cappedDeadline = Math.min(deadline, Date.now() + MAX_WORKER_BLOCKING_MS);
+  const cappedDeadline = Math.min(
+    deadline,
+    Date.now() + MAX_WORKER_BLOCKING_MS
+  );
   if (cappedDeadline === deadline) {
     return continuation;
   }
@@ -122,20 +130,20 @@ export async function awaitVolcanoVideoOrPending(params: {
             pollIntervalMs: continuation.pollIntervalMs,
             timeoutAt: clampContinuationTimeout(continuation).timeoutAt,
           })
-      : continuation.provider === VEO_VIDEO_PROVIDER
-        ? await awaitVeoVideoPoll({
-            apiKey,
-            pollUrl: continuation.pollUrl,
-            pollIntervalMs: continuation.pollIntervalMs,
-            timeoutAt: clampContinuationTimeout(continuation).timeoutAt,
-          })
-        : await awaitVolcanoVideoPoll({
-            apiKey,
-            pollUrl: continuation.pollUrl,
-            pollIntervalMs: continuation.pollIntervalMs,
-            timeoutAt: clampContinuationTimeout(continuation).timeoutAt,
-            pollMapping: params.pollMapping,
-          });
+        : continuation.provider === VEO_VIDEO_PROVIDER
+          ? await awaitVeoVideoPoll({
+              apiKey,
+              pollUrl: continuation.pollUrl,
+              pollIntervalMs: continuation.pollIntervalMs,
+              timeoutAt: clampContinuationTimeout(continuation).timeoutAt,
+            })
+          : await awaitVolcanoVideoPoll({
+              apiKey,
+              pollUrl: continuation.pollUrl,
+              pollIntervalMs: continuation.pollIntervalMs,
+              timeoutAt: clampContinuationTimeout(continuation).timeoutAt,
+              pollMapping: params.pollMapping,
+            });
 
   if (pollResult.status === "failed") {
     await completeJob("failed", pollResult.error ?? "Video generation failed");
@@ -168,26 +176,26 @@ export async function awaitVolcanoVideoOrPending(params: {
             executionId: context.executionId,
             cloudUpload,
           })
-      : continuation.provider === VEO_VIDEO_PROVIDER
-        ? await downloadVeoVideo({
-            apiKey,
-            videoUrl: pollResult.videoUrl,
-            storageMode,
-            objectStore: context.objectStore,
-            organizationId: context.organizationId,
-            workflowId: context.workflowId,
-            executionId: context.executionId,
-            cloudUpload,
-          })
-        : await downloadVolcanoVideo({
-            videoUrl: pollResult.videoUrl,
-            storageMode,
-            objectStore: context.objectStore,
-            organizationId: context.organizationId,
-            workflowId: context.workflowId,
-            executionId: context.executionId,
-            cloudUpload,
-          });
+        : continuation.provider === VEO_VIDEO_PROVIDER
+          ? await downloadVeoVideo({
+              apiKey,
+              videoUrl: pollResult.videoUrl,
+              storageMode,
+              objectStore: context.objectStore,
+              organizationId: context.organizationId,
+              workflowId: context.workflowId,
+              executionId: context.executionId,
+              cloudUpload,
+            })
+          : await downloadVolcanoVideo({
+              videoUrl: pollResult.videoUrl,
+              storageMode,
+              objectStore: context.objectStore,
+              organizationId: context.organizationId,
+              workflowId: context.workflowId,
+              executionId: context.executionId,
+              cloudUpload,
+            });
 
   if (downloadResult.status === "failed") {
     await completeJob(
@@ -200,10 +208,7 @@ export async function awaitVolcanoVideoOrPending(params: {
   await completeJob("succeeded");
 
   const outputName = nodeOutputs[0]?.name ?? "videos";
-  return createSuccessResult(
-    { [outputName]: downloadResult.videos ?? [] },
-    1
-  );
+  return createSuccessResult({ [outputName]: downloadResult.videos ?? [] }, 1);
 }
 
 export { createVolcanoVideoPollContinuation };

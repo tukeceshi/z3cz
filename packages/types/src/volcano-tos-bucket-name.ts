@@ -19,7 +19,9 @@ function randomBucketToken(length: number): string {
 
 function normalizeTosBucketName(candidate: string): string {
   const lowered = candidate.toLowerCase().replace(/[^a-z0-9-]/g, "-");
-  const trimmed = lowered.replace(/^-+|-+$/g, "").slice(0, TOS_BUCKET_MAX_LENGTH);
+  const trimmed = lowered
+    .replace(/^-+|-+$/g, "")
+    .slice(0, TOS_BUCKET_MAX_LENGTH);
   if (trimmed.length < TOS_BUCKET_MIN_LENGTH) {
     return `${VOLCANO_TOS_NEW_BUCKET_PREFIX}-${randomBucketToken(8)}`;
   }
@@ -41,7 +43,9 @@ export function resolveNewVolcanoTosBucketName(
   existingBuckets: readonly string[],
   organizationId: string
 ): string {
-  const occupied = new Set(existingBuckets.map((bucket) => bucket.toLowerCase()));
+  const occupied = new Set(
+    existingBuckets.map((bucket) => bucket.toLowerCase())
+  );
 
   for (let attempt = 0; attempt < 16; attempt += 1) {
     const candidate = buildVolcanoTosBucketNameCandidate(

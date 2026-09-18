@@ -9,7 +9,9 @@ health.get("/", async (c) => {
   const phase = readBootPhase() ?? "listening";
   let storageProvider: string = "unknown";
   try {
-    const { createStorageBuckets } = await import("../storage/storage-provider");
+    const { createStorageBuckets } = await import(
+      "../storage/storage-provider"
+    );
     const storage = await createStorageBuckets(
       c.env as unknown as Record<string, string>
     );

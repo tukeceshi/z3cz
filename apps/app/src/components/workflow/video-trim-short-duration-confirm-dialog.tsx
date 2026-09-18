@@ -47,8 +47,12 @@ export function VideoTrimShortDurationConfirmDialog({
           </AlertDialogTitle>
           <AlertDialogDescription asChild>
             <div className="space-y-1 text-sm text-muted-foreground">
-              <p>{t("workflow.videoTrim.shortDurationConfirm.seedanceReference")}</p>
-              <p>{t("workflow.videoTrim.shortDurationConfirm.seedance25Edit")}</p>
+              <p>
+                {t("workflow.videoTrim.shortDurationConfirm.seedanceReference")}
+              </p>
+              <p>
+                {t("workflow.videoTrim.shortDurationConfirm.seedance25Edit")}
+              </p>
             </div>
           </AlertDialogDescription>
         </AlertDialogHeader>

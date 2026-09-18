@@ -47,9 +47,7 @@ function DashboardPageContent() {
     return (
       <InsetError
         title={t("pages.dashboard.title")}
-        errorMessage={
-          dashboardStatsError.message || t("common.errorOccurred")
-        }
+        errorMessage={dashboardStatsError.message || t("common.errorOccurred")}
       />
     );
   }

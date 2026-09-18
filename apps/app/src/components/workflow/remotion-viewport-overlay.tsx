@@ -3,13 +3,7 @@ import ChevronDown from "lucide-react/icons/chevron-down";
 import ChevronUp from "lucide-react/icons/chevron-up";
 import Clapperboard from "lucide-react/icons/clapperboard";
 import X from "lucide-react/icons/x";
-import {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { useTranslation } from "@/components/locale-provider";
 import { CodeEditor } from "@/components/ui/code-editor";

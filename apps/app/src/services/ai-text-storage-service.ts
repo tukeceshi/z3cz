@@ -5,10 +5,7 @@ import {
   type ResourceIdReference,
   type WorkflowMediaValue,
 } from "@dafthunk/types";
-import {
-  getResourceIdFromValue,
-  isResourceIdReference,
-} from "@dafthunk/types";
+import { getResourceIdFromValue, isResourceIdReference } from "@dafthunk/types";
 
 import { notifyAiMediaCacheChanged } from "@/hooks/use-ai-media-cache";
 import {
@@ -33,7 +30,8 @@ export async function stageAiTextContent(params: {
 }): Promise<ResourceIdReference> {
   const mimeType = inferAiTextMimeType(params.text);
   const blob = new Blob([params.text], { type: mimeType });
-  const resourceId = params.mediaId?.trim() || allocateGenerativeMediaResourceId();
+  const resourceId =
+    params.mediaId?.trim() || allocateGenerativeMediaResourceId();
   await writeGenerativeStaging({
     organizationId: params.organizationId,
     workflowId: params.workflowId,

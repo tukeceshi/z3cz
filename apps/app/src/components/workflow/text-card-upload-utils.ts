@@ -10,7 +10,11 @@ function fileExtension(name: string): string {
   return dot >= 0 ? name.slice(dot).toLowerCase() : "";
 }
 
-export type TextCardUploadFileKind = "text" | "docx" | "legacy-doc" | "unsupported";
+export type TextCardUploadFileKind =
+  | "text"
+  | "docx"
+  | "legacy-doc"
+  | "unsupported";
 
 export function classifyTextCardUploadFile(file: File): TextCardUploadFileKind {
   const ext = fileExtension(file.name);

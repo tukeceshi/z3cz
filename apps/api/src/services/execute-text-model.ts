@@ -43,7 +43,8 @@ async function executeTextModelCandidate(params: {
   readonly tools?: unknown;
   readonly upstreamLog?: UpstreamRequestLogSink;
 }): Promise<
-  { readonly ok: true; readonly text: string } | { readonly ok: false; readonly error: string }
+  | { readonly ok: true; readonly text: string }
+  | { readonly ok: false; readonly error: string }
 > {
   const service = new CloudflareAiInterfaceService(params.env);
   const iface = await service.resolveOrgInterface({
@@ -87,7 +88,8 @@ async function executeTextModelCandidate(params: {
           ...(params.referenceImageUrls && params.referenceImageUrls.length > 0
             ? { referenceImageUrls: params.referenceImageUrls }
             : {}),
-          ...(params.referenceImageInline && params.referenceImageInline.length > 0
+          ...(params.referenceImageInline &&
+          params.referenceImageInline.length > 0
             ? { referenceImageInline: params.referenceImageInline }
             : {}),
           ...(params.referenceVideoUrls && params.referenceVideoUrls.length > 0

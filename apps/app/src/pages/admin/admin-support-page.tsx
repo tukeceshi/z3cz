@@ -55,7 +55,13 @@ import {
 import { formatDate } from "@/utils/date";
 import { cn } from "@/utils/utils";
 
-const VIEW_FILTER_KEYS: { value: AdminThreadView; labelKey: "admin.support.inbox" | "admin.support.archived" | "admin.support.all" }[] = [
+const VIEW_FILTER_KEYS: {
+  value: AdminThreadView;
+  labelKey:
+    | "admin.support.inbox"
+    | "admin.support.archived"
+    | "admin.support.all";
+}[] = [
   { value: "inbox", labelKey: "admin.support.inbox" },
   { value: "archived", labelKey: "admin.support.archived" },
   { value: "all", labelKey: "admin.support.all" },
@@ -198,7 +204,8 @@ export function AdminSupportPage() {
           >
             {scopedUser?.name ||
               scopedUser?.email ||
-              threads.find((thread) => thread.userId === userIdFilter)?.userName ||
+              threads.find((thread) => thread.userId === userIdFilter)
+                ?.userName ||
               t("common.loading")}
           </Link>
           {scopedUser?.email && (
@@ -373,7 +380,9 @@ function ThreadList({
                 >
                   <div className="flex items-start gap-3">
                     <SenderAvatar
-                      name={thread.fromName || thread.userName || thread.fromEmail}
+                      name={
+                        thread.fromName || thread.userName || thread.fromEmail
+                      }
                       avatarUrl={thread.userAvatarUrl}
                       linked={Boolean(thread.userId)}
                       className="h-9 w-9 shrink-0"
@@ -393,7 +402,9 @@ function ThreadList({
                               thread.unread ? "font-semibold" : "font-medium"
                             )}
                           >
-                            {thread.fromName || thread.userName || thread.fromEmail}
+                            {thread.fromName ||
+                              thread.userName ||
+                              thread.fromEmail}
                           </div>
                         </div>
                         <span className="text-xs text-muted-foreground shrink-0">
@@ -540,7 +551,10 @@ function ThreadDetail({
       <div className="px-4 py-2 border-b flex items-center justify-between gap-3">
         <div className="flex items-center gap-3 min-w-0">
           {thread.userId ? (
-            <Link to={`/admin/users/${thread.userId}`} aria-label={t("admin.support.viewUser")}>
+            <Link
+              to={`/admin/users/${thread.userId}`}
+              aria-label={t("admin.support.viewUser")}
+            >
               <SenderAvatar
                 name={thread.fromName || thread.userName || thread.fromEmail}
                 avatarUrl={thread.userAvatarUrl}
@@ -758,7 +772,9 @@ function ComposeThreadDialog({
             />
           </div>
           <div className="space-y-1.5">
-            <Label htmlFor="compose-subject">{t("admin.support.subject")}</Label>
+            <Label htmlFor="compose-subject">
+              {t("admin.support.subject")}
+            </Label>
             <Input
               id="compose-subject"
               value={subject}

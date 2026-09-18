@@ -16,7 +16,10 @@ export interface SingleModelInstanceDraft {
 }
 
 export function createSingleModelInstanceId(): string {
-  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+  if (
+    typeof crypto !== "undefined" &&
+    typeof crypto.randomUUID === "function"
+  ) {
     return crypto.randomUUID();
   }
   return `sm-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
@@ -48,7 +51,10 @@ export function findSingleModelInstanceByCanonicalId(
   metadata: SingleModelProviderMetadata,
   canonicalId: string,
   params?: { readonly enabledOnly?: boolean }
-): { readonly instanceId: string; readonly config: OrgModelInstanceConfig } | null {
+): {
+  readonly instanceId: string;
+  readonly config: OrgModelInstanceConfig;
+} | null {
   const target = canonicalId.trim();
   if (!target) {
     return null;
@@ -70,7 +76,10 @@ export function findSingleModelInstanceByCanonicalId(
 export function findEnabledSingleModelInstanceByCanonicalId(
   metadata: SingleModelProviderMetadata,
   canonicalId: string
-): { readonly instanceId: string; readonly config: OrgModelInstanceConfig } | null {
+): {
+  readonly instanceId: string;
+  readonly config: OrgModelInstanceConfig;
+} | null {
   return findSingleModelInstanceByCanonicalId(metadata, canonicalId, {
     enabledOnly: true,
   });
@@ -84,8 +93,7 @@ export function singleModelInstancesFromMetadata(
     ({ instanceId, config, canonicalId }) => ({
       instanceId,
       canonicalId,
-      displayName:
-        config.alias?.trim() || labelForCanonicalId(canonicalId),
+      displayName: config.alias?.trim() || labelForCanonicalId(canonicalId),
       modality: config.modality,
       upstreamModelId: config.upstreamModelId,
       enabled: config.enabled,
@@ -159,9 +167,7 @@ export function applySharedFormatTransformToVideoInstances(
   formatTransform: SingleModelFormatTransform | null
 ): SingleModelInstanceDraft[] {
   return instances.map((instance) =>
-    instance.modality === "video"
-      ? { ...instance, formatTransform }
-      : instance
+    instance.modality === "video" ? { ...instance, formatTransform } : instance
   );
 }
 
@@ -171,8 +177,10 @@ function areFormatTransformsEqual(
 ): boolean {
   return (
     left.sourceTemplateId === right.sourceTemplateId &&
-    JSON.stringify(left.upstreamParams) === JSON.stringify(right.upstreamParams) &&
-    JSON.stringify(left.paramMappings) === JSON.stringify(right.paramMappings) &&
+    JSON.stringify(left.upstreamParams) ===
+      JSON.stringify(right.upstreamParams) &&
+    JSON.stringify(left.paramMappings) ===
+      JSON.stringify(right.paramMappings) &&
     JSON.stringify(left.pollMapping) === JSON.stringify(right.pollMapping)
   );
 }

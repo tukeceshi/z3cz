@@ -20,9 +20,10 @@ export function useOrgCloudAccelerationInterfaces(
     ? `${orgEndpoint(organizationId)}/interfaces`
     : null;
   const { data, error, isLoading, mutate } = useSWR(key, async () => {
-    const response = await makeRequest<ListAiInterfaceCloudAccelerationResponse>(
-      `${orgEndpoint(organizationId!)}/interfaces`
-    );
+    const response =
+      await makeRequest<ListAiInterfaceCloudAccelerationResponse>(
+        `${orgEndpoint(organizationId!)}/interfaces`
+      );
     return response.entries;
   });
 

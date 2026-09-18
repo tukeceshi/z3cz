@@ -35,7 +35,8 @@ export function CreativeStudioDetailView({
   role = "primary",
 }: CreativeStudioDetailViewProps) {
   const { t } = useTranslation();
-  const { returnToCanvasFromDetail, closeSecondaryDetail } = useCreativeStudio();
+  const { returnToCanvasFromDetail, closeSecondaryDetail } =
+    useCreativeStudio();
   const [emptyTextEditing, setEmptyTextEditing] = useState(false);
   const [textEditHeader, setTextEditHeader] =
     useState<StudioTextEditHeaderState | null>(null);
@@ -70,7 +71,9 @@ export function CreativeStudioDetailView({
   const editHeaderSlot = editHeaderControl ? (
     <div className="pointer-events-none absolute inset-y-0 left-1/2 z-10 flex -translate-x-1/2 items-center">
       <div
-        className={textEditHeader?.isEditing ? "pointer-events-auto" : undefined}
+        className={
+          textEditHeader?.isEditing ? "pointer-events-auto" : undefined
+        }
       >
         {editHeaderControl}
       </div>

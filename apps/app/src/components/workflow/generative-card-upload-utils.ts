@@ -6,7 +6,10 @@ import type { TranslateFn } from "@/i18n";
 
 import { notifyAiMediaCacheChanged } from "@/hooks/use-ai-media-cache";
 import { cacheMediaFromUrl } from "@/services/ai-media-cache-service";
-import { AI_IMAGE_EMPTY_CARD_SIZE, type MediaCardSize } from "./media-card-size";
+import {
+  AI_IMAGE_EMPTY_CARD_SIZE,
+  type MediaCardSize,
+} from "./media-card-size";
 import { prepareGenerativeCardError } from "./prepare-generative-card-error";
 import type { WorkflowParameter } from "./workflow-types";
 
@@ -128,7 +131,8 @@ export function normalizeGenerativeCardUploadFile(
 }
 
 /** File picker accept list for generative image card / studio uploads. */
-export const GENERATIVE_IMAGE_UPLOAD_ACCEPT = "image/png,image/jpeg,.png,.jpg,.jpeg";
+export const GENERATIVE_IMAGE_UPLOAD_ACCEPT =
+  "image/png,image/jpeg,.png,.jpg,.jpeg";
 
 const GENERATIVE_STUDIO_DROP_EXTENSION_SET = new Set<string>([
   ...IMAGE_EXTENSIONS,

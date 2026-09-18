@@ -7,10 +7,7 @@ import { Hono } from "hono";
 import { jwtMiddleware } from "../auth";
 import type { ApiContext } from "../context";
 import { createDatabase } from "../db";
-import {
-  declineInvitation,
-  getUserInvitations,
-} from "../db/queries";
+import { declineInvitation, getUserInvitations } from "../db/queries";
 
 // Create a new Hono instance for invitation endpoints (user-facing)
 const invitationRoutes = new Hono<ApiContext>();

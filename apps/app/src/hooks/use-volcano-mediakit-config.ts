@@ -94,7 +94,9 @@ export function resolveOrgVolcanoMediaKitFromInterfaces(
   };
 }
 
-export function useOrgVolcanoMediaKitConfig(organizationId: string | undefined): {
+export function useOrgVolcanoMediaKitConfig(
+  organizationId: string | undefined
+): {
   readonly interfaceId: string | null;
   readonly config: VolcanoMediaKitConfigState | null;
   readonly isLoading: boolean;
@@ -123,7 +125,10 @@ export async function fetchVolcanoMediaKitConfigState(
     fetchOrganizationAiInterface(organizationId, interfaceId),
   ]);
 
-  const metadata = iface.metadata as VolcanoInterfaceMetadata | null | undefined;
+  const metadata = iface.metadata as
+    | VolcanoInterfaceMetadata
+    | null
+    | undefined;
   const snapshot =
     snapshotResponse.snapshot.mediaKit ??
     resolveVolcanoMediaKitFromMetadata(metadata);

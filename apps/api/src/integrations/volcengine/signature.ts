@@ -23,7 +23,11 @@ async function hmacSha256(
     false,
     ["sign"]
   );
-  const signature = await crypto.subtle.sign("HMAC", cryptoKey, encoder.encode(data));
+  const signature = await crypto.subtle.sign(
+    "HMAC",
+    cryptoKey,
+    encoder.encode(data)
+  );
   return new Uint8Array(signature);
 }
 

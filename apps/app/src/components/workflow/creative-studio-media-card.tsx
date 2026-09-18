@@ -1,7 +1,4 @@
-import {
-  AI_VIDEO_NODE_TYPE,
-  isWorkflowMediaValue,
-} from "@dafthunk/types";
+import { AI_VIDEO_NODE_TYPE, isWorkflowMediaValue } from "@dafthunk/types";
 import type { Node as ReactFlowNode } from "@xyflow/react";
 import { useMemo, useRef, useState } from "react";
 
@@ -15,12 +12,8 @@ import {
   readStudioModelLabel,
   readStudioVideoResolution,
 } from "./creative-studio-media-meta";
-import {
-  CreativeStudioMediaPreviewFrame,
-} from "./creative-studio-media-preview-frame";
-import {
-  STUDIO_MEDIA_CARD,
-} from "./creative-studio-surface";
+import { CreativeStudioMediaPreviewFrame } from "./creative-studio-media-preview-frame";
+import { STUDIO_MEDIA_CARD } from "./creative-studio-surface";
 import { GenerativeCardErrorBlock } from "./generative-card-error-block";
 import { CreativeStudioListItemFooter } from "./creative-studio-list-item-footer";
 import { useCreativeStudio } from "./creative-studio-context";
@@ -99,11 +92,11 @@ export function CreativeStudioMediaCard({
     fullDisplay.phase === "ready" ? fullDisplay.displayUrl : null;
 
   const imageSize = useStudioImageFileSize(isVideo ? null : metaProbeUrl);
-  const videoDuration = useStudioVideoFileDuration(isVideo ? metaProbeUrl : null);
+  const videoDuration = useStudioVideoFileDuration(
+    isVideo ? metaProbeUrl : null
+  );
   const modelLabel = readStudioModelLabel(node.data);
-  const videoResolution = isVideo
-    ? readStudioVideoResolution(node.data)
-    : null;
+  const videoResolution = isVideo ? readStudioVideoResolution(node.data) : null;
 
   const metaTags = useMemo(() => {
     const tags: string[] = [];
@@ -121,13 +114,7 @@ export function CreativeStudioMediaCard({
       tags.push(imageSize);
     }
     return tags;
-  }, [
-    imageSize,
-    isVideo,
-    modelLabel,
-    videoDuration,
-    videoResolution,
-  ]);
+  }, [imageSize, isVideo, modelLabel, videoDuration, videoResolution]);
 
   const { isListNodeRenaming } = useCreativeStudio();
   const isRenaming = isListNodeRenaming(node.id);

@@ -37,16 +37,12 @@ export function isTosRequestError(error: unknown): error is TosRequestError {
 }
 
 export function isVolcanoTosNotOpenedError(error: unknown): boolean {
-  return (
-    isTosRequestError(error) &&
-    error.tosCode === TOS_ACCOUNT_DISABLE_CODE
-  );
+  return isTosRequestError(error) && error.tosCode === TOS_ACCOUNT_DISABLE_CODE;
 }
 
 export function isTosBucketAlreadyOwnedError(error: unknown): boolean {
   return (
-    isTosRequestError(error) &&
-    error.tosCode === "BucketAlreadyOwnedByYou"
+    isTosRequestError(error) && error.tosCode === "BucketAlreadyOwnedByYou"
   );
 }
 

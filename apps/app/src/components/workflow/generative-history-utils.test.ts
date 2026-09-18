@@ -58,7 +58,7 @@ describe("readDisplayHistoryMedia", () => {
           },
         ],
       },
-        readItemImages
+      readItemImages
     );
     expect(media).toEqual([{ resourceId: "done", mimeType: "image/jpeg" }]);
   });
@@ -74,7 +74,7 @@ describe("readDisplayHistoryMedia", () => {
             { id: "gen-1", images: [{ resourceId: "done" }] },
           ],
         },
-          readItemImages
+        readItemImages
       )
     ).toEqual(failed);
   });
@@ -87,7 +87,7 @@ describe("readDisplayHistoryMedia", () => {
           selectedId: "gen-1",
           items: [{ id: "gen-1", images: generating }],
         },
-          readItemImages
+        readItemImages
       )
     ).toEqual(generating);
   });
@@ -108,7 +108,7 @@ describe("readDisplayHistoryMedia", () => {
             },
           ],
         },
-          readItemImages,
+        readItemImages,
         { holdUnreadyCover: true }
       )
     ).toEqual([{ resourceId: "pending", mimeType: "image/png" }]);
@@ -126,7 +126,7 @@ describe("readDisplayHistoryMedia", () => {
             },
           ],
         },
-          readItemImages,
+        readItemImages,
         { holdUnreadyCover: true }
       )
     ).toEqual([{ resourceId: "pending", mimeType: "image/png" }]);
@@ -140,7 +140,7 @@ describe("readDisplayHistoryMedia", () => {
           selectedId: "gen-1",
           items: [{ id: "gen-1", images: staged }],
         },
-          readItemImages,
+        readItemImages,
         { holdUnreadyCover: true }
       )
     ).toEqual(staged);
@@ -164,7 +164,7 @@ describe("readGenerativeCardCoverFromHistory", () => {
             },
           ],
         },
-          readItemImages,
+        readItemImages,
         { isModalityGenerating: true }
       )
     ).toEqual({
@@ -187,7 +187,7 @@ describe("readGenerativeCardCoverFromHistory", () => {
             },
           ],
         },
-          readItemImages,
+        readItemImages,
         { isModalityGenerating: true }
       )
     ).toEqual({
@@ -209,7 +209,7 @@ describe("readGenerativeCardCoverFromHistory", () => {
             { id: "gen-1", images: [{ resourceId: "done" }] },
           ],
         },
-          readItemImages,
+        readItemImages,
         { isModalityGenerating: false }
       )
     ).toEqual({
@@ -228,10 +228,13 @@ describe("readGenerativeCardCoverFromHistory", () => {
           selectedId: "gen-2",
           items: [
             { id: "gen-2", images: failed },
-            { id: "gen-1", images: [{ resourceId: "done", mimeType: "image/jpeg" }] },
+            {
+              id: "gen-1",
+              images: [{ resourceId: "done", mimeType: "image/jpeg" }],
+            },
           ],
         },
-          readItemImages,
+        readItemImages,
         { isModalityGenerating: true }
       )
     ).toEqual({

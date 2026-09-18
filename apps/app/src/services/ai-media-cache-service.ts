@@ -2051,9 +2051,7 @@ async function readAllThumbs(db: IDBDatabase): Promise<ThumbRecord[]> {
   return (rows as ThumbRecord[]) ?? [];
 }
 
-function parseCacheEntryKeyParts(
-  entryKeyValue: string
-): {
+function parseCacheEntryKeyParts(entryKeyValue: string): {
   readonly organizationId: string;
   readonly workflowId: string;
   readonly mediaId: string;

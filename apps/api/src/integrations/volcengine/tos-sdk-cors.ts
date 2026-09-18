@@ -95,7 +95,8 @@ export async function getBucketCors(
   } catch (error) {
     if (
       error instanceof TosServerError &&
-      (error.code === TOS_NO_SUCH_CORS_CONFIGURATION || error.statusCode === 404)
+      (error.code === TOS_NO_SUCH_CORS_CONFIGURATION ||
+        error.statusCode === 404)
     ) {
       return [];
     }

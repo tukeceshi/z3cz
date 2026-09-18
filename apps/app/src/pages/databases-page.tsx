@@ -202,7 +202,10 @@ function DatabasesPageContent() {
     return <InsetLoading title={t("pages.databases.title")} />;
   } else if (databasesError) {
     return (
-      <InsetError title={t("pages.databases.title")} errorMessage={databasesError.message} />
+      <InsetError
+        title={t("pages.databases.title")}
+        errorMessage={databasesError.message}
+      />
     );
   }
 
@@ -235,7 +238,9 @@ function DatabasesPageContent() {
         >
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>{t("pages.databases.createDialogTitle")}</DialogTitle>
+              <DialogTitle>
+                {t("pages.databases.createDialogTitle")}
+              </DialogTitle>
             </DialogHeader>
             <form
               onSubmit={async (e) => {
@@ -246,7 +251,9 @@ function DatabasesPageContent() {
               className="space-y-4"
             >
               <div>
-                <Label htmlFor="name">{t("pages.databases.databaseName")}</Label>
+                <Label htmlFor="name">
+                  {t("pages.databases.databaseName")}
+                </Label>
                 <Input
                   id="name"
                   name="name"

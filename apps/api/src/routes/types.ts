@@ -15,11 +15,7 @@ typeRoutes.get("/", optionalJwtMiddleware, async (c) => {
     const jwtPayload = c.get("jwtPayload");
     const developerMode = jwtPayload?.developerMode ?? false;
 
-    let nodeTypes = await getAllNodeTypes(
-      c.env,
-      c.executionCtx,
-      developerMode
-    );
+    let nodeTypes = await getAllNodeTypes(c.env, c.executionCtx, developerMode);
 
     if (schemeId) {
       const db = createDatabase(c.env);

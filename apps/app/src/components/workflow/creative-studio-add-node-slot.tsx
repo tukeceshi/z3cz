@@ -134,10 +134,15 @@ export function CreativeStudioAddNodeSlot({
   addNodeMenuOpen,
   onAddNodeMenuOpenChange,
 }: CreativeStudioAddNodeSlotProps) {
-  const { uploading, fileDragOver, dropZoneProps } = useStudioGenerativeFileDrop();
+  const { uploading, fileDragOver, dropZoneProps } =
+    useStudioGenerativeFileDrop();
 
   return (
-    <DropZoneShell uploading={uploading} fileDragOver={fileDragOver} {...dropZoneProps}>
+    <DropZoneShell
+      uploading={uploading}
+      fileDragOver={fileDragOver}
+      {...dropZoneProps}
+    >
       {mode === "menu" ? (
         <Popover open={addNodeMenuOpen} onOpenChange={onAddNodeMenuOpenChange}>
           <PopoverTrigger asChild>

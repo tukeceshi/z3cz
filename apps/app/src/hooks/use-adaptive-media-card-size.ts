@@ -13,7 +13,9 @@ export function useAdaptiveMediaCardSize(params: {
   readonly kind: "image" | "video";
 }): MediaCardSize {
   const emptySize =
-    params.kind === "video" ? AI_VIDEO_EMPTY_CARD_SIZE : AI_IMAGE_EMPTY_CARD_SIZE;
+    params.kind === "video"
+      ? AI_VIDEO_EMPTY_CARD_SIZE
+      : AI_IMAGE_EMPTY_CARD_SIZE;
   const [naturalSize, setNaturalSize] = useState<{
     readonly width: number;
     readonly height: number;

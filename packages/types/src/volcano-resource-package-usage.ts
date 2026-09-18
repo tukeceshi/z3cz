@@ -50,7 +50,9 @@ export function isUsageCountableResourcePackage(
 ): boolean {
   const status = row.Status;
   if (!status) return false;
-  return (VOLCANO_USAGE_COUNTABLE_STATUSES as readonly string[]).includes(status);
+  return (VOLCANO_USAGE_COUNTABLE_STATUSES as readonly string[]).includes(
+    status
+  );
 }
 
 export function isEffectiveResourcePackage(
@@ -126,7 +128,9 @@ export function aggregateResourcePackageRows(
   }
 
   const units = new Set(
-    usageRows.map((row) => row.Unit).filter((unit): unit is string => Boolean(unit))
+    usageRows
+      .map((row) => row.Unit)
+      .filter((unit): unit is string => Boolean(unit))
   );
   if (units.size !== 1) {
     return { usage: null, error: "Mixed resource package units" };
@@ -141,12 +145,24 @@ export function aggregateResourcePackageRows(
     sumPackageFieldByStatus(usageRows, usedUp, "TotalAmount") +
     sumPackageFieldByStatus(usageRows, expiredStatus, "TotalAmount");
 
-  const remaining = sumPackageFieldByStatus(usageRows, effective, "AvailableAmount");
-  const expired = sumPackageFieldByStatus(usageRows, expiredStatus, "AvailableAmount");
+  const remaining = sumPackageFieldByStatus(
+    usageRows,
+    effective,
+    "AvailableAmount"
+  );
+  const expired = sumPackageFieldByStatus(
+    usageRows,
+    expiredStatus,
+    "AvailableAmount"
+  );
   const used = Math.max(0, quota - remaining - expired);
 
   const effectiveRemaining = remaining;
-  const usedUpConsumed = sumPackageFieldByStatus(usageRows, usedUp, "TotalAmount");
+  const usedUpConsumed = sumPackageFieldByStatus(
+    usageRows,
+    usedUp,
+    "TotalAmount"
+  );
   const expiredUnused = expired;
 
   const usagePercent =
@@ -181,7 +197,9 @@ export interface UsageBarSegments {
   readonly expiredPercent: number;
 }
 
-function normalizeBarSegmentPercents(segments: UsageBarSegments): UsageBarSegments {
+function normalizeBarSegmentPercents(
+  segments: UsageBarSegments
+): UsageBarSegments {
   const sum =
     segments.usedPercent + segments.remainPercent + segments.expiredPercent;
   if (sum === 100 || sum === 0) {

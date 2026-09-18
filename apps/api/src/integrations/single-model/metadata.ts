@@ -64,14 +64,18 @@ export function mergeSingleModelEndpointRulesMetadata(
 
 export function mergeSingleModelFormatTransformsMetadata(
   metadata: SingleModelProviderMetadata,
-  updates: Readonly<Record<string, SingleModelFormatTransform | null | undefined>>
+  updates: Readonly<
+    Record<string, SingleModelFormatTransform | null | undefined>
+  >
 ): SingleModelProviderMetadata {
   return mergeSingleModelFormatTransformsByCanonicalId(metadata, updates);
 }
 
 export function mergeSingleModelCapabilityLimitsMetadata(
   metadata: SingleModelProviderMetadata,
-  updates: Readonly<Record<string, SingleModelCapabilityLimits | null | undefined>>
+  updates: Readonly<
+    Record<string, SingleModelCapabilityLimits | null | undefined>
+  >
 ): SingleModelProviderMetadata {
   return mergeSingleModelCapabilityLimitsByCanonicalId(metadata, updates);
 }

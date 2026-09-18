@@ -11,19 +11,21 @@ describe("classifyInferenceProbe", () => {
   });
 
   it("maps OperationDenied.ServiceNotOpen to service_not_open", () => {
-    expect(
-      classifyInferenceProbe(403, "OperationDenied.ServiceNotOpen")
-    ).toBe("service_not_open");
+    expect(classifyInferenceProbe(403, "OperationDenied.ServiceNotOpen")).toBe(
+      "service_not_open"
+    );
   });
 
   it("maps InvalidEndpointOrModel.NotFound to invalid_model_id", () => {
-    expect(
-      classifyInferenceProbe(404, "InvalidEndpointOrModel.NotFound")
-    ).toBe("invalid_model_id");
+    expect(classifyInferenceProbe(404, "InvalidEndpointOrModel.NotFound")).toBe(
+      "invalid_model_id"
+    );
   });
 
   it("maps AuthenticationError to auth_error", () => {
-    expect(classifyInferenceProbe(401, "AuthenticationError")).toBe("auth_error");
+    expect(classifyInferenceProbe(401, "AuthenticationError")).toBe(
+      "auth_error"
+    );
   });
 
   it("maps InvalidParameter to open", () => {

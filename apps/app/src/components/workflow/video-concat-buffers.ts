@@ -39,9 +39,8 @@ export async function concatVideoBuffers(
 
   const firstAudio = await firstInput.getPrimaryAudioTrack();
   const audioCodec = await firstAudio?.getCodec();
-  const audioSource = firstAudio && audioCodec
-    ? new EncodedAudioPacketSource(audioCodec)
-    : null;
+  const audioSource =
+    firstAudio && audioCodec ? new EncodedAudioPacketSource(audioCodec) : null;
   if (audioSource) {
     output.addAudioTrack(audioSource);
   }

@@ -7,8 +7,9 @@ import { useWorkflow } from "./workflow-context";
 export function useWorkflowVideoFrameCapture(nodeId: string | undefined) {
   const { disabled } = useWorkflow();
   const videoRef = useRef<HTMLVideoElement>(null);
-  const { captureFrameToAiImageNode, isCapturing } =
-    useVideoFrameToAiImageNode(nodeId ?? "");
+  const { captureFrameToAiImageNode, isCapturing } = useVideoFrameToAiImageNode(
+    nodeId ?? ""
+  );
 
   const onFrameCapture = useCallback(
     (mode: VideoFrameCaptureMode) => {

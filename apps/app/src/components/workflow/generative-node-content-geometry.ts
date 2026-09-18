@@ -69,9 +69,10 @@ export function resolveGenerativeLayoutContentSize(
 }
 
 /** Same box as layout — left/right anchors share one midpoint. */
-export function resolveGenerativeNodeContentSize(
-  node: InternalNode<Node>
-): { width: number; height: number } {
+export function resolveGenerativeNodeContentSize(node: InternalNode<Node>): {
+  width: number;
+  height: number;
+} {
   const nodeType = (node.data as { nodeType?: string } | undefined)?.nodeType;
   return resolveGenerativeLayoutContentSize(nodeType, node);
 }

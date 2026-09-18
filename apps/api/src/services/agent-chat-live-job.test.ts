@@ -85,7 +85,7 @@ describe("agent-chat-live-job", () => {
     const replay: string[] = [];
     subscribeAgentChatLiveJob(job, (event) => {
       replay.push(
-        `${event.type}:${"text" in event ? event.text : ""}:${"thinking" in event ? event.thinking ?? "" : ""}`
+        `${event.type}:${"text" in event ? event.text : ""}:${"thinking" in event ? (event.thinking ?? "") : ""}`
       );
     });
     expect(replay[0]).toBe("snapshot:可以:先看");

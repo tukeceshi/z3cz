@@ -121,7 +121,9 @@ export async function executeAiInterfaceSync(params: {
 
     let usage = 1;
     if (sync.usagePromptPath && sync.usageCompletionPath) {
-      const promptTokens = Number(readDotPath(parsed, sync.usagePromptPath) ?? 0);
+      const promptTokens = Number(
+        readDotPath(parsed, sync.usagePromptPath) ?? 0
+      );
       const completionTokens = Number(
         readDotPath(parsed, sync.usageCompletionPath) ?? 0
       );
@@ -161,12 +163,16 @@ export function mergeResolvedAiInterface(params: {
     templateVersion: artifact.version,
     baseUrl: (params.baseUrl ?? artifact.connection.baseUrl).replace(/\/$/, ""),
     apiKey: params.apiKey,
-    selectedModel: params.selectedModel ?? artifact.nodeType.inputs.find(
-      (input) => input.name === "model"
-    )?.default as string ?? "",
+    selectedModel:
+      params.selectedModel ??
+      (artifact.nodeType.inputs.find((input) => input.name === "model")
+        ?.default as string) ??
+      "",
     artifact,
     ...(params.videoEndpoints ? { videoEndpoints: params.videoEndpoints } : {}),
-    ...(params.formatTransform ? { formatTransform: params.formatTransform } : {}),
+    ...(params.formatTransform
+      ? { formatTransform: params.formatTransform }
+      : {}),
     ...(params.useFullSubmitUrl ? { useFullSubmitUrl: true } : {}),
   };
 }

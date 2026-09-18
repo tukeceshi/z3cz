@@ -17,9 +17,7 @@ vi.mock("../auth", () => ({
 }));
 
 vi.mock("../utils/workflow-scheme", () => ({
-  filterNodeTypesForScheme: vi.fn(
-    (nodeTypes: NodeType[]) => nodeTypes
-  ),
+  filterNodeTypesForScheme: vi.fn((nodeTypes: NodeType[]) => nodeTypes),
 }));
 
 const { defaultTypesCatalog, generativeNodeTypes, getAllNodeTypesMock } =

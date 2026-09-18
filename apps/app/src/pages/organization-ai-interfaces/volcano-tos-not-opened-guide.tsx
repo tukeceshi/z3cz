@@ -9,7 +9,9 @@ interface VolcanoTosGuideProps {
   readonly compact?: boolean;
 }
 
-export function VolcanoTosNotOpenedGuide({ compact = false }: VolcanoTosGuideProps) {
+export function VolcanoTosNotOpenedGuide({
+  compact = false,
+}: VolcanoTosGuideProps) {
   const { t } = useTranslation();
 
   return (
@@ -34,7 +36,9 @@ export function VolcanoTosNotOpenedGuide({ compact = false }: VolcanoTosGuidePro
   );
 }
 
-export function VolcanoTosAuthErrorGuide({ compact = false }: VolcanoTosGuideProps) {
+export function VolcanoTosAuthErrorGuide({
+  compact = false,
+}: VolcanoTosGuideProps) {
   const { t } = useTranslation();
 
   return (

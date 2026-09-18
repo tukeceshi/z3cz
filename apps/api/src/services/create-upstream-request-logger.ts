@@ -33,7 +33,10 @@ export function createUpstreamRequestLogger(
         error: record.error,
       });
     } catch (error) {
-      console.error("[api-interface-log] failed to persist upstream log", error);
+      console.error(
+        "[api-interface-log] failed to persist upstream log",
+        error
+      );
     }
   };
 }

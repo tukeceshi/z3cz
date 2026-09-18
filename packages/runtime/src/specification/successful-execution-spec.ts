@@ -12,7 +12,7 @@ export function testSuccessfulExecution(
   createRuntime: RuntimeFactory
 ) {
   describe(`${runtimeName}: successful execution`, () => {
-    it("should execute simple linear workflow (number-input â†?addition â†?multiplication)", async () => {
+    it("should execute simple linear workflow (number-input â†’addition â†’multiplication)", async () => {
       const workflow = {
         id: "test-workflow-1",
         name: "Linear Math Workflow",

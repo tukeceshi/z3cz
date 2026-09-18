@@ -16,31 +16,45 @@ describe("generative-card-mode-utils", () => {
     expect(shouldShowGenerativeHistoryIcon(1, undefined)).toBe(false);
     expect(shouldShowGenerativeHistoryIcon(2, undefined)).toBe(true);
     expect(
-      shouldShowGenerativeHistoryIcon(3, withGenerativeManualContentMode(undefined))
+      shouldShowGenerativeHistoryIcon(
+        3,
+        withGenerativeManualContentMode(undefined)
+      )
     ).toBe(false);
   });
 
   it("hides bottom panel in manual content mode or when explicitly hidden", () => {
     expect(shouldShowGenerativeBottomPanel(undefined)).toBe(true);
     expect(
-      shouldShowGenerativeBottomPanel(withGenerativeManualContentMode(undefined))
-    ).toBe(false);
-    expect(
-      shouldShowGenerativeBottomPanel(withGenerativeBottomPanelHidden(undefined))
+      shouldShowGenerativeBottomPanel(
+        withGenerativeManualContentMode(undefined)
+      )
     ).toBe(false);
     expect(
       shouldShowGenerativeBottomPanel(
-        withAiVideoPanelKind(withGenerativeManualContentMode(undefined), "enhance")
+        withGenerativeBottomPanelHidden(undefined)
+      )
+    ).toBe(false);
+    expect(
+      shouldShowGenerativeBottomPanel(
+        withAiVideoPanelKind(
+          withGenerativeManualContentMode(undefined),
+          "enhance"
+        )
       )
     ).toBe(true);
     expect(
-      shouldShowGenerativeBottomPanel(withGenerativeCardEditing(undefined, true))
+      shouldShowGenerativeBottomPanel(
+        withGenerativeCardEditing(undefined, true)
+      )
     ).toBe(true);
   });
 
   it("clears manual-only metadata to undefined (must not fall back with ??)", () => {
     const manual = withGenerativeManualContentMode(undefined);
     expect(withGenerativeGeneratedContentMode(manual)).toBeUndefined();
-    expect(withGenerativeGeneratedContentMode(manual) ?? manual).toEqual(manual);
+    expect(withGenerativeGeneratedContentMode(manual) ?? manual).toEqual(
+      manual
+    );
   });
 });

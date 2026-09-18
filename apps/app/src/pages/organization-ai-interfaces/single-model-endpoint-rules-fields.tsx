@@ -55,8 +55,10 @@ function areFormatTransformsEqual(
 ): boolean {
   return (
     left.sourceTemplateId === right.sourceTemplateId &&
-    JSON.stringify(left.upstreamParams) === JSON.stringify(right.upstreamParams) &&
-    JSON.stringify(left.paramMappings) === JSON.stringify(right.paramMappings) &&
+    JSON.stringify(left.upstreamParams) ===
+      JSON.stringify(right.upstreamParams) &&
+    JSON.stringify(left.paramMappings) ===
+      JSON.stringify(right.paramMappings) &&
     JSON.stringify(left.pollMapping) === JSON.stringify(right.pollMapping)
   );
 }
@@ -144,7 +146,11 @@ export function rulesSettingsFormStateFromMetadata(params: {
       })
     | null;
 
-  if (!capabilityLimits && legacyTransform && params.platformBaseline?.resolution) {
+  if (
+    !capabilityLimits &&
+    legacyTransform &&
+    params.platformBaseline?.resolution
+  ) {
     const legacyLimits = capabilityLimitsFromLegacyFormatTransform({
       supportsTaskCancel: legacyTransform.supportsTaskCancel,
       lockedResolution: legacyTransform.lockedResolution ?? null,

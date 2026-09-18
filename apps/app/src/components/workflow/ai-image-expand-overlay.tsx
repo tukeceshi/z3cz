@@ -69,12 +69,7 @@ function ExpandMediaPreview({
     );
   }
 
-  return (
-    <MediaImageField
-      value={media}
-      className="min-h-[200px]"
-    />
-  );
+  return <MediaImageField value={media} className="min-h-[200px]" />;
 }
 
 export interface AiImageExpandOverlayProps {

@@ -5,11 +5,8 @@ export type VolcanoSetupStatus =
   | "failed"
   | "enqueue_failed";
 
-export const VOLCANO_SETUP_IN_PROGRESS_STATUSES: readonly VolcanoSetupStatus[] = [
-  "pending",
-  "running",
-  "enqueue_failed",
-] as const;
+export const VOLCANO_SETUP_IN_PROGRESS_STATUSES: readonly VolcanoSetupStatus[] =
+  ["pending", "running", "enqueue_failed"] as const;
 
 export function isVolcanoSetupInProgress(
   status: VolcanoSetupStatus | null | undefined

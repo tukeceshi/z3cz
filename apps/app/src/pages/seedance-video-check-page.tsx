@@ -57,7 +57,11 @@ function formatCacheLabel(entry: AiMediaCacheEntrySummary): string {
 
 function formatErrorDetail(error: unknown): string {
   if (error instanceof CloudObjectUploadFailedError) {
-    return JSON.stringify({ name: error.name, message: error.message }, null, 2);
+    return JSON.stringify(
+      { name: error.name, message: error.message },
+      null,
+      2
+    );
   }
   return formatSeedanceVideoCheckErrorDetail(error);
 }
@@ -68,7 +72,10 @@ export function SeedanceVideoCheckPage() {
 
   if (!perms.canViewWorkflows) {
     return (
-      <OrgPermissionGate allowed={false} title={t("sidebar.seedanceVideoCheck")}>
+      <OrgPermissionGate
+        allowed={false}
+        title={t("sidebar.seedanceVideoCheck")}
+      >
         {null}
       </OrgPermissionGate>
     );
@@ -87,7 +94,8 @@ function SeedanceVideoCheckPageContent() {
   const { interfaces, isInterfacesLoading } =
     useOrganizationAiInterfaces(orgId);
   const hasVolcanoInterface = useMemo(
-    () => interfaces.some((iface) => isVolcanoAiInterfaceProvider(iface.provider)),
+    () =>
+      interfaces.some((iface) => isVolcanoAiInterfaceProvider(iface.provider)),
     [interfaces]
   );
 
@@ -102,9 +110,8 @@ function SeedanceVideoCheckPageContent() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isRefreshingResult, setIsRefreshingResult] = useState(false);
   const [queryId, setQueryId] = useState<string | null>(null);
-  const [result, setResult] = useState<GetSeedanceVideoCheckResultResponse | null>(
-    null
-  );
+  const [result, setResult] =
+    useState<GetSeedanceVideoCheckResultResponse | null>(null);
   const [errorDetail, setErrorDetail] = useState<string | null>(null);
   const [submitLog, setSubmitLog] = useState<SeedanceVideoCheckApiLog | null>(
     null
@@ -114,7 +121,10 @@ function SeedanceVideoCheckPageContent() {
   );
 
   usePageBreadcrumbs([
-    { label: t("sidebar.groups.tools"), to: getOrgUrl("/tools/seedance-video-check") },
+    {
+      label: t("sidebar.groups.tools"),
+      to: getOrgUrl("/tools/seedance-video-check"),
+    },
     { label: t("pages.seedanceVideoCheck.title") },
   ]);
 
@@ -265,14 +275,18 @@ function SeedanceVideoCheckPageContent() {
         </p>
 
         <Alert variant="destructive">
-          <AlertTitle>{t("pages.seedanceVideoCheck.enterpriseAlertTitle")}</AlertTitle>
+          <AlertTitle>
+            {t("pages.seedanceVideoCheck.enterpriseAlertTitle")}
+          </AlertTitle>
           <AlertDescription>
             {t("pages.seedanceVideoCheck.enterpriseAlertDescription")}
           </AlertDescription>
         </Alert>
 
         <Alert>
-          <AlertTitle>{t("pages.seedanceVideoCheck.limitationsTitle")}</AlertTitle>
+          <AlertTitle>
+            {t("pages.seedanceVideoCheck.limitationsTitle")}
+          </AlertTitle>
           <AlertDescription className="space-y-1">
             <p>{t("pages.seedanceVideoCheck.limitationsLine1")}</p>
             <p>{t("pages.seedanceVideoCheck.limitationsLine2")}</p>
@@ -281,7 +295,9 @@ function SeedanceVideoCheckPageContent() {
 
         {!isInterfacesLoading && !hasVolcanoInterface ? (
           <Alert>
-            <AlertTitle>{t("pages.seedanceVideoCheck.volcanoRequiredTitle")}</AlertTitle>
+            <AlertTitle>
+              {t("pages.seedanceVideoCheck.volcanoRequiredTitle")}
+            </AlertTitle>
             <AlertDescription className="space-y-3">
               <p>{t("pages.seedanceVideoCheck.volcanoRequiredDescription")}</p>
               <Button asChild variant="outline" size="sm">
@@ -329,7 +345,9 @@ function SeedanceVideoCheckPageContent() {
 
           <TabsContent value="cached" className="space-y-3">
             {isLoadingCache ? (
-              <p className="text-sm text-muted-foreground">{t("common.loading")}</p>
+              <p className="text-sm text-muted-foreground">
+                {t("common.loading")}
+              </p>
             ) : cachedEntries.length === 0 ? (
               <p className="text-sm text-muted-foreground">
                 {t("pages.seedanceVideoCheck.cachedEmpty")}
@@ -351,7 +369,9 @@ function SeedanceVideoCheckPageContent() {
                       onClick={() => setSelectedCacheKey(entry.key)}
                       disabled={!hasVolcanoInterface || isBusy}
                     >
-                      <span className="truncate">{formatCacheLabel(entry)}</span>
+                      <span className="truncate">
+                        {formatCacheLabel(entry)}
+                      </span>
                       <span className="ml-3 shrink-0 text-xs text-muted-foreground">
                         {entry.mimeType}
                       </span>
@@ -410,7 +430,9 @@ function SeedanceVideoCheckPageContent() {
 
         {errorDetail ? (
           <Alert variant="destructive">
-            <AlertTitle>{t("pages.seedanceVideoCheck.errors.debugTitle")}</AlertTitle>
+            <AlertTitle>
+              {t("pages.seedanceVideoCheck.errors.debugTitle")}
+            </AlertTitle>
             <AlertDescription>
               <pre className="mt-2 max-h-80 overflow-auto whitespace-pre-wrap break-all text-xs">
                 {errorDetail}

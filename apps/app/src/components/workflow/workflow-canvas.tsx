@@ -330,7 +330,10 @@ export function WorkflowCanvas({
           selectedNodes.length > 1 && WORKFLOW_MULTI_SELECTED_CLASS
         )}
       >
-        <ReactFlow<ReactFlowNode<WorkflowNodeType>, ReactFlowEdge<WorkflowEdgeType>>
+        <ReactFlow<
+          ReactFlowNode<WorkflowNodeType>,
+          ReactFlowEdge<WorkflowEdgeType>
+        >
           nodes={renderNodes}
           edges={edges}
           proOptions={{ hideAttribution: true }}

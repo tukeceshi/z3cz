@@ -1,5 +1,9 @@
 import type { ObjectReference } from "@dafthunk/types";
-import type { Connection, Edge as ReactFlowEdge, Node as ReactFlowNode } from "@xyflow/react";
+import type {
+  Connection,
+  Edge as ReactFlowEdge,
+  Node as ReactFlowNode,
+} from "@xyflow/react";
 
 import {
   edgeTouchesInputHandle,

@@ -10,8 +10,7 @@ import { handleMaintenanceHomepageRequest } from "./maintenance-page";
 
 const ReactCompilerConfig = {};
 
-const apiProxyTarget =
-  process.env.API_PROXY_TARGET ?? "http://127.0.0.1:3102";
+const apiProxyTarget = process.env.API_PROXY_TARGET ?? "http://127.0.0.1:3102";
 
 const apiProxyConfig = {
   "/api": {
@@ -78,7 +77,10 @@ function maintenanceHomepagePlugin(apiTarget: string): Plugin {
       server.middlewares.use((req, res, next) => {
         void handleMaintenanceHomepageRequest(req, res, next, apiTarget).catch(
           (error: unknown) => {
-            console.error("[vite] maintenance homepage middleware failed:", error);
+            console.error(
+              "[vite] maintenance homepage middleware failed:",
+              error
+            );
             next();
           }
         );
@@ -88,7 +90,10 @@ function maintenanceHomepagePlugin(apiTarget: string): Plugin {
       server.middlewares.use((req, res, next) => {
         void handleMaintenanceHomepageRequest(req, res, next, apiTarget).catch(
           (error: unknown) => {
-            console.error("[vite] maintenance homepage middleware failed:", error);
+            console.error(
+              "[vite] maintenance homepage middleware failed:",
+              error
+            );
             next();
           }
         );
@@ -143,7 +148,9 @@ export default defineConfig(({ mode }) => {
       host: true,
       // Docker Desktop (Windows/macOS) bind mounts often miss inotify events.
       watch: {
-        usePolling: process.env.CHOKIDAR_USEPOLLING === "1" || !!process.env.API_PROXY_TARGET,
+        usePolling:
+          process.env.CHOKIDAR_USEPOLLING === "1" ||
+          !!process.env.API_PROXY_TARGET,
         interval: 300,
       },
       proxy: {

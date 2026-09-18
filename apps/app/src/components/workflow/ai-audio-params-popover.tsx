@@ -25,7 +25,8 @@ import {
 } from "./generative-param-labels";
 import type { TranslateFn } from "@/i18n";
 
-export interface AiAudioParamsPopoverProps extends GenerativeParamsPopoverUiProps {
+export interface AiAudioParamsPopoverProps
+  extends GenerativeParamsPopoverUiProps {
   readonly fields: readonly UpstreamParamProfileField[];
   readonly disabled?: boolean;
   readonly triggerLabel: string;
@@ -116,7 +117,10 @@ function SliderFieldSection({
   formatValue,
   onChange,
 }: SliderFieldProps) {
-  const clamped = Math.min(max, Math.max(min, Number.isFinite(value) ? value : min));
+  const clamped = Math.min(
+    max,
+    Math.max(min, Number.isFinite(value) ? value : min)
+  );
 
   return (
     <div className="space-y-2">
@@ -312,7 +316,11 @@ export function AiAudioParamsPopover({
                   </SelectTrigger>
                   <SelectContent>
                     {field.enumValues.map((option) => (
-                      <SelectItem key={option} value={option} className="text-xs">
+                      <SelectItem
+                        key={option}
+                        value={option}
+                        className="text-xs"
+                      >
                         {resolveGenerationOptionLabel(field.name, option, t)}
                       </SelectItem>
                     ))}

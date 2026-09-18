@@ -3,7 +3,11 @@ import type { VolcanoInterfaceMetadata } from "./volcano-snapshot";
 export const VOLCANO_MEDIKIT_CONSOLE_URL =
   "https://docs.volcengine.com/imp/ai-mediakit" as const;
 
-export type VolcanoMediaKitVideoEnhanceMode = "fast" | "standard" | "pro" | "llm";
+export type VolcanoMediaKitVideoEnhanceMode =
+  | "fast"
+  | "standard"
+  | "pro"
+  | "llm";
 
 export const VOLCANO_MEDIKIT_VIDEO_ENHANCE_MODES: readonly VolcanoMediaKitVideoEnhanceMode[] =
   ["fast", "standard", "pro", "llm"] as const;
@@ -54,7 +58,8 @@ export type VolcanoMediaKitEnhanceSnapshot = VolcanoMediaKitConfig;
 
 export type VolcanoMediaKitEnhanceMode = VolcanoMediaKitVideoEnhanceMode;
 
-export const VOLCANO_MEDIKIT_ENHANCE_MODES = VOLCANO_MEDIKIT_VIDEO_ENHANCE_MODES;
+export const VOLCANO_MEDIKIT_ENHANCE_MODES =
+  VOLCANO_MEDIKIT_VIDEO_ENHANCE_MODES;
 
 export const VOLCANO_MEDIKIT_VIDEO_ENHANCE_MODE_LABEL_KEYS: Readonly<
   Record<VolcanoMediaKitVideoEnhanceMode, string>
@@ -145,9 +150,13 @@ export function normalizeVolcanoMediaKitEnhanceConfig(
 
 function hasAnyMediaKitFeatureSelected(config: VolcanoMediaKitConfig): boolean {
   return (
-    VOLCANO_MEDIKIT_VIDEO_ENHANCE_MODES.some((mode) => config.videoEnhance[mode]) ||
+    VOLCANO_MEDIKIT_VIDEO_ENHANCE_MODES.some(
+      (mode) => config.videoEnhance[mode]
+    ) ||
     config.videoTrim.enabled ||
-    VOLCANO_MEDIKIT_SUBTITLE_ERASE_MODES.some((mode) => config.subtitleErase[mode])
+    VOLCANO_MEDIKIT_SUBTITLE_ERASE_MODES.some(
+      (mode) => config.subtitleErase[mode]
+    )
   );
 }
 
@@ -157,7 +166,9 @@ export function isVolcanoMediaKitVideoTrimEnabled(
   return config.enabled && config.videoTrim.enabled;
 }
 
-export function isVolcanoMediaKitConfigValid(config: VolcanoMediaKitConfig): boolean {
+export function isVolcanoMediaKitConfigValid(
+  config: VolcanoMediaKitConfig
+): boolean {
   if (!config.enabled) {
     return true;
   }
@@ -171,7 +182,9 @@ export function isVolcanoMediaKitEnhanceConfigValid(
   return isVolcanoMediaKitConfigValid(config);
 }
 
-export function isVolcanoMediaKitActive(config: VolcanoMediaKitConfig): boolean {
+export function isVolcanoMediaKitActive(
+  config: VolcanoMediaKitConfig
+): boolean {
   return config.enabled && hasAnyMediaKitFeatureSelected(config);
 }
 

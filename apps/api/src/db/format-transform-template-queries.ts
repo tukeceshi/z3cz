@@ -81,10 +81,8 @@ function parsePollMapping(value: unknown): TransformPollMapping {
 
   const mapping = value as TransformPollMapping;
   return resolveTransformPollMapping({
-    statusKey:
-      typeof mapping.statusKey === "string" ? mapping.statusKey : "",
-    outputKey:
-      typeof mapping.outputKey === "string" ? mapping.outputKey : "",
+    statusKey: typeof mapping.statusKey === "string" ? mapping.statusKey : "",
+    outputKey: typeof mapping.outputKey === "string" ? mapping.outputKey : "",
     successValues: Array.isArray(mapping.successValues)
       ? mapping.successValues.filter(
           (entry): entry is string => typeof entry === "string"

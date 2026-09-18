@@ -127,7 +127,8 @@ async function callOfficialResultApi(params: {
   const hasVolcanoError = Boolean(metadata && asRecord(metadata.Error));
   if (!response.ok || hasVolcanoError) {
     throw new SeedanceOfficialResultCallError(
-      volcanoError.message ?? `Volcano API ${params.action} failed (${response.status})`,
+      volcanoError.message ??
+        `Volcano API ${params.action} failed (${response.status})`,
       log,
       volcanoError.code ?? undefined
     );
@@ -140,7 +141,10 @@ async function callOfficialResultApi(params: {
 export async function createSeedanceVideoCheckQuery(params: {
   readonly credentials: VolcengineCredentials;
   readonly videoUrl: string;
-}): Promise<{ readonly queryId: string; readonly log: SeedanceVideoCheckApiLog }> {
+}): Promise<{
+  readonly queryId: string;
+  readonly log: SeedanceVideoCheckApiLog;
+}> {
   const { log, result } = await callOfficialResultApi({
     credentials: params.credentials,
     action: "CreateArkOfficialResultQuery",

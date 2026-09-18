@@ -24,7 +24,8 @@ function createFakeVideo(): HTMLVideoElement {
 describe("inline-video-playback", () => {
   it("detects fine hover pointers", () => {
     const matchMedia = vi.fn((query: string) => ({
-      matches: query.includes("hover: hover") && query.includes("pointer: fine"),
+      matches:
+        query.includes("hover: hover") && query.includes("pointer: fine"),
       media: query,
       onchange: null,
       addEventListener: vi.fn(),

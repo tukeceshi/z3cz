@@ -29,7 +29,11 @@ interface WorkflowAddNodePreviewLineProps {
 function resolvePreviewSourceAnchor(
   sourceNode: InternalNode<Node>,
   handleId: string | null | undefined
-): { readonly x: number; readonly y: number; readonly position: Position } | null {
+): {
+  readonly x: number;
+  readonly y: number;
+  readonly position: Position;
+} | null {
   switch (handleId) {
     case AI_TEXT_OUTPUT_ID: {
       const snap = snapAiTextOutputBorderPoint(sourceNode);
@@ -52,73 +56,75 @@ function resolvePreviewSourceAnchor(
   }
 }
 
-export const WorkflowAddNodePreviewLine = memo(function WorkflowAddNodePreviewLine({
-  menu,
-}: WorkflowAddNodePreviewLineProps) {
-  const transform = useStore((state) => state.transform);
-  const nodeLookup = useStore((state) => state.nodeLookup);
+export const WorkflowAddNodePreviewLine = memo(
+  function WorkflowAddNodePreviewLine({
+    menu,
+  }: WorkflowAddNodePreviewLineProps) {
+    const transform = useStore((state) => state.transform);
+    const nodeLookup = useStore((state) => state.nodeLookup);
 
-  const edgePath = useMemo(() => {
-    const sourceContext = menu?.sourceContext;
-    if (!sourceContext) {
+    const edgePath = useMemo(() => {
+      const sourceContext = menu?.sourceContext;
+      if (!sourceContext) {
+        return null;
+      }
+
+      const sourceNode = nodeLookup.get(sourceContext.nodeId);
+      if (!sourceNode) {
+        return null;
+      }
+
+      const sourceAnchor = resolvePreviewSourceAnchor(
+        sourceNode,
+        sourceContext.handle.id
+      );
+      if (!sourceAnchor) {
+        return null;
+      }
+
+      const targetX = menu.flowX;
+      const targetY = menu.flowY;
+
+      const anchors = resolveAiTextEdgeAnchors({
+        sourceX: sourceAnchor.x,
+        sourceY: sourceAnchor.y,
+        targetX,
+        targetY,
+        source: sourceContext.nodeId,
+        target: "",
+        sourceHandle: sourceContext.handle.id ?? null,
+        targetHandle: null,
+        nodeLookup,
+      });
+
+      return buildWorkflowSmoothStepPath({
+        sourceX: anchors.sourceX,
+        sourceY: anchors.sourceY,
+        targetX: anchors.targetX,
+        targetY: anchors.targetY,
+        sourcePosition: sourceAnchor.position,
+        targetPosition: Position.Left,
+        offset: GENERATIVE_EDGE_PLUS_BORDER_GAP_PX,
+      });
+    }, [menu, nodeLookup]);
+
+    if (!edgePath) {
       return null;
     }
 
-    const sourceNode = nodeLookup.get(sourceContext.nodeId);
-    if (!sourceNode) {
-      return null;
-    }
-
-    const sourceAnchor = resolvePreviewSourceAnchor(
-      sourceNode,
-      sourceContext.handle.id
-    );
-    if (!sourceAnchor) {
-      return null;
-    }
-
-    const targetX = menu.flowX;
-    const targetY = menu.flowY;
-
-    const anchors = resolveAiTextEdgeAnchors({
-      sourceX: sourceAnchor.x,
-      sourceY: sourceAnchor.y,
-      targetX,
-      targetY,
-      source: sourceContext.nodeId,
-      target: "",
-      sourceHandle: sourceContext.handle.id ?? null,
-      targetHandle: null,
-      nodeLookup,
-    });
-
-    return buildWorkflowSmoothStepPath({
-      sourceX: anchors.sourceX,
-      sourceY: anchors.sourceY,
-      targetX: anchors.targetX,
-      targetY: anchors.targetY,
-      sourcePosition: sourceAnchor.position,
-      targetPosition: Position.Left,
-      offset: GENERATIVE_EDGE_PLUS_BORDER_GAP_PX,
-    });
-  }, [menu, nodeLookup]);
-
-  if (!edgePath) {
-    return null;
-  }
-
-  return (
-    <svg
-      className="pointer-events-none absolute inset-0 overflow-visible"
-      style={{ zIndex: 1001 }}
-    >
-      <g
-        transform={`translate(${transform[0]},${transform[1]}) scale(${transform[2]})`}
+    return (
+      <svg
+        className="pointer-events-none absolute inset-0 overflow-visible"
+        style={{ zIndex: 1001 }}
       >
-        {renderWorkflowEdgePath(edgePath, ADD_NODE_PREVIEW_LINE_COLOR, {
-          isSelectionFlow: true,
-        })}
-      </g>
-    </svg>
-  );
-});
+        <g
+          transform={`translate(${transform[0]},${transform[1]}) scale(${transform[2]})`}
+        >
+          {renderWorkflowEdgePath(edgePath, ADD_NODE_PREVIEW_LINE_COLOR, {
+            isSelectionFlow: true,
+          })}
+        </g>
+      </svg>
+    );
+  }
+);

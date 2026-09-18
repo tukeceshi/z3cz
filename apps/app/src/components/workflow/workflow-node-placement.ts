@@ -1,4 +1,9 @@
-import { AI_AUDIO_NODE_TYPE, AI_IMAGE_NODE_TYPE, AI_TEXT_NODE_TYPE, AI_VIDEO_NODE_TYPE } from "@dafthunk/types";
+import {
+  AI_AUDIO_NODE_TYPE,
+  AI_IMAGE_NODE_TYPE,
+  AI_TEXT_NODE_TYPE,
+  AI_VIDEO_NODE_TYPE,
+} from "@dafthunk/types";
 import type { Node as ReactFlowNode } from "@xyflow/react";
 
 import { resolveGenerativeLayoutContentSize } from "./generative-node-content-geometry";
@@ -258,7 +263,11 @@ function* iterateCenterSpiralOffsets(
 ): Generator<{ readonly dx: number; readonly dy: number }> {
   yield { dx: 0, dy: 0 };
 
-  for (let radius = spiralStep; radius <= maxRadius + 0.5; radius += spiralStep) {
+  for (
+    let radius = spiralStep;
+    radius <= maxRadius + 0.5;
+    radius += spiralStep
+  ) {
     for (let dx = -radius; dx <= radius + 0.5; dx += spiralStep) {
       yield { dx, dy: -radius };
       yield { dx, dy: radius };
@@ -346,9 +355,9 @@ export function findSnugAdjacencyPositionInBounds(
   occupied: readonly FlowRect[],
   gap: number = WORKFLOW_NODE_ADD_GAP_PX
 ): { readonly position: FlowPoint } | null {
-  const candidates = [...collectSnugAdjacencyCandidates(occupied, nodeSize, gap)].sort(
-    (a, b) => compareDistanceToCenter(a, b, center)
-  );
+  const candidates = [
+    ...collectSnugAdjacencyCandidates(occupied, nodeSize, gap),
+  ].sort((a, b) => compareDistanceToCenter(a, b, center));
 
   for (const candidate of candidates) {
     if (isValidPlacementCandidate(candidate, bounds, occupied, gap)) {
@@ -376,7 +385,13 @@ export function findOpenNodePositionInBounds(
   );
   if (fromCenter) return fromCenter;
 
-  return findSnugAdjacencyPositionInBounds(bounds, center, nodeSize, occupied, gap);
+  return findSnugAdjacencyPositionInBounds(
+    bounds,
+    center,
+    nodeSize,
+    occupied,
+    gap
+  );
 }
 
 /** When the viewport has no room: prefer right of the cluster, then below. */
@@ -475,8 +490,7 @@ export function findOpenNodePositionFromSource(params: {
   );
   const occupied = collectOccupiedRects(params.existingNodes);
   const seedY =
-    params.dropFlowY ??
-    params.sourceNode.position.y + sourceDims.height / 2;
+    params.dropFlowY ?? params.sourceNode.position.y + sourceDims.height / 2;
 
   return findOpenNodePositionNearSeed(
     {

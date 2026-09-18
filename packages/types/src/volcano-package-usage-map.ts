@@ -4,9 +4,7 @@ import type {
   VolcanoModelUsage,
 } from "./volcano-snapshot";
 import type { VolcanoResourcePackageRow } from "./volcano-resource-package-usage";
-import {
-  pickVolcanoPackageOwnerCanonicalId,
-} from "./volcano-package-catalog";
+import { pickVolcanoPackageOwnerCanonicalId } from "./volcano-package-catalog";
 import {
   aggregateResourcePackageRows,
   isUsageCountableResourcePackage,
@@ -88,8 +86,9 @@ export function buildVolcanoPackageSnapshotForModel(params: {
   /** Defaults to `[canonicalId]` when omitted (single-model lookup). */
   readonly catalogCanonicalIds?: readonly string[];
 }): VolcanoModelPackageSnapshot {
-  const catalogCanonicalIds =
-    params.catalogCanonicalIds ?? [params.canonicalId];
+  const catalogCanonicalIds = params.catalogCanonicalIds ?? [
+    params.canonicalId,
+  ];
   return snapshotFromRows(
     collectRowsForCanonicalId({
       canonicalId: params.canonicalId,

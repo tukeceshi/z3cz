@@ -63,7 +63,11 @@ export async function resolveSeedanceCheckVideoUrl(params: {
     if (!params.object) {
       throw new Error("Uploaded object reference is required");
     }
-    return presignObjectReference(params.env, params.organizationId, params.object);
+    return presignObjectReference(
+      params.env,
+      params.organizationId,
+      params.object
+    );
   }
 
   const resourceId = params.resourceId?.trim();
@@ -77,7 +81,9 @@ export async function resolveSeedanceCheckVideoUrl(params: {
     resourceIds: [resourceId],
   });
 
-  const entry = resolved.resolved.find((item) => item.resourceId === resourceId);
+  const entry = resolved.resolved.find(
+    (item) => item.resourceId === resourceId
+  );
   if (!entry) {
     throw new Error("Video resource not found");
   }
@@ -109,7 +115,9 @@ export async function resolveSeedanceCheckVideoUrl(params: {
   });
   const catalogEntry = catalogRows[0];
   if (!catalogEntry?.storageKey) {
-    throw new Error("Local video resource must be uploaded to cloud storage first");
+    throw new Error(
+      "Local video resource must be uploaded to cloud storage first"
+    );
   }
 
   const object: ObjectReference = {

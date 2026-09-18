@@ -71,11 +71,15 @@ export function toPublicAuthConfig(config: AuthConfig): PublicAuthConfig {
     },
     github: {
       enabled: config.github.enabled,
-      clientId: config.github.enabled ? config.github.clientId.trim() || null : null,
+      clientId: config.github.enabled
+        ? config.github.clientId.trim() || null
+        : null,
     },
     google: {
       enabled: config.google.enabled,
-      clientId: config.google.enabled ? config.google.clientId.trim() || null : null,
+      clientId: config.google.enabled
+        ? config.google.clientId.trim() || null
+        : null,
     },
   };
 }
@@ -84,7 +88,8 @@ export function isOAuthProviderConfigured(
   provider: OAuthProviderAuthConfigShape
 ): boolean {
   return (
-    provider.clientId.trim().length > 0 && provider.clientSecret.trim().length > 0
+    provider.clientId.trim().length > 0 &&
+    provider.clientSecret.trim().length > 0
   );
 }
 
@@ -248,11 +253,17 @@ export function validateAuthConfigUpdate(
     return "Email verification requires a from address and working email delivery";
   }
 
-  if (config.github.enabled && !canEnableOAuthProvider(config.github, env, "github")) {
+  if (
+    config.github.enabled &&
+    !canEnableOAuthProvider(config.github, env, "github")
+  ) {
     return "GitHub login requires Client ID and Client Secret";
   }
 
-  if (config.google.enabled && !canEnableOAuthProvider(config.google, env, "google")) {
+  if (
+    config.google.enabled &&
+    !canEnableOAuthProvider(config.google, env, "google")
+  ) {
     return "Google login requires Client ID and Client Secret";
   }
 

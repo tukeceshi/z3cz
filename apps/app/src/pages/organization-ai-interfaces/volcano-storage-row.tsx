@@ -13,7 +13,11 @@ import { useTranslation } from "@/components/locale-provider";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { useAppToast } from "@/hooks/use-app-toast";
-import { updateVolcanoTosStorage, ensureVolcanoTosCors, VOLCANO_TOS_NOT_OPENED_CODE } from "@/services/organization-ai-interface-service";
+import {
+  updateVolcanoTosStorage,
+  ensureVolcanoTosCors,
+  VOLCANO_TOS_NOT_OPENED_CODE,
+} from "@/services/organization-ai-interface-service";
 import { ApiRequestError } from "@/services/utils";
 
 import { VolcanoStorageDisableDialog } from "./volcano-storage-disable-dialog";
@@ -28,10 +32,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 
-
-
 interface VolcanoStorageRowProps {
-
   readonly organizationId: string;
 
   readonly interfaceId: string;
@@ -43,17 +44,13 @@ interface VolcanoStorageRowProps {
   readonly onUpdated: () => Promise<void>;
 
   readonly onRefreshSnapshot: () => Promise<void>;
-
 }
 
 function formatGiB(value: number, locale: string): string {
   return `${value.toLocaleString(locale, { maximumFractionDigits: 2 })} GiB`;
 }
 
-
-
 export function VolcanoStorageRow({
-
   organizationId,
 
   interfaceId,
@@ -65,9 +62,7 @@ export function VolcanoStorageRow({
   onUpdated,
 
   onRefreshSnapshot,
-
 }: VolcanoStorageRowProps) {
-
   const { t, locale } = useTranslation();
 
   const toast = useAppToast();
@@ -80,17 +75,16 @@ export function VolcanoStorageRow({
 
   const [isSaving, setIsSaving] = useState(false);
 
-
-
   const regionLabel = useMemo(() => {
-    const match = VOLCANO_TOS_REGIONS.find((entry) => entry.code === snapshot.region);
+    const match = VOLCANO_TOS_REGIONS.find(
+      (entry) => entry.code === snapshot.region
+    );
     return match ? t(match.labelKey) : snapshot.region;
   }, [snapshot.region, t]);
 
   const pricingRegion =
     snapshot.region || defaultVolcanoTosRegionForLocale(locale);
-  const pricing =
-    snapshot.pricing ?? volcanoTosPricingForRegion(pricingRegion);
+  const pricing = snapshot.pricing ?? volcanoTosPricingForRegion(pricingRegion);
   const pricingRegionLabel = useMemo(() => {
     const match = VOLCANO_TOS_REGIONS.find(
       (entry) => entry.code === pricingRegion
@@ -124,55 +118,38 @@ export function VolcanoStorageRow({
     }
 
     if (checked) {
-
       if (snapshot.configured) {
-
         setImpactWarningOpen(true);
 
         return;
-
       }
 
       setSetupOpen(true);
 
       return;
-
     }
 
     setDisableOpen(true);
-
   };
 
-
-
   const handleConfirmEnableImpact = async () => {
-
     setImpactWarningOpen(false);
 
-
-
     if (!snapshot.configured) {
-
       setSetupOpen(true);
 
       return;
-
     }
-
-
 
     setIsSaving(true);
 
     try {
-
       await updateVolcanoTosStorage(organizationId, interfaceId, {
-
         enabled: true,
 
         region: snapshot.region,
 
         bucket: snapshot.bucket,
-
       });
 
       await onUpdated();
@@ -180,27 +157,18 @@ export function VolcanoStorageRow({
       await onRefreshSnapshot();
 
       toast.success("pages.aiInterfaces.tosStorage.saved");
-
     } catch (error) {
-
       toast.errorRaw(
-
-        error instanceof Error ? error.message : t("pages.aiInterfaces.saveFailed")
-
+        error instanceof Error
+          ? error.message
+          : t("pages.aiInterfaces.saveFailed")
       );
-
     } finally {
-
       setIsSaving(false);
-
     }
-
   };
 
-
-
   const handleSetupComplete = async (params: {
-
     readonly region: string;
 
     readonly bucket: string;
@@ -208,15 +176,11 @@ export function VolcanoStorageRow({
     readonly createBucket: boolean;
 
     readonly enable: boolean;
-
   }) => {
-
     setIsSaving(true);
 
     try {
-
       await updateVolcanoTosStorage(organizationId, interfaceId, {
-
         enabled: params.enable,
 
         region: params.region,
@@ -224,7 +188,6 @@ export function VolcanoStorageRow({
         bucket: params.bucket,
 
         createBucket: params.createBucket,
-
       });
 
       await onUpdated();
@@ -234,55 +197,38 @@ export function VolcanoStorageRow({
       toast.success("pages.aiInterfaces.tosStorage.saved");
 
       setSetupOpen(false);
-
     } catch (error) {
-
       if (
-
         error instanceof ApiRequestError &&
-
         error.code === VOLCANO_TOS_NOT_OPENED_CODE
-
       ) {
-
         toast.error("pages.aiInterfaces.tosStorage.notOpened.configureBlocked");
 
         return;
-
       }
 
       toast.errorRaw(
-
-        error instanceof Error ? error.message : t("pages.aiInterfaces.saveFailed")
-
+        error instanceof Error
+          ? error.message
+          : t("pages.aiInterfaces.saveFailed")
       );
-
     } finally {
-
       setIsSaving(false);
-
     }
-
   };
 
-
-
   const handleDisableConfirm = async () => {
-
     if (!snapshot.configured) return;
 
     setIsSaving(true);
 
     try {
-
       await updateVolcanoTosStorage(organizationId, interfaceId, {
-
         enabled: false,
 
         region: snapshot.region,
 
         bucket: snapshot.bucket,
-
       });
 
       await onUpdated();
@@ -292,29 +238,19 @@ export function VolcanoStorageRow({
       toast.success("pages.aiInterfaces.tosStorage.disabled");
 
       setDisableOpen(false);
-
     } catch (error) {
-
       toast.errorRaw(
-
-        error instanceof Error ? error.message : t("pages.aiInterfaces.saveFailed")
-
+        error instanceof Error
+          ? error.message
+          : t("pages.aiInterfaces.saveFailed")
       );
-
     } finally {
-
       setIsSaving(false);
-
     }
-
   };
 
-
-
   return (
-
     <>
-
       <div className="rounded-lg border p-3 space-y-2">
         <div className="flex items-start gap-3">
           <Switch
@@ -364,7 +300,9 @@ export function VolcanoStorageRow({
                   usage={snapshot.trafficUsage}
                 />
                 {snapshot.usageError ? (
-                  <p className="text-destructive text-xs">{snapshot.usageError}</p>
+                  <p className="text-destructive text-xs">
+                    {snapshot.usageError}
+                  </p>
                 ) : null}
               </div>
             ) : null}
@@ -372,98 +310,55 @@ export function VolcanoStorageRow({
         </div>
       </div>
 
-
-
       <VolcanoStorageSetupDialog
-
         open={setupOpen}
-
         organizationId={organizationId}
-
         interfaceId={interfaceId}
-
         initialRegion={
-
           snapshot.region || defaultVolcanoTosRegionForLocale(locale)
-
         }
-
         initialBucket={snapshot.bucket}
-
         defaultEnable
-
         onOpenChange={setSetupOpen}
-
         onComplete={handleSetupComplete}
-
         isSaving={isSaving}
-
       />
-
-
 
       <VolcanoStorageDisableDialog
-
         open={disableOpen}
-
         onOpenChange={setDisableOpen}
-
         onConfirm={() => void handleDisableConfirm()}
-
         isSaving={isSaving}
-
       />
 
-
-
       {impactWarningOpen ? (
-
         <Dialog open={impactWarningOpen} onOpenChange={setImpactWarningOpen}>
-
           <DialogContent className="sm:max-w-md">
-
             <DialogHeader>
-
               <DialogTitle>
-
                 {t("pages.aiInterfaces.tosStorage.impactTitle")}
-
               </DialogTitle>
-
             </DialogHeader>
 
             <p className="text-sm text-muted-foreground">
-
               {t("pages.aiInterfaces.tosStorage.impactDescription")}
-
             </p>
 
             <DialogFooter className="gap-2">
-
-              <Button variant="outline" onClick={() => setImpactWarningOpen(false)}>
-
+              <Button
+                variant="outline"
+                onClick={() => setImpactWarningOpen(false)}
+              >
                 {t("common.cancel")}
-
               </Button>
 
               <Button onClick={() => void handleConfirmEnableImpact()}>
-
                 {t("common.continue")}
-
               </Button>
-
             </DialogFooter>
-
           </DialogContent>
-
         </Dialog>
-
       ) : null}
-
     </>
-
   );
-
 }
-
-

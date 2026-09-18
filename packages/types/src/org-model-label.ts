@@ -82,7 +82,9 @@ export function pickLegacyOrgModelInterfaceId<T extends OrgModelBindingPickRef>(
 
   const preferredId = preferredInterfaceId?.trim();
   if (preferredId) {
-    const preferred = matches.find((entry) => entry.interfaceId === preferredId);
+    const preferred = matches.find(
+      (entry) => entry.interfaceId === preferredId
+    );
     if (preferred) {
       return preferred.interfaceId;
     }

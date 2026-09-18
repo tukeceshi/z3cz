@@ -50,8 +50,12 @@ export function resolveGenerativeNodeDisplayName(params: {
   readonly existingNodes: ReadonlyArray<GenerativeNodeNamingNode>;
   readonly additionalSameTypeCount?: number;
 }): string {
-  const { nodeType, baseName, existingNodes, additionalSameTypeCount = 0 } =
-    params;
+  const {
+    nodeType,
+    baseName,
+    existingNodes,
+    additionalSameTypeCount = 0,
+  } = params;
 
   if (!isGenerativeNodeType(nodeType)) {
     return baseName;

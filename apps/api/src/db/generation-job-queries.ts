@@ -308,8 +308,6 @@ export function extractFinalMediaFromJob(
   return job.resultJson?.finalMedia;
 }
 
-export function extractPendingMediaFromJob(
-  job: GenerationJobRecord
-) {
+export function extractPendingMediaFromJob(job: GenerationJobRecord) {
   return job.resultJson?.pendingMedia;
 }

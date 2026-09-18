@@ -123,7 +123,9 @@ export function VolcanoPanelSetupBanners({
             >
               {t("pages.aiInterfaces.volcano.openManagement")}
             </a>
-            {t("pages.aiInterfaces.volcano.activation.panelNotOpenHintAfterLink")}
+            {t(
+              "pages.aiInterfaces.volcano.activation.panelNotOpenHintAfterLink"
+            )}
           </p>
         </SetupBanner>
       ) : null}
@@ -139,7 +141,9 @@ export function VolcanoPanelSetupBanners({
             >
               {t("pages.aiInterfaces.tosStorage.notOpened.link")}
             </a>
-            {t("pages.aiInterfaces.volcano.activation.panelTosNotOpenHintAfterLink")}
+            {t(
+              "pages.aiInterfaces.volcano.activation.panelTosNotOpenHintAfterLink"
+            )}
           </p>
         </SetupBanner>
       ) : null}

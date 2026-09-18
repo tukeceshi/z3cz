@@ -48,14 +48,7 @@ function normalizeRatio(value: string): string {
   return value.trim().replace(/\s+/g, "");
 }
 
-const ESTIMATE_RATIOS = new Set([
-  "16:9",
-  "9:16",
-  "4:3",
-  "1:1",
-  "3:4",
-  "21:9",
-]);
+const ESTIMATE_RATIOS = new Set(["16:9", "9:16", "4:3", "1:1", "3:4", "21:9"]);
 
 function resolveSeedanceEstimateRatio(ratio: string): string {
   const aspect = normalizeRatio(ratio);

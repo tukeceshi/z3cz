@@ -14,7 +14,9 @@ describe("video-trim-mediakit", () => {
   });
 
   it("validates minimum trim duration", () => {
-    expect(isSubmitVideoTrimRangeValid({ startSec: 0, endSec: 0.1 })).toBe(true);
+    expect(isSubmitVideoTrimRangeValid({ startSec: 0, endSec: 0.1 })).toBe(
+      true
+    );
     expect(isSubmitVideoTrimRangeValid({ startSec: 0, endSec: 0.05 })).toBe(
       false
     );

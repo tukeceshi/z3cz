@@ -1,4 +1,7 @@
-import type { Edge as ReactFlowEdge, Node as ReactFlowNode } from "@xyflow/react";
+import type {
+  Edge as ReactFlowEdge,
+  Node as ReactFlowNode,
+} from "@xyflow/react";
 
 import { WORKFLOW_NODE_GAP_PX } from "./workflow-node-placement";
 import type { WorkflowEdgeType, WorkflowNodeType } from "./workflow-types";
@@ -290,9 +293,7 @@ async function layoutConnectedComponent(
     normalizeLayoutOrigin(positions);
     return positions;
   } catch {
-    return new Map(
-      component.map((node) => [node.id, { x: 0, y: 0 }] as const)
-    );
+    return new Map(component.map((node) => [node.id, { x: 0, y: 0 }] as const));
   }
 }
 
@@ -314,7 +315,8 @@ function stitchComponentLayouts(
   for (const component of components) {
     if (
       cursorX > anchorX &&
-      cursorX + component.width > anchorX + WORKFLOW_LAYOUT_COMPONENT_WRAP_WIDTH_PX
+      cursorX + component.width >
+        anchorX + WORKFLOW_LAYOUT_COMPONENT_WRAP_WIDTH_PX
     ) {
       cursorY += rowMaxHeight + WORKFLOW_LAYOUT_COMPONENT_GAP_PX;
       cursorX = anchorX;
@@ -392,10 +394,5 @@ export async function computeWorkflowOrganizeLayoutUpdates(
     Math.min(...nodes.map((node) => node.position.y))
   );
 
-  return stitchComponentLayouts(
-    laidOutComponents,
-    nodesById,
-    anchorX,
-    anchorY
-  );
+  return stitchComponentLayouts(laidOutComponents, nodesById, anchorX, anchorY);
 }

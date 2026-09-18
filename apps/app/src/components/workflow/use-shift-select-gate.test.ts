@@ -24,15 +24,24 @@ describe("shouldBlockCardInteraction", () => {
 
 describe("isTypingTarget", () => {
   it("ignores Shift inside text fields", () => {
-    expect(isTypingTarget({ tagName: "INPUT" } as unknown as EventTarget)).toBe(true);
-    expect(isTypingTarget({ tagName: "TEXTAREA" } as unknown as EventTarget)).toBe(true);
+    expect(isTypingTarget({ tagName: "INPUT" } as unknown as EventTarget)).toBe(
+      true
+    );
     expect(
-      isTypingTarget({ tagName: "DIV", isContentEditable: true } as unknown as EventTarget)
+      isTypingTarget({ tagName: "TEXTAREA" } as unknown as EventTarget)
+    ).toBe(true);
+    expect(
+      isTypingTarget({
+        tagName: "DIV",
+        isContentEditable: true,
+      } as unknown as EventTarget)
     ).toBe(true);
   });
 
   it("treats the canvas as not typing", () => {
     expect(isTypingTarget(null)).toBe(false);
-    expect(isTypingTarget({ tagName: "DIV" } as unknown as EventTarget)).toBe(false);
+    expect(isTypingTarget({ tagName: "DIV" } as unknown as EventTarget)).toBe(
+      false
+    );
   });
 });

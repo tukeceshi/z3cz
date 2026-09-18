@@ -55,7 +55,9 @@ export function createR2BucketFromBlobStore(store: BlobStore): R2Bucket {
         text: async () => new TextDecoder().decode(body),
         json: async () => JSON.parse(new TextDecoder().decode(body)) as object,
         blob: async () =>
-          new Blob([body], { type: result.contentType ?? "application/octet-stream" }),
+          new Blob([body], {
+            type: result.contentType ?? "application/octet-stream",
+          }),
       } as R2ObjectBody;
     },
 

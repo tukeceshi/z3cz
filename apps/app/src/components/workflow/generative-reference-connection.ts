@@ -1,5 +1,9 @@
 import type { ObjectReference } from "@dafthunk/types";
-import type { Connection, Edge as ReactFlowEdge, Node as ReactFlowNode } from "@xyflow/react";
+import type {
+  Connection,
+  Edge as ReactFlowEdge,
+  Node as ReactFlowNode,
+} from "@xyflow/react";
 
 import { buildAiAudioPromptReferenceConnectionFromCardDrop } from "./ai-audio-prompt-reference";
 import { buildAiImagePromptReferenceConnectionFromCardDrop } from "./ai-image-prompt-reference";
@@ -24,7 +28,10 @@ export interface GenerativeReferenceCardDropParams {
   readonly dragFromNodeId: string;
   readonly dragFromHandle: GenerativeReferenceCardDropHandle | null;
   readonly hoveredNodeId: string;
-  readonly nodes: readonly Pick<ReactFlowNode<WorkflowNodeType>, "id" | "data">[];
+  readonly nodes: readonly Pick<
+    ReactFlowNode<WorkflowNodeType>,
+    "id" | "data"
+  >[];
 }
 
 /** Shared card-drop / add-node routing for generative reference edges. */

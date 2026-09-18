@@ -181,10 +181,7 @@ function FeedbackPageContent() {
     ? criteria.filter((c) => c.workflowId === workflowId)
     : criteria;
 
-  const columns = useMemo(
-    () => createColumns(getOrgUrl, t),
-    [getOrgUrl, t]
-  );
+  const columns = useMemo(() => createColumns(getOrgUrl, t), [getOrgUrl, t]);
 
   const errorMessage = feedbackError
     ? feedbackError instanceof Error
@@ -198,7 +195,9 @@ function FeedbackPageContent() {
 
   useEffect(() => {
     if (feedbackError) {
-      appToast.errorRaw(t("pages.feedback.fetchFailed", { message: errorMessage }));
+      appToast.errorRaw(
+        t("pages.feedback.fetchFailed", { message: errorMessage })
+      );
     }
   }, [feedbackError, errorMessage, appToast, t]);
 
@@ -222,7 +221,10 @@ function FeedbackPageContent() {
     return <InsetLoading title={t("pages.feedback.title")} />;
   } else if (feedbackError) {
     return (
-      <InsetError title={t("pages.feedback.title")} errorMessage={errorMessage} />
+      <InsetError
+        title={t("pages.feedback.title")}
+        errorMessage={errorMessage}
+      />
     );
   }
 
@@ -244,7 +246,9 @@ function FeedbackPageContent() {
               <SelectValue placeholder={t("pages.executions.allWorkflows")} />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">{t("pages.executions.allWorkflows")}</SelectItem>
+              <SelectItem value="all">
+                {t("pages.executions.allWorkflows")}
+              </SelectItem>
               {workflows.map((w) => (
                 <SelectItem key={w.id} value={w.id}>
                   {w.name}
@@ -262,7 +266,9 @@ function FeedbackPageContent() {
               <SelectValue placeholder={t("pages.feedback.allCriteria")} />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">{t("pages.feedback.allCriteria")}</SelectItem>
+              <SelectItem value="all">
+                {t("pages.feedback.allCriteria")}
+              </SelectItem>
               {filteredCriteria.map((c) => (
                 <SelectItem key={c.id} value={c.id}>
                   {c.question}
@@ -282,7 +288,9 @@ function FeedbackPageContent() {
                 )}
               >
                 <CalendarIcon className="h-4 w-4 mr-2" />
-                {startDate ? formatDate(startDate) : t("pages.feedback.startDate")}
+                {startDate
+                  ? formatDate(startDate)
+                  : t("pages.feedback.startDate")}
               </Button>
             </PopoverTrigger>
             <PopoverContent className="w-auto p-0" align="start">
@@ -327,7 +335,9 @@ function FeedbackPageContent() {
               disabled={isExporting || feedbackList.length === 0}
             >
               <DownloadIcon className="h-4 w-4 mr-2" />
-              {isExporting ? t("pages.feedback.exporting") : t("pages.feedback.exportCsv")}
+              {isExporting
+                ? t("pages.feedback.exporting")
+                : t("pages.feedback.exportCsv")}
             </Button>
           </div>
         </div>

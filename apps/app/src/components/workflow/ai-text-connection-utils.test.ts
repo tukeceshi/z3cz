@@ -1,4 +1,8 @@
-import { AI_IMAGE_NODE_TYPE, AI_TEXT_NODE_TYPE, AI_VIDEO_NODE_TYPE } from "@dafthunk/types";
+import {
+  AI_IMAGE_NODE_TYPE,
+  AI_TEXT_NODE_TYPE,
+  AI_VIDEO_NODE_TYPE,
+} from "@dafthunk/types";
 import type { InternalNode, Node } from "@xyflow/react";
 import { describe, expect, it } from "vitest";
 
@@ -16,7 +20,10 @@ import {
   AI_TEXT_CARD_WIDTH_PX,
   AI_TEXT_KEYWORDS_HANDLE_ID,
 } from "./ai-text-node-utils";
-import { AI_VIDEO_CARD_HEIGHT_PX, AI_VIDEO_REFERENCE_HANDLE_ID } from "./ai-video-node-utils";
+import {
+  AI_VIDEO_CARD_HEIGHT_PX,
+  AI_VIDEO_REFERENCE_HANDLE_ID,
+} from "./ai-video-node-utils";
 
 function mockTextNode(
   id: string,
@@ -95,14 +102,22 @@ describe("ai-text-connection-utils", () => {
   });
 
   it("snaps image to video on card midpoints, ignoring measured chrome", () => {
-    const source = mockImageNode("image-1", { x: 0, y: 100 }, {
-      width: 272,
-      height: 277,
-    });
-    const target = mockVideoNode("video-1", { x: 500, y: 100 }, {
-      width: 472,
-      height: 277,
-    });
+    const source = mockImageNode(
+      "image-1",
+      { x: 0, y: 100 },
+      {
+        width: 272,
+        height: 277,
+      }
+    );
+    const target = mockVideoNode(
+      "video-1",
+      { x: 500, y: 100 },
+      {
+        width: 472,
+        height: 277,
+      }
+    );
     const nodeLookup = new Map<string, InternalNode<Node>>([
       [source.id, source],
       [target.id, target],

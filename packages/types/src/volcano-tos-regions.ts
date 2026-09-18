@@ -34,9 +34,7 @@ export const VOLCANO_TOS_REGIONS: readonly VolcanoTosRegionOption[] = [
 
 export const VOLCANO_TOS_DEFAULT_PREFIX = "z3cz" as const;
 
-export function defaultVolcanoTosRegionForLocale(
-  locale: string
-): string {
+export function defaultVolcanoTosRegionForLocale(locale: string): string {
   if (locale.startsWith("zh")) {
     return "cn-guangzhou";
   }

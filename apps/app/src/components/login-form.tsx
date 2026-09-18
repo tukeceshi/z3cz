@@ -21,10 +21,7 @@ import { Label } from "@/components/ui/label";
 import { AuthError, authService } from "@/services/auth-service";
 import { usePublicAuthConfig } from "@/services/auth-config-service";
 import { LegalDocumentDialog } from "@/components/legal-document-dialog";
-import {
-  getDashboardPath,
-  mapAuthErrorMessage,
-} from "@/utils/auth-navigation";
+import { getDashboardPath, mapAuthErrorMessage } from "@/utils/auth-navigation";
 import { cn } from "@/utils/utils";
 
 interface LoginFormProps extends React.ComponentPropsWithoutRef<"div"> {
@@ -63,21 +60,20 @@ export function LoginForm({
     subAccountInvitationId
       ? `/auth/sub-account-invitations/${subAccountInvitationId}`
       : null,
-    () =>
-      authService.getSubAccountInvitationPreview(subAccountInvitationId!),
+    () => authService.getSubAccountInvitationPreview(subAccountInvitationId!),
     { revalidateOnFocus: false }
   );
 
   const { authConfig } = usePublicAuthConfig();
 
   const isSubAccountInvite = !!subAccountInvitationId;
-  const isBootstrap =
-    setupStatus?.hasUsers === false && !isSubAccountInvite;
+  const isBootstrap = setupStatus?.hasUsers === false && !isSubAccountInvite;
   const requiresVerification =
     authConfig?.email.requireVerificationOnRegister === true && !isBootstrap;
   const showOAuthProviders =
     !isSubAccountInvite &&
-    (authConfig?.github.enabled === true || authConfig?.google.enabled === true);
+    (authConfig?.github.enabled === true ||
+      authConfig?.google.enabled === true);
   const [pendingRegister, setPendingRegister] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -86,9 +82,8 @@ export function LoginForm({
   const [isSendingCode, setIsSendingCode] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [legalDialogType, setLegalDialogType] = useState<LegalDocumentType | null>(
-    null
-  );
+  const [legalDialogType, setLegalDialogType] =
+    useState<LegalDocumentType | null>(null);
 
   useEffect(() => {
     if (invitationPreview?.invitation.email) {
@@ -144,7 +139,9 @@ export function LoginForm({
             email,
             password,
             invitationId: subAccountInvitationId!,
-            verificationCode: requiresVerification ? verificationCode : undefined,
+            verificationCode: requiresVerification
+              ? verificationCode
+              : undefined,
           })
         : await authService.registerWithPassword(
             email,
@@ -177,7 +174,9 @@ export function LoginForm({
     }
   };
 
-  const handlePasswordSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+  const handlePasswordSubmit = async (
+    event: React.FormEvent<HTMLFormElement>
+  ) => {
     event.preventDefault();
     setFormError(null);
 
@@ -253,11 +252,15 @@ export function LoginForm({
 
   if (isSubAccountInvite && invitationError) {
     return (
-      <div className={cn("mx-auto flex w-full max-w-sm flex-col gap-4", className)}>
+      <div
+        className={cn("mx-auto flex w-full max-w-sm flex-col gap-4", className)}
+      >
         <Card>
           <CardHeader>
             <CardTitle>{t("auth.subAccountInviteInvalidTitle")}</CardTitle>
-            <CardDescription>{t("auth.subAccountInviteInvalidDescription")}</CardDescription>
+            <CardDescription>
+              {t("auth.subAccountInviteInvalidDescription")}
+            </CardDescription>
           </CardHeader>
         </Card>
       </div>
@@ -298,7 +301,9 @@ export function LoginForm({
         </div>
         {showVerificationFields && (pendingRegister || isSubAccountInvite) && (
           <div className="grid gap-2">
-            <Label htmlFor="verificationCode">{t("auth.verificationCode")}</Label>
+            <Label htmlFor="verificationCode">
+              {t("auth.verificationCode")}
+            </Label>
             <div className="flex gap-2">
               <Input
                 id="verificationCode"
@@ -329,9 +334,7 @@ export function LoginForm({
             )}
           </div>
         )}
-        {formError && (
-          <p className="text-sm text-destructive">{formError}</p>
-        )}
+        {formError && <p className="text-sm text-destructive">{formError}</p>}
         <Button type="submit" className="w-full" disabled={isSubmitting}>
           {submitButtonLabel}
         </Button>

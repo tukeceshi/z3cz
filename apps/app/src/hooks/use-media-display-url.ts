@@ -1,7 +1,4 @@
-import {
-  isWorkflowMediaValue,
-  type WorkflowMediaValue,
-} from "@dafthunk/types";
+import { isWorkflowMediaValue, type WorkflowMediaValue } from "@dafthunk/types";
 import { useMemo } from "react";
 
 import type { MediaDisplaySize } from "@/services/media-display-size";

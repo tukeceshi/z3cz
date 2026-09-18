@@ -7,9 +7,7 @@ export function readSidebarCookie(): boolean | undefined {
     return undefined;
   }
 
-  const match = document.cookie.match(
-    `(?:^|; )${SIDEBAR_COOKIE_NAME}=([^;]*)`
-  );
+  const match = document.cookie.match(`(?:^|; )${SIDEBAR_COOKIE_NAME}=([^;]*)`);
   if (!match) {
     return undefined;
   }

@@ -1,4 +1,8 @@
-import { AI_IMAGE_NODE_TYPE, AI_TEXT_NODE_TYPE, AI_VIDEO_NODE_TYPE } from "@dafthunk/types";
+import {
+  AI_IMAGE_NODE_TYPE,
+  AI_TEXT_NODE_TYPE,
+  AI_VIDEO_NODE_TYPE,
+} from "@dafthunk/types";
 import { describe, expect, it } from "vitest";
 
 import { AI_IMAGE_PROMPT_HANDLE_ID } from "./ai-image-node-utils";
@@ -12,11 +16,7 @@ import {
 import type { WorkflowNodeType } from "./workflow-types";
 import { testWorkflowNodeData } from "./workflow-test-fixtures";
 
-function node(
-  id: string,
-  nodeType: string,
-  data?: Partial<WorkflowNodeType>
-) {
+function node(id: string, nodeType: string, data?: Partial<WorkflowNodeType>) {
   return {
     id,
     data: testWorkflowNodeData({
@@ -75,7 +75,10 @@ describe("buildReferenceConnectionToNewNode", () => {
       dragFromNodeId: "text-1",
       dragFromHandle: { type: "target", id: "keywords" },
       targetNodeId: "text-2",
-      nodes: [node("text-1", AI_TEXT_NODE_TYPE), node("text-2", AI_TEXT_NODE_TYPE)],
+      nodes: [
+        node("text-1", AI_TEXT_NODE_TYPE),
+        node("text-2", AI_TEXT_NODE_TYPE),
+      ],
     });
 
     expect(connection).toBeNull();

@@ -11,7 +11,8 @@ export interface ArchivedWorkflowDetection {
 
 export { buildCatalogAllowedNodeTypeSet } from "@dafthunk/types";
 
-export function findArchivedWorkflowNodes(  nodes: readonly { readonly id: string; readonly type: string }[],
+export function findArchivedWorkflowNodes(
+  nodes: readonly { readonly id: string; readonly type: string }[],
   allowedNodeTypes: ReadonlySet<string>
 ): readonly ArchivedWorkflowNode[] {
   const archived: ArchivedWorkflowNode[] = [];
@@ -44,7 +45,9 @@ export function assertWorkflowExecutableAgainstCatalog(
   if (archived.length === 0) {
     return;
   }
-  const types = [...new Set(archived.map((entry) => entry.nodeType))].join(", ");
+  const types = [...new Set(archived.map((entry) => entry.nodeType))].join(
+    ", "
+  );
   throw new Error(
     `Workflow contains archived node types and cannot be executed: ${types}`
   );

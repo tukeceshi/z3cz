@@ -4,7 +4,10 @@ import { getOrganizationAiInterfaceRow } from "../src/db/ai-interface-queries";
 import { getVolcanoCredentials } from "../src/integrations/volcengine/ensure-api-key";
 import { callVolcengineMonitorApi } from "../src/integrations/volcengine/monitor-client";
 import { queryTosBucketStorageGiB } from "../src/integrations/volcengine/query-tos-bucket-storage";
-import { isVolcanoMetadata, parseInterfaceMetadata } from "../src/integrations/volcengine/metadata";
+import {
+  isVolcanoMetadata,
+  parseInterfaceMetadata,
+} from "../src/integrations/volcengine/metadata";
 
 const orgId = process.argv[2] ?? "019f9cf9-e5b3-720f-9b26-babb3ed15830";
 const ifaceId = process.argv[3] ?? "41713747-0341-45b1-ab4f-3c3c7a9cb184";
@@ -106,7 +109,11 @@ async function main(): Promise<void> {
     }
   }
 
-  for (const service of ["volcobserve", "Volc_Observe", "CloudMonitor"] as const) {
+  for (const service of [
+    "volcobserve",
+    "Volc_Observe",
+    "CloudMonitor",
+  ] as const) {
     console.log(`\n=== service=${service} region=${region} ===`);
     try {
       const { signVolcengineRequest } = await import(
@@ -120,9 +127,7 @@ async function main(): Promise<void> {
         StartTime: end - 86400,
         EndTime: end,
         Period: "3600s",
-        Instances: [
-          { Dimensions: [{ Name: "ResourceID", Value: bucket }] },
-        ],
+        Instances: [{ Dimensions: [{ Name: "ResourceID", Value: bucket }] }],
       };
       const signed = await signVolcengineRequest({
         accessKeyId: credentials.accessKeyId,

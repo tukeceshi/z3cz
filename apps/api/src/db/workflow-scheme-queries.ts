@@ -7,10 +7,7 @@ import type {
   WorkflowSchemeNodeRules,
   WorkflowTrigger,
 } from "@dafthunk/types";
-import {
-  ALL_WORKFLOW_RUNTIMES,
-  ALL_WORKFLOW_TRIGGERS,
-} from "@dafthunk/types";
+import { ALL_WORKFLOW_RUNTIMES, ALL_WORKFLOW_TRIGGERS } from "@dafthunk/types";
 import { and, asc, eq, ne } from "drizzle-orm";
 
 import type { Database } from "./index";
@@ -34,7 +31,9 @@ function parseJsonArray<T extends string>(value: string | null): T[] {
   }
 }
 
-function serializeJsonArray(values: readonly string[] | undefined): string | null {
+function serializeJsonArray(
+  values: readonly string[] | undefined
+): string | null {
   if (!values || values.length === 0) {
     return null;
   }
@@ -125,7 +124,9 @@ function normalizeNodeRules(
   nodeRules: WorkflowSchemeNodeRules | undefined
 ): WorkflowSchemeNodeRules {
   return {
-    includeTags: nodeRules?.includeTags ? [...new Set(nodeRules.includeTags)] : [],
+    includeTags: nodeRules?.includeTags
+      ? [...new Set(nodeRules.includeTags)]
+      : [],
     includeNodeTypes: nodeRules?.includeNodeTypes
       ? [...new Set(nodeRules.includeNodeTypes)]
       : [],
@@ -138,7 +139,10 @@ function normalizeNodeRules(
   };
 }
 
-async function clearDefaultScheme(db: Database, exceptId?: string): Promise<void> {
+async function clearDefaultScheme(
+  db: Database,
+  exceptId?: string
+): Promise<void> {
   const conditions = [eq(workflowSchemes.isDefault, true)];
   if (exceptId) {
     conditions.push(ne(workflowSchemes.id, exceptId));
@@ -162,7 +166,9 @@ export async function listEnabledWorkflowSchemes(
   return rows.map(rowToPublicWorkflowScheme);
 }
 
-export async function listWorkflowSchemes(db: Database): Promise<WorkflowScheme[]> {
+export async function listWorkflowSchemes(
+  db: Database
+): Promise<WorkflowScheme[]> {
   const rows = await db
     .select()
     .from(workflowSchemes)
@@ -259,7 +265,9 @@ export async function createWorkflowScheme(
       includeTags: serializeJsonArray(nodeRules.includeTags),
       includeNodeTypes: serializeJsonArray(nodeRules.includeNodeTypes),
       excludeNodeTypes: serializeJsonArray(nodeRules.excludeNodeTypes),
-      alwaysIncludeNodeTypes: serializeJsonArray(nodeRules.alwaysIncludeNodeTypes),
+      alwaysIncludeNodeTypes: serializeJsonArray(
+        nodeRules.alwaysIncludeNodeTypes
+      ),
       isDefault: false,
       isSystem: false,
       sortOrder: input.sortOrder ?? 0,
@@ -316,7 +324,9 @@ export async function updateWorkflowScheme(
       includeTags: serializeJsonArray(nodeRules.includeTags),
       includeNodeTypes: serializeJsonArray(nodeRules.includeNodeTypes),
       excludeNodeTypes: serializeJsonArray(nodeRules.excludeNodeTypes),
-      alwaysIncludeNodeTypes: serializeJsonArray(nodeRules.alwaysIncludeNodeTypes),
+      alwaysIncludeNodeTypes: serializeJsonArray(
+        nodeRules.alwaysIncludeNodeTypes
+      ),
       sortOrder: input.sortOrder ?? existing.sortOrder,
       enabled: input.enabled ?? existing.enabled,
       isDefault: input.isDefault ?? existing.isDefault,

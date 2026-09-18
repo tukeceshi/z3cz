@@ -10,7 +10,10 @@ import type { NodeEnv } from "../node-types";
 import type { ObjectStore } from "../object-store";
 import { pollUpstreamContinuation } from "../upstream/upstream-poll-router";
 import type { UpstreamPollResult } from "../upstream/upstream-types";
-import { reschedulePollContinuation, resolvePollTimeout } from "../upstream/upstream-types";
+import {
+  reschedulePollContinuation,
+  resolvePollTimeout,
+} from "../upstream/upstream-types";
 import { nodeToApiParameter } from "../parameter-mapper";
 import {
   registerContinuation,
@@ -24,7 +27,10 @@ export interface PollContinuationHandlerDeps {
   readonly aiInterfaceService?: import("../ai-interface-service").AiInterfaceService;
   readonly resolveAiVideoStorage?: import("../ai-image-storage").ResolveAiImageStorage;
   readonly trackWorkflowGenerationJob?: import("../generation-job-tracker").WorkflowGenerationJobTracker;
-  readonly findNode: (workflowContext: WorkflowExecutionContext, nodeId: string) => Node | undefined;
+  readonly findNode: (
+    workflowContext: WorkflowExecutionContext,
+    nodeId: string
+  ) => Node | undefined;
 }
 
 export interface PollContinuationHandler {
@@ -77,7 +83,9 @@ async function upstreamResultToNodeExecution(
     };
   }
 
-  const node = workflowContext.workflow.nodes.find((entry) => entry.id === nodeId);
+  const node = workflowContext.workflow.nodes.find(
+    (entry) => entry.id === nodeId
+  );
   if (!node) {
     return {
       nodeId,
@@ -206,7 +214,9 @@ export function listDuePollContinuations(
 ): import("@dafthunk/types").UpstreamPollContinuation[] {
   const nowMs = now.getTime();
   return [...state.continuations.values()].filter(
-    (continuation): continuation is import("@dafthunk/types").UpstreamPollContinuation =>
+    (
+      continuation
+    ): continuation is import("@dafthunk/types").UpstreamPollContinuation =>
       continuation.kind === "upstream_poll" &&
       Date.parse(continuation.nextPollAt) <= nowMs
   );

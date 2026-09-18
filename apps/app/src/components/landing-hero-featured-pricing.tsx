@@ -421,7 +421,9 @@ export function LandingHeroFeaturedPricing() {
     [allScenarios]
   );
 
-  const [canonicalId, setCanonicalId] = useState<string>(LANDING_VIDEO_PRICE_MODEL_ID);
+  const [canonicalId, setCanonicalId] = useState<string>(
+    LANDING_VIDEO_PRICE_MODEL_ID
+  );
   const [resolution, setResolution] = useState(LANDING_DEFAULT_RESOLUTION);
   const [ratio, setRatio] = useState<BillingRatio>(LANDING_DEFAULT_RATIO);
   const [durationSec, setDurationSec] = useState(LANDING_DEFAULT_DURATION_SEC);

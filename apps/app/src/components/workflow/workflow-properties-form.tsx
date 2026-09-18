@@ -92,7 +92,9 @@ export function WorkflowPropertiesForm({
           id="workflow-description"
           value={localDescription}
           onChange={handleDescriptionChange}
-          placeholder={t("workflow.propertiesForm.workflowDescriptionPlaceholder")}
+          placeholder={t(
+            "workflow.propertiesForm.workflowDescriptionPlaceholder"
+          )}
           className="mt-2"
           maxLength={256}
           rows={3}

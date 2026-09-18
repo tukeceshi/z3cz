@@ -319,7 +319,8 @@ export async function submitMediaKitSubtitleEraseTask(
   return { taskId };
 }
 
-export interface SubmitMediaKitVideoTrimParams {  readonly apiKey: string;
+export interface SubmitMediaKitVideoTrimParams {
+  readonly apiKey: string;
   readonly videoUrl: string;
   readonly startSec: number;
   readonly endSec: number;

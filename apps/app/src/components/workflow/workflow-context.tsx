@@ -1,4 +1,7 @@
-import type { WorkflowTrigger, WorkflowGenerativeDefaults } from "@dafthunk/types";
+import type {
+  WorkflowTrigger,
+  WorkflowGenerativeDefaults,
+} from "@dafthunk/types";
 import type { Edge as ReactFlowEdge } from "@xyflow/react";
 import { createContext, ReactNode, useContext, useMemo } from "react";
 
@@ -75,10 +78,7 @@ const WorkflowGraphContext =
   createContext<WorkflowGraphContextValue>(defaultGraph);
 
 export function isWorkflowHandleConnected(
-  connectedHandles:
-    | ReadonlySet<string>
-    | readonly string[]
-    | undefined,
+  connectedHandles: ReadonlySet<string> | readonly string[] | undefined,
   nodeId: string,
   handleId: string
 ): boolean {
@@ -237,7 +237,12 @@ export function upsertNodeInputValues(
 ): WorkflowParameter[] {
   let next = [...inputs];
   for (const [inputId, value] of Object.entries(values)) {
-    next = upsertNodeInputValue(next, inputId, value, types[inputId] ?? "string");
+    next = upsertNodeInputValue(
+      next,
+      inputId,
+      value,
+      types[inputId] ?? "string"
+    );
   }
   return next;
 }
@@ -288,7 +293,9 @@ export const updateNodeOutput = (
   updateNodeData?: UpdateNodeFn
 ): readonly WorkflowParameter[] => {
   const updatedOutputs = outputs.map((output) =>
-    output.id === outputId ? ({ ...output, value } as WorkflowParameter) : output
+    output.id === outputId
+      ? ({ ...output, value } as WorkflowParameter)
+      : output
   );
 
   updateNodeData?.(nodeId, { outputs: updatedOutputs });

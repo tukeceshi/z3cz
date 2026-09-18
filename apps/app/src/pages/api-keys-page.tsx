@@ -271,7 +271,9 @@ function ApiKeysPageContent() {
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>{t("pages.apiKeys.nameDialogTitle")}</AlertDialogTitle>
+            <AlertDialogTitle>
+              {t("pages.apiKeys.nameDialogTitle")}
+            </AlertDialogTitle>
             <AlertDialogDescription>
               {t("pages.apiKeys.nameDialogDescription")}
             </AlertDialogDescription>
@@ -304,7 +306,9 @@ function ApiKeysPageContent() {
       >
         <AlertDialogContent className="max-w-2xl">
           <AlertDialogHeader>
-            <AlertDialogTitle>{t("pages.apiKeys.showDialogTitle")}</AlertDialogTitle>
+            <AlertDialogTitle>
+              {t("pages.apiKeys.showDialogTitle")}
+            </AlertDialogTitle>
             <AlertDialogDescription>
               {t("pages.apiKeys.showDialogDescription")}
             </AlertDialogDescription>
@@ -339,7 +343,9 @@ function ApiKeysPageContent() {
       <AlertDialog open={isRollDialogOpen} onOpenChange={setIsRollDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>{t("pages.apiKeys.rollDialogTitle")}</AlertDialogTitle>
+            <AlertDialogTitle>
+              {t("pages.apiKeys.rollDialogTitle")}
+            </AlertDialogTitle>
             <AlertDialogDescription>
               {t("pages.apiKeys.rollDialogDescription")}
             </AlertDialogDescription>

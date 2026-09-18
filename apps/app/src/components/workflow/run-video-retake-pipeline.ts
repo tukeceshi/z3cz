@@ -26,7 +26,10 @@ import {
   submitVideoTrim,
 } from "@/services/platform-ai-model-service";
 import { resolveMediaReferencesForVideoGenerate } from "@/services/resolve-references-for-generate";
-import { stageGenerativeCardUpload, uploadGenerativeMediaFile } from "@/services/stage-generative-media";
+import {
+  stageGenerativeCardUpload,
+  uploadGenerativeMediaFile,
+} from "@/services/stage-generative-media";
 
 import {
   appendAiVideoGeneratedHistoryItems,
@@ -243,7 +246,9 @@ function markTargetFailed(params: {
       readGenerativeProgressJobId(current.metadata)
     ),
     metadata: withAiVideoGenerateError(
-      withGenerativeBottomPanelHidden(clearRetakeBusyMetadata(current.metadata)),
+      withGenerativeBottomPanelHidden(
+        clearRetakeBusyMetadata(current.metadata)
+      ),
       formatted
     ),
   }));
@@ -324,13 +329,16 @@ async function writeCloudResultToNode(params: {
           resolved.media as unknown as WorkflowMediaValue[],
           {
             prompt:
-              typeof current.inputs.find((input) => input.id === "prompt")?.value ===
-              "string"
+              typeof current.inputs.find((input) => input.id === "prompt")
+                ?.value === "string"
                 ? current.inputs.find((input) => input.id === "prompt")!.value
                 : "",
           }
         )
-      : withAiVideoManualUpload(current, resolved.media as unknown as WorkflowMediaValue[]);
+      : withAiVideoManualUpload(
+          current,
+          resolved.media as unknown as WorkflowMediaValue[]
+        );
     const merged = { ...current, ...withMedia };
     const finalized = finalizeRetakeNode(merged, {});
     return {
@@ -353,9 +361,7 @@ function writeGeneratedVideoToNode(params: {
     throw new Error("Video generation succeeded without a playable reference");
   }
   const jobId = params.generated.jobId;
-  const canWriteHistory = jobId
-    ? tryClaimGenerativeJobFinalize(jobId)
-    : true;
+  const canWriteHistory = jobId ? tryClaimGenerativeJobFinalize(jobId) : true;
   if (canWriteHistory) {
     persistMediaForNodeInBackground({
       organizationId: params.pipeline.organizationId,
@@ -379,13 +385,14 @@ function writeGeneratedVideoToNode(params: {
       current,
       [video as unknown as WorkflowMediaValue],
       {
-      prompt: params.pipeline.prompt,
-      params: params.pipeline.generationParams,
-      platformModelId: params.pipeline.modelCanonicalId,
-      aiInterfaceId: params.generated.aiInterfaceId,
-      modelDisplayName: params.pipeline.modelDisplayName,
-      jobId: jobId ?? undefined,
-    });
+        prompt: params.pipeline.prompt,
+        params: params.pipeline.generationParams,
+        platformModelId: params.pipeline.modelCanonicalId,
+        aiInterfaceId: params.generated.aiInterfaceId,
+        modelDisplayName: params.pipeline.modelDisplayName,
+        jobId: jobId ?? undefined,
+      }
+    );
     const merged = { ...current, ...withResult };
     const finalized = finalizeRetakeNode(merged, withResult);
     return {
@@ -651,7 +658,9 @@ async function runLocalRetake(
       referenceVideoUrl,
     });
     if (!generated.video) {
-      throw new Error("Video generation succeeded without a playable reference");
+      throw new Error(
+        "Video generation succeeded without a playable reference"
+      );
     }
     writeGeneratedVideoToNode({ pipeline: params, generated });
     return;
@@ -782,7 +791,9 @@ async function runCloudRetake(
       referenceVideoUrl,
     });
     if (!generated.video) {
-      throw new Error("Video generation succeeded without a playable reference");
+      throw new Error(
+        "Video generation succeeded without a playable reference"
+      );
     }
     writeGeneratedVideoToNode({ pipeline: params, generated });
     return;

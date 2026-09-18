@@ -68,7 +68,8 @@ export function VideoSubtitleEraseToolbarButton({
       }
 
       const sourceMedia =
-        isResourceIdReference(sourceVideo) && !isUnloadedResourceRef(sourceVideo)
+        isResourceIdReference(sourceVideo) &&
+        !isUnloadedResourceRef(sourceVideo)
           ? sourceVideo
           : null;
       if (!sourceMedia) {

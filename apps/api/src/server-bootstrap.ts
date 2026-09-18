@@ -1,7 +1,4 @@
-import {
-  runDatabaseMigrations,
-  waitForPostgres,
-} from "./env/docker-bootstrap";
+import { runDatabaseMigrations, waitForPostgres } from "./env/docker-bootstrap";
 import { writeBootPhase } from "./env/api-boot-cache";
 import { serve } from "@hono/node-server";
 import { createNodeWebSocket } from "@hono/node-ws";
@@ -12,7 +9,9 @@ import { createNodeBindings } from "./env/create-node-bindings";
 import { registerNodeWsRoutes } from "./routes/ws-node";
 import { handleScheduledEvent } from "./scheduled";
 
-export async function runServer(envVars: Record<string, string>): Promise<void> {
+export async function runServer(
+  envVars: Record<string, string>
+): Promise<void> {
   const databaseUrl =
     envVars.DATABASE_URL ??
     "postgresql://postgres:postgres@supabase-db:5432/postgres";
@@ -110,5 +109,4 @@ export async function runServer(envVars: Record<string, string>): Promise<void> 
     runScheduled();
     setInterval(runScheduled, 60_000);
   }
-
 }

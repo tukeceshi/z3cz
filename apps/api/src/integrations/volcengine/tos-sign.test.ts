@@ -14,7 +14,9 @@ describe("signTosRequest", () => {
     });
 
     expect(signed.url).toBe("https://tos-cn-beijing.volces.com/");
-    expect(signed.headers.Authorization).toMatch(/^TOS4-HMAC-SHA256 Credential=/);
+    expect(signed.headers.Authorization).toMatch(
+      /^TOS4-HMAC-SHA256 Credential=/
+    );
     expect(signed.headers.Authorization).toContain("/cn-beijing/tos/request");
     expect(signed.headers["x-tos-date"]).toMatch(/^\d{8}T\d{6}Z$/);
     expect(signed.headers["x-tos-content-sha256"]).toBe("UNSIGNED-PAYLOAD");

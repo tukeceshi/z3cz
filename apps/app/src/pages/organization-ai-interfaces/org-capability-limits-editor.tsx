@@ -139,7 +139,9 @@ function OrgPriceEstimateDiscountInput(props: {
   readonly onCommit: (fold: number) => void;
 }) {
   const { t } = useTranslation();
-  const [draft, setDraft] = useState(() => formatVideoPricePromoFold(props.fold));
+  const [draft, setDraft] = useState(() =>
+    formatVideoPricePromoFold(props.fold)
+  );
 
   useEffect(() => {
     setDraft(formatVideoPricePromoFold(props.fold));
@@ -181,7 +183,9 @@ function OrgPriceEstimateDiscountInput(props: {
 function OrgPriceEstimateSection(props: {
   readonly platformBaseline: PlatformVideoModelBaseline;
   readonly capabilityLimits: SingleModelCapabilityLimits;
-  readonly onCapabilityLimitsChange: (limits: SingleModelCapabilityLimits) => void;
+  readonly onCapabilityLimitsChange: (
+    limits: SingleModelCapabilityLimits
+  ) => void;
 }) {
   const { t } = useTranslation();
   const config = props.platformBaseline.priceEstimate;
@@ -203,7 +207,9 @@ function OrgPriceEstimateSection(props: {
         <div className="flex flex-wrap items-center justify-end gap-3">
           <div className="flex items-center gap-2">
             <span className="text-muted-foreground text-xs">
-              {t("pages.aiInterfaces.singleModel.priceEstimateOfficialDiscount")}
+              {t(
+                "pages.aiInterfaces.singleModel.priceEstimateOfficialDiscount"
+              )}
             </span>
             <Switch
               checked={officialEnabled}
@@ -366,7 +372,12 @@ export function OrgCapabilityLimitsEditor({
         </SettingsSection>
       ) : null}
 
-      <SettingsSection compact stacked columns={1} title={t("pages.aiInterfaces.singleModel.referenceLimitsTitle")}>
+      <SettingsSection
+        compact
+        stacked
+        columns={1}
+        title={t("pages.aiInterfaces.singleModel.referenceLimitsTitle")}
+      >
         <div className="grid gap-3 sm:grid-cols-3">
           <OrgReferenceCountInput
             id="org_cap_ref_images"
@@ -433,7 +444,9 @@ export function OrgCapabilityLimitsEditor({
               max: resolveMaxDurationFromField(platformBaseline.duration),
             }}
             onFieldsChange={(fields) => {
-              const nextDuration = fields.find((field) => field.name === "duration");
+              const nextDuration = fields.find(
+                (field) => field.name === "duration"
+              );
               if (!nextDuration) {
                 return;
               }

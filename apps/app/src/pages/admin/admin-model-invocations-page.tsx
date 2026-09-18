@@ -41,7 +41,9 @@ export function AdminModelInvocationsPage() {
   const { t } = useTranslation();
   const setBreadcrumbs = useBreadcrumbsSetter();
   const [page, setPage] = useState(1);
-  const [draftRange, setDraftRange] = useState<DateRange | undefined>(undefined);
+  const [draftRange, setDraftRange] = useState<DateRange | undefined>(
+    undefined
+  );
   const [appliedRange, setAppliedRange] = useState<DateRange | undefined>(
     undefined
   );
@@ -137,7 +139,9 @@ export function AdminModelInvocationsPage() {
                   </p>
                 </div>
                 <div className="flex items-center gap-2">
-                  <Badge variant={invocationStatusBadgeVariant(invocation.status)}>
+                  <Badge
+                    variant={invocationStatusBadgeVariant(invocation.status)}
+                  >
                     {t(invocationStatusLabelKey(invocation.status))}
                   </Badge>
                   <Button

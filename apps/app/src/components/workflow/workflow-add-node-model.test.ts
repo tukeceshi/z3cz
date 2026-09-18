@@ -17,7 +17,10 @@ import {
 import { createProjectedModelFits } from "./generative-model-ref-fit";
 import { validateWorkflowConnection } from "./workflow-connection-validation";
 import type { WorkflowNodeType } from "./workflow-types";
-import { testWorkflowNodeData, testWorkflowParam } from "./workflow-test-fixtures";
+import {
+  testWorkflowNodeData,
+  testWorkflowParam,
+} from "./workflow-test-fixtures";
 
 function mockTextModel(
   canonicalId: string,
@@ -78,18 +81,24 @@ describe("add-node reference model before validation", () => {
       name: "text-new",
       inputs: [
         testWorkflowParam({ id: "model", value: current.canonicalId }),
-        testWorkflowParam({ id: "ai_interface_id", value: current.interfaceId }),
+        testWorkflowParam({
+          id: "ai_interface_id",
+          value: current.interfaceId,
+        }),
       ],
       outputs: [{ id: "text", name: "text", type: "string" }],
     });
 
     const nodesBeforeSwitch = [
-      makeFlowNode("image-1", testWorkflowNodeData({
-        nodeType: AI_IMAGE_NODE_TYPE,
-        name: "Image 1",
-        inputs: [],
-        outputs: [{ id: "images", name: "images", type: "image" }],
-      })),
+      makeFlowNode(
+        "image-1",
+        testWorkflowNodeData({
+          nodeType: AI_IMAGE_NODE_TYPE,
+          name: "Image 1",
+          inputs: [],
+          outputs: [{ id: "images", name: "images", type: "image" }],
+        })
+      ),
       makeFlowNode("text-new", defaultNodeData),
     ];
 

@@ -33,7 +33,11 @@ import {
 import type { OrgModelBindingRef } from "./org-model-selection-utils";
 import { withGenerativeGeneratedContentMode } from "./generative-card-mode-utils";
 import { WORKFLOW_NODE_ADD_GAP_PX } from "./workflow-node-placement";
-import type { NodeType, WorkflowNodeType, WorkflowParameter } from "./workflow-types";
+import type {
+  NodeType,
+  WorkflowNodeType,
+  WorkflowParameter,
+} from "./workflow-types";
 
 export type HistoryExpandKind = "image" | "video" | "audio";
 
@@ -50,9 +54,10 @@ export function findHistoryExpandCatalog(
   return nodeTypes.find((entry) => entry.type === type);
 }
 
-export function computeHistoryExpandNodePosition(
-  sourcePosition: { readonly x: number; readonly y: number }
-): { readonly x: number; readonly y: number } {
+export function computeHistoryExpandNodePosition(sourcePosition: {
+  readonly x: number;
+  readonly y: number;
+}): { readonly x: number; readonly y: number } {
   return {
     x: sourcePosition.x + 280 + WORKFLOW_NODE_ADD_GAP_PX,
     y: sourcePosition.y,
@@ -137,7 +142,12 @@ export function buildSiblingNodeFromHistoryItem(params: {
   inputs = upsertParam(inputs, "prompt", params.prompt, "string");
 
   if (params.kind === "image") {
-    inputs = upsertParam(inputs, AI_IMAGE_RESULT_INPUT_ID, [params.media], "json");
+    inputs = upsertParam(
+      inputs,
+      AI_IMAGE_RESULT_INPUT_ID,
+      [params.media],
+      "json"
+    );
     inputs = upsertParam(
       inputs,
       AI_IMAGE_HISTORY_INPUT_ID,
@@ -160,7 +170,12 @@ export function buildSiblingNodeFromHistoryItem(params: {
     );
     inputs = upsertParam(inputs, "manual_images", [], "json");
   } else if (params.kind === "video") {
-    inputs = upsertParam(inputs, AI_VIDEO_RESULT_INPUT_ID, [params.media], "json");
+    inputs = upsertParam(
+      inputs,
+      AI_VIDEO_RESULT_INPUT_ID,
+      [params.media],
+      "json"
+    );
     inputs = upsertParam(
       inputs,
       AI_VIDEO_HISTORY_INPUT_ID,
@@ -183,7 +198,12 @@ export function buildSiblingNodeFromHistoryItem(params: {
     );
     inputs = upsertParam(inputs, "manual_videos", [], "json");
   } else {
-    inputs = upsertParam(inputs, AI_AUDIO_RESULT_INPUT_ID, [params.media], "json");
+    inputs = upsertParam(
+      inputs,
+      AI_AUDIO_RESULT_INPUT_ID,
+      [params.media],
+      "json"
+    );
     inputs = upsertParam(
       inputs,
       AI_AUDIO_HISTORY_INPUT_ID,

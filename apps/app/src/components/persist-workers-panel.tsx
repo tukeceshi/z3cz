@@ -205,9 +205,7 @@ export function PersistWorkersPanel({
     <div className="space-y-3">
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0">
-          {title ? (
-            <h2 className="text-sm font-medium">{title}</h2>
-          ) : null}
+          {title ? <h2 className="text-sm font-medium">{title}</h2> : null}
           <p
             className={cn(
               "text-muted-foreground",
@@ -217,7 +215,11 @@ export function PersistWorkersPanel({
             {description ?? t("admin.persistWorkers.description")}
           </p>
         </div>
-        <Button type="button" className="shrink-0" onClick={handleOpenBootstrap}>
+        <Button
+          type="button"
+          className="shrink-0"
+          onClick={handleOpenBootstrap}
+        >
           {t("admin.persistWorkers.add")}
         </Button>
       </div>
@@ -228,11 +230,15 @@ export function PersistWorkersPanel({
             <TableRow>
               <TableHead>{t("admin.persistWorkers.columns.name")}</TableHead>
               <TableHead>{t("admin.persistWorkers.columns.host")}</TableHead>
-              <TableHead>{t("admin.persistWorkers.columns.capacity")}</TableHead>
+              <TableHead>
+                {t("admin.persistWorkers.columns.capacity")}
+              </TableHead>
               <TableHead>
                 {t("admin.persistWorkers.columns.deployStatus")}
               </TableHead>
-              <TableHead>{t("admin.persistWorkers.columns.heartbeat")}</TableHead>
+              <TableHead>
+                {t("admin.persistWorkers.columns.heartbeat")}
+              </TableHead>
               <TableHead className="text-right">
                 {t("admin.persistWorkers.columns.actions")}
               </TableHead>
@@ -260,7 +266,9 @@ export function PersistWorkersPanel({
                     <TableCell>—</TableCell>
                     <TableCell>—</TableCell>
                     <TableCell>
-                      <Badge variant={deployStatusVariant(platform.deployStatus)}>
+                      <Badge
+                        variant={deployStatusVariant(platform.deployStatus)}
+                      >
                         {t(
                           `admin.persistWorkers.deployStatus.${platform.deployStatus}`
                         )}
@@ -297,7 +305,9 @@ export function PersistWorkersPanel({
                     </TableCell>
                     <TableCell>
                       <div className="space-y-1">
-                        <Badge variant={deployStatusVariant(worker.deployStatus)}>
+                        <Badge
+                          variant={deployStatusVariant(worker.deployStatus)}
+                        >
                           {t(
                             `admin.persistWorkers.deployStatus.${worker.deployStatus}`
                           )}
@@ -374,7 +384,10 @@ export function PersistWorkersPanel({
                 name={`${idPrefix}_name`}
                 value={form.name}
                 onChange={(event) =>
-                  setForm((current) => ({ ...current, name: event.target.value }))
+                  setForm((current) => ({
+                    ...current,
+                    name: event.target.value,
+                  }))
                 }
                 placeholder={t("admin.persistWorkers.form.namePlaceholder")}
               />
@@ -554,7 +567,9 @@ export function PersistWorkersPanel({
       <Dialog open={deployLogOpen} onOpenChange={setDeployLogOpen}>
         <DialogContent className="max-w-2xl">
           <DialogHeader>
-            <DialogTitle>{t("admin.persistWorkers.deployLogTitle")}</DialogTitle>
+            <DialogTitle>
+              {t("admin.persistWorkers.deployLogTitle")}
+            </DialogTitle>
           </DialogHeader>
           <pre className="max-h-96 overflow-auto rounded-md bg-muted p-3 text-xs">
             {deployLog || t("admin.persistWorkers.deployLogEmpty")}

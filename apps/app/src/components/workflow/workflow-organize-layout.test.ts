@@ -10,7 +10,10 @@ import {
   WORKFLOW_LAYOUT_COMPONENT_GAP_PX,
   WORKFLOW_LAYOUT_SNAP_GRID_PX,
 } from "./workflow-organize-layout";
-import type { Edge as ReactFlowEdge, Node as ReactFlowNode } from "@xyflow/react";
+import type {
+  Edge as ReactFlowEdge,
+  Node as ReactFlowNode,
+} from "@xyflow/react";
 
 function node(
   id: string,
@@ -104,7 +107,8 @@ describe("computeWorkflowOrganizeLayoutUpdates", () => {
     const updates = await computeWorkflowOrganizeLayoutUpdates(
       nodes,
       edges,
-      (layoutNode) => dimensions.get(layoutNode.id) ?? { width: 200, height: 100 }
+      (layoutNode) =>
+        dimensions.get(layoutNode.id) ?? { width: 200, height: 100 }
     );
 
     const positions = new Map(
@@ -140,7 +144,8 @@ describe("computeWorkflowOrganizeLayoutUpdates", () => {
     const updates = await computeWorkflowOrganizeLayoutUpdates(
       nodes,
       edges,
-      (layoutNode) => dimensions.get(layoutNode.id) ?? { width: 200, height: 100 }
+      (layoutNode) =>
+        dimensions.get(layoutNode.id) ?? { width: 200, height: 100 }
     );
 
     const positions = new Map(

@@ -15,7 +15,10 @@ function clampContinuationTimeout(
   continuation: UpstreamPollContinuation
 ): UpstreamPollContinuation {
   const deadline = Date.parse(continuation.timeoutAt);
-  const cappedDeadline = Math.min(deadline, Date.now() + MAX_WORKER_BLOCKING_MS);
+  const cappedDeadline = Math.min(
+    deadline,
+    Date.now() + MAX_WORKER_BLOCKING_MS
+  );
   if (cappedDeadline === deadline) {
     return continuation;
   }

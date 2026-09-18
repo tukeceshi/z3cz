@@ -79,10 +79,7 @@ const FILE_TYPES: InputOutputType[] = [
 ];
 
 // Types whose values should not expose a copy action
-const NON_COPYABLE_TYPES: InputOutputType[] = [
-  ...FILE_TYPES,
-  "secret",
-];
+const NON_COPYABLE_TYPES: InputOutputType[] = [...FILE_TYPES, "secret"];
 
 const toCopyableString = (value: unknown): string | null => {
   if (value === undefined || value === null) return null;

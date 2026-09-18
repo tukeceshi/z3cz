@@ -2,7 +2,10 @@ import { AI_IMAGE_NODE_TYPE, AI_TEXT_NODE_TYPE } from "@dafthunk/types";
 import type { Edge, Node } from "@xyflow/react";
 import { describe, expect, it } from "vitest";
 
-import { AI_IMAGE_PROMPT_HANDLE_ID, AI_IMAGE_REFERENCE_HANDLE_ID } from "./ai-image-node-utils";
+import {
+  AI_IMAGE_PROMPT_HANDLE_ID,
+  AI_IMAGE_REFERENCE_HANDLE_ID,
+} from "./ai-image-node-utils";
 import { AI_TEXT_OUTPUT_ID } from "./ai-text-node-utils";
 import {
   appendGenerativeReferenceConnection,
@@ -20,7 +23,9 @@ function node(id: string, nodeType: string): Node<WorkflowNodeType> {
       nodeType,
       name: id,
       inputs: [],
-      outputs: [{ id: AI_TEXT_OUTPUT_ID, name: AI_TEXT_OUTPUT_ID, type: "string" }],
+      outputs: [
+        { id: AI_TEXT_OUTPUT_ID, name: AI_TEXT_OUTPUT_ID, type: "string" },
+      ],
     }),
   };
 }
@@ -31,7 +36,10 @@ describe("buildPanelReferenceConnection", () => {
       sourceNodeId: "text-1",
       sourceHandle: AI_TEXT_OUTPUT_ID,
       targetNodeId: "image-1",
-      nodes: [node("text-1", AI_TEXT_NODE_TYPE), node("image-1", AI_IMAGE_NODE_TYPE)],
+      nodes: [
+        node("text-1", AI_TEXT_NODE_TYPE),
+        node("image-1", AI_IMAGE_NODE_TYPE),
+      ],
     });
 
     expect(connection).toEqual({
@@ -45,7 +53,10 @@ describe("buildPanelReferenceConnection", () => {
 
 describe("canConnectGenerativeReferenceConnection", () => {
   it("accepts text to image via reference handle after normalization", () => {
-    const nodes = [node("text-1", AI_TEXT_NODE_TYPE), node("image-1", AI_IMAGE_NODE_TYPE)];
+    const nodes = [
+      node("text-1", AI_TEXT_NODE_TYPE),
+      node("image-1", AI_IMAGE_NODE_TYPE),
+    ];
 
     expect(
       canConnectGenerativeReferenceConnection({
@@ -59,7 +70,10 @@ describe("canConnectGenerativeReferenceConnection", () => {
   });
 
   it("rejects duplicate prompt references", () => {
-    const nodes = [node("text-1", AI_TEXT_NODE_TYPE), node("image-1", AI_IMAGE_NODE_TYPE)];
+    const nodes = [
+      node("text-1", AI_TEXT_NODE_TYPE),
+      node("image-1", AI_IMAGE_NODE_TYPE),
+    ];
     const edges = [
       {
         id: "existing",
@@ -84,7 +98,10 @@ describe("canConnectGenerativeReferenceConnection", () => {
 
 describe("appendGenerativeReferenceConnection", () => {
   it("normalizes text onto image reference handle when committing", () => {
-    const nodes = [node("text-1", AI_TEXT_NODE_TYPE), node("image-1", AI_IMAGE_NODE_TYPE)];
+    const nodes = [
+      node("text-1", AI_TEXT_NODE_TYPE),
+      node("image-1", AI_IMAGE_NODE_TYPE),
+    ];
     let nextEdges: WorkflowEdgeType[] = [];
 
     const ok = appendGenerativeReferenceConnection({

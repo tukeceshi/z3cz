@@ -36,10 +36,7 @@ export function collectAiTextFirstDegreeEdgeIds(
       ids.add(edge.id);
     }
 
-    if (
-      edge.source === nodeId &&
-      resolved.sourceHandle === AI_TEXT_OUTPUT_ID
-    ) {
+    if (edge.source === nodeId && resolved.sourceHandle === AI_TEXT_OUTPUT_ID) {
       ids.add(edge.id);
     }
   }

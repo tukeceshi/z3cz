@@ -5,9 +5,7 @@ import type {
 } from "@dafthunk/types";
 import { buildOpenAiMultimodalUserContent } from "@dafthunk/types";
 
-function readToolCalls(
-  value: unknown
-): Array<{
+function readToolCalls(value: unknown): Array<{
   id: string;
   type: "function";
   function: { name: string; arguments: string };
@@ -106,7 +104,9 @@ function readStringArray(value: unknown): readonly string[] | undefined {
   if (!Array.isArray(value)) {
     return undefined;
   }
-  const items = value.filter((entry): entry is string => typeof entry === "string");
+  const items = value.filter(
+    (entry): entry is string => typeof entry === "string"
+  );
   return items.length > 0 ? items : undefined;
 }
 
@@ -205,9 +205,7 @@ export function buildBodyFromSlots(params: {
     const field = fieldByName.get(fieldName);
     const raw = inputs[fieldName];
     const value =
-      raw === undefined || raw === null || raw === ""
-        ? field?.default
-        : raw;
+      raw === undefined || raw === null || raw === "" ? field?.default : raw;
 
     if (
       (value === undefined || value === null || value === "") &&

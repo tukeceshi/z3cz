@@ -12,7 +12,8 @@ export const corsMiddleware = (
   }
 
   const webHost = c.env?.WEB_HOST ?? "http://localhost:3101";
-  const isDevelopment = (c.env?.CLOUDFLARE_ENV ?? "development") !== "production";
+  const isDevelopment =
+    (c.env?.CLOUDFLARE_ENV ?? "development") !== "production";
 
   return cors({
     origin: webHost,

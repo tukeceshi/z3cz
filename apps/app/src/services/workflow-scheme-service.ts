@@ -14,12 +14,14 @@ const PUBLIC_ENDPOINT = "/workflow-schemes";
 const ADMIN_ENDPOINT = "/admin/workflow-schemes";
 
 export function usePublicWorkflowSchemes() {
-  const { data, error, isLoading, mutate } = useSWR(PUBLIC_ENDPOINT, async () => {
-    const response = await makeRequest<ListPublicWorkflowSchemesResponse>(
-      PUBLIC_ENDPOINT
-    );
-    return response.schemes;
-  });
+  const { data, error, isLoading, mutate } = useSWR(
+    PUBLIC_ENDPOINT,
+    async () => {
+      const response =
+        await makeRequest<ListPublicWorkflowSchemesResponse>(PUBLIC_ENDPOINT);
+      return response.schemes;
+    }
+  );
 
   return {
     schemes: data ?? [],
@@ -30,12 +32,14 @@ export function usePublicWorkflowSchemes() {
 }
 
 export function useAdminWorkflowSchemes() {
-  const { data, error, isLoading, mutate } = useSWR(ADMIN_ENDPOINT, async () => {
-    const response = await makeRequest<ListWorkflowSchemesResponse>(
-      ADMIN_ENDPOINT
-    );
-    return response.schemes;
-  });
+  const { data, error, isLoading, mutate } = useSWR(
+    ADMIN_ENDPOINT,
+    async () => {
+      const response =
+        await makeRequest<ListWorkflowSchemesResponse>(ADMIN_ENDPOINT);
+      return response.schemes;
+    }
+  );
 
   return {
     schemes: data ?? [],

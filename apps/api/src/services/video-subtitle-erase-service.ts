@@ -113,9 +113,7 @@ export async function submitVideoSubtitleEraseTask(
     metadataRaw: row.metadata,
   });
   if (!apiKey) {
-    throw new Error(
-      "AI MediaKit API key is not configured on this interface"
-    );
+    throw new Error("AI MediaKit API key is not configured on this interface");
   }
 
   const resolved = await resolveResourceRefs(env, {
@@ -252,11 +250,12 @@ export async function pollVideoSubtitleEraseGenerationJob(
   job: GenerationJobRecord
 ): Promise<GenerationJobRecord> {
   const upstreamTaskId =
-    job.upstreamTaskId?.trim() ||
-    job.resultJson?.upstreamTaskId?.trim() ||
-    "";
+    job.upstreamTaskId?.trim() || job.resultJson?.upstreamTaskId?.trim() || "";
 
-  if (job.resultJson?.jobKind !== VIDEO_SUBTITLE_ERASE_JOB_KIND || !upstreamTaskId) {
+  if (
+    job.resultJson?.jobKind !== VIDEO_SUBTITLE_ERASE_JOB_KIND ||
+    !upstreamTaskId
+  ) {
     return job;
   }
 

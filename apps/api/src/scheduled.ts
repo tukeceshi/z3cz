@@ -1,10 +1,7 @@
 import CronParser from "cron-parser";
 
 import type { Bindings } from "./context";
-import {
-  createDatabase,
-  getActiveScheduledTriggers,
-} from "./db";
+import { createDatabase, getActiveScheduledTriggers } from "./db";
 import { creditChecksEnabled } from "./utils/credits";
 
 export async function handleScheduledEvent(

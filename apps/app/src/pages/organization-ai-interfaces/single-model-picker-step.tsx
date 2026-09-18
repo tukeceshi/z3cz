@@ -102,10 +102,24 @@ function resolveInitialPickerFilter(
   if (selectedPreset) {
     return selectedPreset.category;
   }
-  if (selection.kind === "deepseek" || selection.kind === "seed" || selection.kind === "glm" || selection.kind === "kimi" || selection.kind === "openai" || selection.kind === "gemini" || selection.kind === "grok" || selection.kind === "claude") {
+  if (
+    selection.kind === "deepseek" ||
+    selection.kind === "seed" ||
+    selection.kind === "glm" ||
+    selection.kind === "kimi" ||
+    selection.kind === "openai" ||
+    selection.kind === "gemini" ||
+    selection.kind === "grok" ||
+    selection.kind === "claude"
+  ) {
     return "text";
   }
-  if (selection.kind === "seedance" || selection.kind === "veo" || selection.kind === "grok-imagine-video" || selection.kind === "minimax-video") {
+  if (
+    selection.kind === "seedance" ||
+    selection.kind === "veo" ||
+    selection.kind === "grok-imagine-video" ||
+    selection.kind === "minimax-video"
+  ) {
     return "video";
   }
   if (selection.kind === "minimax-speech") {
@@ -117,7 +131,10 @@ function resolveInitialPickerFilter(
   if (selection.kind === "openai-image") {
     return "image";
   }
-  if (selection.kind === "nano-banana" || selection.kind === "grok-imagine-image") {
+  if (
+    selection.kind === "nano-banana" ||
+    selection.kind === "grok-imagine-image"
+  ) {
     return "image";
   }
   return "all";
@@ -186,7 +203,9 @@ function PresetTile({
       )}
     >
       <ModelBrandIcon canonicalId={canonicalId} presetId={presetId} />
-      <span className="min-w-0 flex-1 truncate text-xs font-medium">{label}</span>
+      <span className="min-w-0 flex-1 truncate text-xs font-medium">
+        {label}
+      </span>
     </button>
   );
 }
@@ -212,8 +231,10 @@ export function SingleModelPickerStep({
     usePlatformCatalogVideoModels(organizationId);
   const { models: audioModels, isLoading: isAudioLoading } =
     usePlatformCatalogAudioModels(organizationId);
-  const { presetChannelIds: apiPresetChannelIds, isLoading: isChannelsLoading } =
-    useApiPresetChannelIdMap(organizationId);
+  const {
+    presetChannelIds: apiPresetChannelIds,
+    isLoading: isChannelsLoading,
+  } = useApiPresetChannelIdMap(organizationId);
   const isPickerLoading =
     isTextLoading ||
     isImageLoading ||
@@ -226,8 +247,8 @@ export function SingleModelPickerStep({
       ? getSingleModelPresetById(selection.presetId)
       : undefined;
 
-  const [activeFilter, setActiveFilter] = useState<SingleModelPickerFilter>(() =>
-    resolveInitialPickerFilter(selection, selectedPreset)
+  const [activeFilter, setActiveFilter] = useState<SingleModelPickerFilter>(
+    () => resolveInitialPickerFilter(selection, selectedPreset)
   );
 
   const enabledCanonicalIds = useMemo(() => {
@@ -380,7 +401,10 @@ export function SingleModelPickerStep({
     const presets: SingleModelPresetEntry[] = [];
     for (const category of categories) {
       for (const preset of grouped[category]) {
-        if (!preset.canonicalId || enabledCanonicalIds.has(preset.canonicalId)) {
+        if (
+          !preset.canonicalId ||
+          enabledCanonicalIds.has(preset.canonicalId)
+        ) {
           presets.push(preset);
         }
       }
@@ -496,156 +520,181 @@ export function SingleModelPickerStep({
         ) : isPickerLoading ? (
           <PickerTileSkeletons />
         ) : (
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-          {showDeepSeekCard ? (
-            <PresetTile
-              presetId={DEEPSEEK_PROVIDER_CARD_ID}
-              label={t("pages.aiInterfaces.singleModel.presets.deepseekProvider")}
-              selected={selection.kind === "deepseek"}
-              onSelect={handleDeepSeekSelect}
-            />
-          ) : null}
-          {showSeedCard ? (
-            <PresetTile
-              presetId={SEED_PROVIDER_CARD_ID}
-              label={t("pages.aiInterfaces.singleModel.presets.seedProvider")}
-              selected={selection.kind === "seed"}
-              onSelect={handleSeedSelect}
-            />
-          ) : null}
-          {showSeedanceCard ? (
-            <PresetTile
-              presetId={SEEDANCE_PROVIDER_CARD_ID}
-              label={t("pages.aiInterfaces.singleModel.presets.seedanceProvider")}
-              selected={selection.kind === "seedance"}
-              onSelect={handleSeedanceSelect}
-            />
-          ) : null}
-          {showSeedreamCard ? (
-            <PresetTile
-              presetId={SEEDREAM_PROVIDER_CARD_ID}
-              label={t("pages.aiInterfaces.singleModel.presets.seedreamProvider")}
-              selected={selection.kind === "seedream"}
-              onSelect={handleSeedreamSelect}
-            />
-          ) : null}
-          {showGlmCard ? (
-            <PresetTile
-              presetId={GLM_PROVIDER_CARD_ID}
-              label={t("pages.aiInterfaces.singleModel.presets.glmProvider")}
-              selected={selection.kind === "glm"}
-              onSelect={handleGlmSelect}
-            />
-          ) : null}
-          {showKimiCard ? (
-            <PresetTile
-              presetId={KIMI_PROVIDER_CARD_ID}
-              label={t("pages.aiInterfaces.singleModel.presets.kimiProvider")}
-              selected={selection.kind === "kimi"}
-              onSelect={handleKimiSelect}
-            />
-          ) : null}
-          {showOpenAiCard ? (
-            <PresetTile
-              presetId={OPENAI_PROVIDER_CARD_ID}
-              label={t("pages.aiInterfaces.singleModel.presets.openaiProvider")}
-              selected={selection.kind === "openai"}
-              onSelect={handleOpenAiSelect}
-            />
-          ) : null}
-          {showOpenAiImageCard ? (
-            <PresetTile
-              presetId={OPENAI_IMAGE_PROVIDER_CARD_ID}
-              label={t("pages.aiInterfaces.singleModel.presets.openaiImageProvider")}
-              selected={selection.kind === "openai-image"}
-              onSelect={handleOpenAiImageSelect}
-            />
-          ) : null}
-          {showGeminiCard ? (
-            <PresetTile
-              presetId={GEMINI_PROVIDER_CARD_ID}
-              label={t("pages.aiInterfaces.singleModel.presets.geminiProvider")}
-              selected={selection.kind === "gemini"}
-              onSelect={handleGeminiSelect}
-            />
-          ) : null}
-          {showNanoBananaCard ? (
-            <PresetTile
-              presetId={NANO_BANANA_PROVIDER_CARD_ID}
-              label={t("pages.aiInterfaces.singleModel.presets.nanoBananaProvider")}
-              selected={selection.kind === "nano-banana"}
-              onSelect={handleNanoBananaSelect}
-            />
-          ) : null}
-          {showVeoCard ? (
-            <PresetTile
-              presetId={VEO_PROVIDER_CARD_ID}
-              label={t("pages.aiInterfaces.singleModel.presets.veoProvider")}
-              selected={selection.kind === "veo"}
-              onSelect={handleVeoSelect}
-            />
-          ) : null}
-          {showGrokCard ? (
-            <PresetTile
-              presetId={GROK_PROVIDER_CARD_ID}
-              label={t("pages.aiInterfaces.singleModel.presets.grokProvider")}
-              selected={selection.kind === "grok"}
-              onSelect={handleGrokSelect}
-            />
-          ) : null}
-          {showGrokImagineImageCard ? (
-            <PresetTile
-              presetId={GROK_IMAGINE_IMAGE_PROVIDER_CARD_ID}
-              label={t("pages.aiInterfaces.singleModel.presets.grokImagineImageProvider")}
-              selected={selection.kind === "grok-imagine-image"}
-              onSelect={handleGrokImagineImageSelect}
-            />
-          ) : null}
-          {showGrokImagineVideoCard ? (
-            <PresetTile
-              presetId={GROK_IMAGINE_VIDEO_PROVIDER_CARD_ID}
-              label={t("pages.aiInterfaces.singleModel.presets.grokImagineVideoProvider")}
-              selected={selection.kind === "grok-imagine-video"}
-              onSelect={handleGrokImagineVideoSelect}
-            />
-          ) : null}
-          {showMinimaxSpeechCard ? (
-            <PresetTile
-              presetId={MINIMAX_SPEECH_PROVIDER_CARD_ID}
-              label={t("pages.aiInterfaces.singleModel.presets.minimaxSpeechProvider")}
-              selected={selection.kind === "minimax-speech"}
-              onSelect={handleMinimaxSpeechSelect}
-            />
-          ) : null}
-          {showMinimaxVideoCard ? (
-            <PresetTile
-              presetId={MINIMAX_VIDEO_PROVIDER_CARD_ID}
-              label={t("pages.aiInterfaces.singleModel.presets.minimaxVideoProvider")}
-              selected={selection.kind === "minimax-video"}
-              onSelect={handleMinimaxVideoSelect}
-            />
-          ) : null}
-          {showClaudeCard ? (
-            <PresetTile
-              presetId={CLAUDE_PROVIDER_CARD_ID}
-              label={t("pages.aiInterfaces.singleModel.presets.claudeProvider")}
-              selected={selection.kind === "claude"}
-              onSelect={handleClaudeSelect}
-            />
-          ) : null}
-          {visiblePresets.map((preset) => (
-            <PresetTile
-              key={preset.id}
-              presetId={preset.id}
-              canonicalId={preset.canonicalId}
-              label={resolveSingleModelPresetCardName(preset, t)}
-              selected={
-                selection.kind === "preset" && selection.presetId === preset.id
-              }
-              onSelect={() => handlePresetSelect(preset.id)}
-            />
-          ))}
-        </div>
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+            {showDeepSeekCard ? (
+              <PresetTile
+                presetId={DEEPSEEK_PROVIDER_CARD_ID}
+                label={t(
+                  "pages.aiInterfaces.singleModel.presets.deepseekProvider"
+                )}
+                selected={selection.kind === "deepseek"}
+                onSelect={handleDeepSeekSelect}
+              />
+            ) : null}
+            {showSeedCard ? (
+              <PresetTile
+                presetId={SEED_PROVIDER_CARD_ID}
+                label={t("pages.aiInterfaces.singleModel.presets.seedProvider")}
+                selected={selection.kind === "seed"}
+                onSelect={handleSeedSelect}
+              />
+            ) : null}
+            {showSeedanceCard ? (
+              <PresetTile
+                presetId={SEEDANCE_PROVIDER_CARD_ID}
+                label={t(
+                  "pages.aiInterfaces.singleModel.presets.seedanceProvider"
+                )}
+                selected={selection.kind === "seedance"}
+                onSelect={handleSeedanceSelect}
+              />
+            ) : null}
+            {showSeedreamCard ? (
+              <PresetTile
+                presetId={SEEDREAM_PROVIDER_CARD_ID}
+                label={t(
+                  "pages.aiInterfaces.singleModel.presets.seedreamProvider"
+                )}
+                selected={selection.kind === "seedream"}
+                onSelect={handleSeedreamSelect}
+              />
+            ) : null}
+            {showGlmCard ? (
+              <PresetTile
+                presetId={GLM_PROVIDER_CARD_ID}
+                label={t("pages.aiInterfaces.singleModel.presets.glmProvider")}
+                selected={selection.kind === "glm"}
+                onSelect={handleGlmSelect}
+              />
+            ) : null}
+            {showKimiCard ? (
+              <PresetTile
+                presetId={KIMI_PROVIDER_CARD_ID}
+                label={t("pages.aiInterfaces.singleModel.presets.kimiProvider")}
+                selected={selection.kind === "kimi"}
+                onSelect={handleKimiSelect}
+              />
+            ) : null}
+            {showOpenAiCard ? (
+              <PresetTile
+                presetId={OPENAI_PROVIDER_CARD_ID}
+                label={t(
+                  "pages.aiInterfaces.singleModel.presets.openaiProvider"
+                )}
+                selected={selection.kind === "openai"}
+                onSelect={handleOpenAiSelect}
+              />
+            ) : null}
+            {showOpenAiImageCard ? (
+              <PresetTile
+                presetId={OPENAI_IMAGE_PROVIDER_CARD_ID}
+                label={t(
+                  "pages.aiInterfaces.singleModel.presets.openaiImageProvider"
+                )}
+                selected={selection.kind === "openai-image"}
+                onSelect={handleOpenAiImageSelect}
+              />
+            ) : null}
+            {showGeminiCard ? (
+              <PresetTile
+                presetId={GEMINI_PROVIDER_CARD_ID}
+                label={t(
+                  "pages.aiInterfaces.singleModel.presets.geminiProvider"
+                )}
+                selected={selection.kind === "gemini"}
+                onSelect={handleGeminiSelect}
+              />
+            ) : null}
+            {showNanoBananaCard ? (
+              <PresetTile
+                presetId={NANO_BANANA_PROVIDER_CARD_ID}
+                label={t(
+                  "pages.aiInterfaces.singleModel.presets.nanoBananaProvider"
+                )}
+                selected={selection.kind === "nano-banana"}
+                onSelect={handleNanoBananaSelect}
+              />
+            ) : null}
+            {showVeoCard ? (
+              <PresetTile
+                presetId={VEO_PROVIDER_CARD_ID}
+                label={t("pages.aiInterfaces.singleModel.presets.veoProvider")}
+                selected={selection.kind === "veo"}
+                onSelect={handleVeoSelect}
+              />
+            ) : null}
+            {showGrokCard ? (
+              <PresetTile
+                presetId={GROK_PROVIDER_CARD_ID}
+                label={t("pages.aiInterfaces.singleModel.presets.grokProvider")}
+                selected={selection.kind === "grok"}
+                onSelect={handleGrokSelect}
+              />
+            ) : null}
+            {showGrokImagineImageCard ? (
+              <PresetTile
+                presetId={GROK_IMAGINE_IMAGE_PROVIDER_CARD_ID}
+                label={t(
+                  "pages.aiInterfaces.singleModel.presets.grokImagineImageProvider"
+                )}
+                selected={selection.kind === "grok-imagine-image"}
+                onSelect={handleGrokImagineImageSelect}
+              />
+            ) : null}
+            {showGrokImagineVideoCard ? (
+              <PresetTile
+                presetId={GROK_IMAGINE_VIDEO_PROVIDER_CARD_ID}
+                label={t(
+                  "pages.aiInterfaces.singleModel.presets.grokImagineVideoProvider"
+                )}
+                selected={selection.kind === "grok-imagine-video"}
+                onSelect={handleGrokImagineVideoSelect}
+              />
+            ) : null}
+            {showMinimaxSpeechCard ? (
+              <PresetTile
+                presetId={MINIMAX_SPEECH_PROVIDER_CARD_ID}
+                label={t(
+                  "pages.aiInterfaces.singleModel.presets.minimaxSpeechProvider"
+                )}
+                selected={selection.kind === "minimax-speech"}
+                onSelect={handleMinimaxSpeechSelect}
+              />
+            ) : null}
+            {showMinimaxVideoCard ? (
+              <PresetTile
+                presetId={MINIMAX_VIDEO_PROVIDER_CARD_ID}
+                label={t(
+                  "pages.aiInterfaces.singleModel.presets.minimaxVideoProvider"
+                )}
+                selected={selection.kind === "minimax-video"}
+                onSelect={handleMinimaxVideoSelect}
+              />
+            ) : null}
+            {showClaudeCard ? (
+              <PresetTile
+                presetId={CLAUDE_PROVIDER_CARD_ID}
+                label={t(
+                  "pages.aiInterfaces.singleModel.presets.claudeProvider"
+                )}
+                selected={selection.kind === "claude"}
+                onSelect={handleClaudeSelect}
+              />
+            ) : null}
+            {visiblePresets.map((preset) => (
+              <PresetTile
+                key={preset.id}
+                presetId={preset.id}
+                canonicalId={preset.canonicalId}
+                label={resolveSingleModelPresetCardName(preset, t)}
+                selected={
+                  selection.kind === "preset" &&
+                  selection.presetId === preset.id
+                }
+                onSelect={() => handlePresetSelect(preset.id)}
+              />
+            ))}
+          </div>
         )}
       </div>
     </div>

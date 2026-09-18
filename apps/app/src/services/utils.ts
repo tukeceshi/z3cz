@@ -103,12 +103,7 @@ const throwApiRequestError = (
     );
   }
 
-  throw new ApiRequestError(
-    message,
-    status,
-    errorData?.code,
-    errorData?.jobId
-  );
+  throw new ApiRequestError(message, status, errorData?.code, errorData?.jobId);
 };
 
 /**

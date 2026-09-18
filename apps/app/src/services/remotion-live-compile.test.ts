@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 
-import { compileRemotionSource, type RemotionCompileSuccess } from "./remotion-live-compile";
+import {
+  compileRemotionSource,
+  type RemotionCompileSuccess,
+} from "./remotion-live-compile";
 import { DEFAULT_REMOTION_SOURCE_CODE } from "./remotion-viewport-staging";
 
 describe("remotion live compile", () => {
@@ -32,12 +35,16 @@ function RemotionRoot() {
   );
 }`);
     expect(result.error).toBeUndefined();
-    expect((result as unknown as RemotionCompileSuccess).durationInFrames).toBe(200);
+    expect((result as unknown as RemotionCompileSuccess).durationInFrames).toBe(
+      200
+    );
     expect(typeof result.component).toBe("function");
   });
 
   it("returns an error when official Composition is missing", () => {
-    const result = compileRemotionSource("function Composition() { return null; }");
+    const result = compileRemotionSource(
+      "function Composition() { return null; }"
+    );
     expect(result.component).toBeUndefined();
     expect(result.error).toMatch(/RemotionRoot|Composition/i);
   });

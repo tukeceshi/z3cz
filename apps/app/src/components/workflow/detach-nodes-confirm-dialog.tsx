@@ -29,10 +29,7 @@ export interface DetachNodesConfirmDialogProps {
   readonly onConfirm: () => void;
 }
 
-const SOURCE_DESCRIPTION_KEY: Record<
-  DetachConfirmSource,
-  TranslationKey
-> = {
+const SOURCE_DESCRIPTION_KEY: Record<DetachConfirmSource, TranslationKey> = {
   delete: "workflow.canvas.detachConfirm.delete",
   undo: "workflow.canvas.detachConfirm.undo",
   redo: "workflow.canvas.detachConfirm.redo",
@@ -51,7 +48,9 @@ export function DetachNodesConfirmDialog({
   const confirmButtonRef = useRef<HTMLButtonElement>(null);
 
   const descriptionKey =
-    source != null ? SOURCE_DESCRIPTION_KEY[source] : SOURCE_DESCRIPTION_KEY.delete;
+    source != null
+      ? SOURCE_DESCRIPTION_KEY[source]
+      : SOURCE_DESCRIPTION_KEY.delete;
 
   return (
     <AlertDialog open={open} onOpenChange={onOpenChange}>
@@ -79,7 +78,10 @@ export function DetachNodesConfirmDialog({
               onDontAskAgainChange(checked === true)
             }
           />
-          <Label htmlFor="detach-confirm-dont-ask" className="text-sm font-normal">
+          <Label
+            htmlFor="detach-confirm-dont-ask"
+            className="text-sm font-normal"
+          >
             {t("workflow.canvas.detachConfirm.dontAskAgain")}
           </Label>
         </div>

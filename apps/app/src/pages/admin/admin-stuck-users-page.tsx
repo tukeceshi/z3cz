@@ -136,10 +136,7 @@ export function AdminStuckUsersPage() {
     limit
   );
 
-  const columns = useMemo(
-    () => createColumns(navigate, t),
-    [navigate, t]
-  );
+  const columns = useMemo(() => createColumns(navigate, t), [navigate, t]);
 
   if (stuckSummaryError) {
     return (

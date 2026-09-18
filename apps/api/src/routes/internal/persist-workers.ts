@@ -10,7 +10,10 @@ import { z } from "zod";
 
 import { ApiContext } from "../../context";
 import { createDatabase } from "../../db";
-import { touchPersistWorkerHeartbeat, verifyPersistWorkerSecret } from "../../db/persist-worker-queries";
+import {
+  touchPersistWorkerHeartbeat,
+  verifyPersistWorkerSecret,
+} from "../../db/persist-worker-queries";
 import {
   claimPersistJobForWorker,
   completePersistJobFromWorker,
@@ -128,7 +131,9 @@ internalPersistWorkerRoutes.post(
     }
 
     const jobId = c.req.param("jobId");
-    const body = c.req.valid("json") as unknown as PersistWorkerCompleteJobRequest;
+    const body = c.req.valid(
+      "json"
+    ) as unknown as PersistWorkerCompleteJobRequest;
     const db = createDatabase(c.env);
 
     const job = await completePersistJobFromWorker(c.env, db, {

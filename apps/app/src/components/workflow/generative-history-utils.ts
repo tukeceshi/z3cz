@@ -86,9 +86,7 @@ export function isGenerativeCardCoverBusy(
   }
 
   const progressPhase = readGenerativeProgressPhase(metadata);
-  return (
-    isModalityGenerating || isGenerativeProgressBusyPhase(progressPhase)
-  );
+  return isModalityGenerating || isGenerativeProgressBusyPhase(progressPhase);
 }
 
 export function shouldHoldUnreadyCardCover(params: {
@@ -174,10 +172,7 @@ export function readGenerativeCardCoverFromHistory<
   };
 }
 
-function isReadyCoverMedia(
-  value: unknown,
-  holdUnreadyCover: boolean
-): boolean {
+function isReadyCoverMedia(value: unknown, holdUnreadyCover: boolean): boolean {
   if (!isDisplayableWorkflowMedia(value)) {
     return false;
   }
@@ -187,10 +182,13 @@ function isReadyCoverMedia(
 /**
  * Shared helpers for generative media history: one media per row.
  */
-export function splitHistoryMediaRows<TMedia, TItem extends {
-  readonly id: string;
-  readonly createdAt: string;
-}>(params: {
+export function splitHistoryMediaRows<
+  TMedia,
+  TItem extends {
+    readonly id: string;
+    readonly createdAt: string;
+  },
+>(params: {
   readonly items: readonly TItem[];
   readonly getMedia: (item: TItem) => readonly TMedia[];
   readonly withMedia: (item: TItem, media: readonly TMedia[]) => TItem;
@@ -217,7 +215,10 @@ export function splitHistoryMediaRows<TMedia, TItem extends {
   return out;
 }
 
-export function readSelectedHistoryMedia<TItem extends { readonly id: string }, TMedia>(
+export function readSelectedHistoryMedia<
+  TItem extends { readonly id: string },
+  TMedia,
+>(
   history: {
     readonly items: readonly TItem[];
     readonly selectedId: string | null;
@@ -235,7 +236,10 @@ export function readSelectedHistoryMedia<TItem extends { readonly id: string }, 
 }
 
 /** Card cover: keep the last ready media while the selected row is still generating. */
-export function readDisplayHistoryMedia<TItem extends { readonly id: string }, TMedia>(
+export function readDisplayHistoryMedia<
+  TItem extends { readonly id: string },
+  TMedia,
+>(
   history: {
     readonly items: readonly TItem[];
     readonly selectedId: string | null;

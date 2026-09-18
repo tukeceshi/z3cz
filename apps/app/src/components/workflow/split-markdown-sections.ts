@@ -97,7 +97,11 @@ function isLeafHeading(
     }
   }
 
-  for (let candidate = index + 1; candidate < nextBoundaryIndex; candidate += 1) {
+  for (
+    let candidate = index + 1;
+    candidate < nextBoundaryIndex;
+    candidate += 1
+  ) {
     if (headings[candidate]!.level > current.level) {
       return false;
     }
@@ -200,7 +204,9 @@ export function sectionHeadingDisplayText(
   markdown: string,
   section: MarkdownHeadingSection
 ): string {
-  return markdown.slice(section.headingStart, section.bodyStart).replace(/\n+$/, "");
+  return markdown
+    .slice(section.headingStart, section.bodyStart)
+    .replace(/\n+$/, "");
 }
 
 export interface SectionContentRange {

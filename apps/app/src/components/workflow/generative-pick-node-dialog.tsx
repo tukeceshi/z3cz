@@ -29,8 +29,10 @@ export interface GenerativePickNodeDialogProps {
 }
 
 function iconForKind(kind: AiTextReferenceKind) {
-  if (kind === "text") return <TypeIcon className="h-4 w-4 shrink-0 text-muted-foreground" />;
-  if (kind === "video") return <VideoIcon className="h-4 w-4 shrink-0 text-muted-foreground" />;
+  if (kind === "text")
+    return <TypeIcon className="h-4 w-4 shrink-0 text-muted-foreground" />;
+  if (kind === "video")
+    return <VideoIcon className="h-4 w-4 shrink-0 text-muted-foreground" />;
   return <ImageIcon className="h-4 w-4 shrink-0 text-muted-foreground" />;
 }
 

@@ -346,7 +346,9 @@ export async function registerSubAccountFromInvitation(
     .limit(1);
 
   if (!invitation || invitation.status !== InvitationStatus.PENDING) {
-    throw new SubAccountInvitationError("Invitation not found or no longer valid");
+    throw new SubAccountInvitationError(
+      "Invitation not found or no longer valid"
+    );
   }
 
   if (invitation.expiresAt < now) {

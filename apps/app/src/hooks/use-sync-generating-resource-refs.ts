@@ -57,7 +57,9 @@ function applyGeneratingResourceSync(
         : modality === "video"
           ? withAiVideoResourcesMarkedFailed(node, failedIds)
           : withAiAudioResourcesMarkedFailed(node, failedIds);
-    const cleared = clearGenerativeProgress(withFailed.metadata ?? node.metadata);
+    const cleared = clearGenerativeProgress(
+      withFailed.metadata ?? node.metadata
+    );
     const metadata =
       modality === "image"
         ? withAiImageGeneratingFlag(cleared, false)
@@ -129,8 +131,14 @@ function collectKindMismatches(
 
 function collectCloudAccelerationSync(
   media: readonly WorkflowMediaValue[],
-  entriesById: ReadonlyMap<string, ResolvedMediaResourceEntry | null | undefined>
-): { readonly resourceIds: readonly string[]; readonly status: "pending" | "active" } | null {
+  entriesById: ReadonlyMap<
+    string,
+    ResolvedMediaResourceEntry | null | undefined
+  >
+): {
+  readonly resourceIds: readonly string[];
+  readonly status: "pending" | "active";
+} | null {
   const resourceIds: string[] = [];
   let status: "pending" | "active" | null = null;
 
@@ -161,7 +169,10 @@ function collectCloudAccelerationSync(
 
 function applyCloudAccelerationSync(
   node: WorkflowNodeType,
-  sync: { readonly resourceIds: readonly string[]; readonly status: "pending" | "active" }
+  sync: {
+    readonly resourceIds: readonly string[];
+    readonly status: "pending" | "active";
+  }
 ): Partial<WorkflowNodeType> {
   return (
     (patchNodeMediaCloudAccelerationStatus(
@@ -182,7 +193,10 @@ function applyCloudAccelerationSync(
 }
 
 function hasCloudAccelerationInProgressEntry(
-  entriesById: ReadonlyMap<string, ResolvedMediaResourceEntry | null | undefined>
+  entriesById: ReadonlyMap<
+    string,
+    ResolvedMediaResourceEntry | null | undefined
+  >
 ): boolean {
   for (const entry of entriesById.values()) {
     if (isCloudAccelerationInProgress(entry?.cloudAccelerationStatus)) {
@@ -318,8 +332,11 @@ export function useSyncGeneratingResourceRefs(params: {
         });
         const resolveFailed =
           generatingIds.length > 0 &&
-          generatingIds.every((resourceId) => entriesById.get(resourceId) == null);
-        const serverCloudAccelActive = hasCloudAccelerationInProgressEntry(entriesById);
+          generatingIds.every(
+            (resourceId) => entriesById.get(resourceId) == null
+          );
+        const serverCloudAccelActive =
+          hasCloudAccelerationInProgressEntry(entriesById);
         const generatingDone =
           generatingIds.length > 0 &&
           !stillGenerating &&
@@ -340,7 +357,12 @@ export function useSyncGeneratingResourceRefs(params: {
             if (generatingDone) {
               patch = {
                 ...patch,
-                ...applyGeneratingResourceSync(node, modality, generatingIds, []),
+                ...applyGeneratingResourceSync(
+                  node,
+                  modality,
+                  generatingIds,
+                  []
+                ),
               };
             }
             let working = { ...node, ...patch };

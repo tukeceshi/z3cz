@@ -33,11 +33,18 @@ describe("filterMentionNodes", () => {
 
 describe("insertMention", () => {
   it("replaces the @query with the node name", () => {
-    expect(insertMention("看 @猫", 4, { start: 2, query: "猫" }, {
-      id: "n1",
-      name: "猫图",
-      type: "ai-image",
-    })).toEqual({
+    expect(
+      insertMention(
+        "看 @猫",
+        4,
+        { start: 2, query: "猫" },
+        {
+          id: "n1",
+          name: "猫图",
+          type: "ai-image",
+        }
+      )
+    ).toEqual({
       text: "看 @猫图 ",
       caret: 6,
     });

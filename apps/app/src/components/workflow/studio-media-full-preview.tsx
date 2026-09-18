@@ -33,7 +33,9 @@ export interface StudioMediaFullPreviewProps {
   readonly displayUrl?: string | null;
 }
 
-function readModality(nodeType: "ai-image" | "ai-video"): GenerativeBusyModality {
+function readModality(
+  nodeType: "ai-image" | "ai-video"
+): GenerativeBusyModality {
   return nodeType === "ai-video" ? "video" : "image";
 }
 
@@ -165,7 +167,9 @@ export function StudioMediaFullPreview({
             uploading={uploading}
             roundedClass="rounded-xl"
           />
-          {generateError ? <GenerativeCardErrorBlock error={generateError} /> : null}
+          {generateError ? (
+            <GenerativeCardErrorBlock error={generateError} />
+          ) : null}
         </div>
       ) : null}
     </div>

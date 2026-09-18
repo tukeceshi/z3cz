@@ -413,8 +413,7 @@ export const nodeMailboxHub = new NodeMailboxHub();
 
 export function createNodeMailboxNamespace(): DurableObjectNamespace {
   return {
-    idFromName: (name: string) =>
-      ({ toString: () => name }) as DurableObjectId,
+    idFromName: (name: string) => ({ toString: () => name }) as DurableObjectId,
     idFromString: (id: string) => ({ toString: () => id }) as DurableObjectId,
     newUniqueId: () =>
       ({ toString: () => crypto.randomUUID() }) as DurableObjectId,

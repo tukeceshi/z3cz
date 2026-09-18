@@ -76,9 +76,7 @@ describe("resolveCardGenerationParams", () => {
 
 describe("persistNodeGenerationParams", () => {
   it("writes params only", () => {
-    expect(
-      persistNodeGenerationParams({ ratio: "16:9" }, [])
-    ).toEqual([
+    expect(persistNodeGenerationParams({ ratio: "16:9" }, [])).toEqual([
       {
         id: "params",
         name: "params",

@@ -36,7 +36,10 @@ export function canViewWorkflows(
   if (!organization) {
     return false;
   }
-  return organization.role === "owner" || getEffectivePermissions(organization).workflows !== undefined;
+  return (
+    organization.role === "owner" ||
+    getEffectivePermissions(organization).workflows !== undefined
+  );
 }
 
 export function canAccessModelCalls(

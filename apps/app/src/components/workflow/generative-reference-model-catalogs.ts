@@ -1,7 +1,4 @@
-import type {
-  OrgImageModelOption,
-  OrgVideoModelOption,
-} from "@dafthunk/types";
+import type { OrgImageModelOption, OrgVideoModelOption } from "@dafthunk/types";
 
 import type { AiImageReferenceModelOption } from "./ai-image-reference-policy";
 import type { AiVideoReferenceModelOption } from "./ai-video-reference-policy";

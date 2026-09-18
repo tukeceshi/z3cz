@@ -441,7 +441,10 @@ adminCompetitorVideoPricingRoutes.put(
       return c.json({ scenarios: next.scenarios });
     } catch (error) {
       console.error("Error updating homepage video scenarios:", error);
-      return c.json({ error: "Failed to update homepage video scenarios" }, 500);
+      return c.json(
+        { error: "Failed to update homepage video scenarios" },
+        500
+      );
     }
   }
 );

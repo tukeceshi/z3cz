@@ -1,4 +1,8 @@
-const WEAK_JWT_SECRETS = new Set(["your-secret-key", "development", "CHANGE_ME"]);
+const WEAK_JWT_SECRETS = new Set([
+  "your-secret-key",
+  "development",
+  "CHANGE_ME",
+]);
 
 export function validateJwtSecret(secret: string): void {
   if (!secret || secret.length < 32) {

@@ -15,7 +15,9 @@ export function NotFoundPage() {
           alt={t("pages.notFound.imageAlt")}
           className="h-32 mb-8 dark:invert"
         />
-        <h2 className="text-xl font-semibold mb-4">{t("pages.notFound.title")}</h2>
+        <h2 className="text-xl font-semibold mb-4">
+          {t("pages.notFound.title")}
+        </h2>
         <p className="text-muted-foreground mb-8">
           {t("pages.notFound.description")}
         </p>

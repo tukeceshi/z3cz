@@ -1,9 +1,7 @@
 import { useNodes } from "@xyflow/react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-import type {
-  UpstreamParamProfileField,
-} from "@dafthunk/types";
+import type { UpstreamParamProfileField } from "@dafthunk/types";
 
 import { useAppToast } from "@/hooks/use-app-toast";
 
@@ -16,9 +14,7 @@ import {
   applySelectedModelRecord,
 } from "./generative-model-binding";
 import { generativeReferenceMetadataForModel } from "./generative-reference-metadata";
-import {
-  readWorkflowGenerativeDefault,
-} from "./generative-workflow-defaults";
+import { readWorkflowGenerativeDefault } from "./generative-workflow-defaults";
 import {
   buildModelBindingOptionId,
   readModelSelectionRecord,
@@ -45,7 +41,9 @@ interface UseGenerativeModelCardParams<T extends OrgModelBindingRef> {
   readonly data: WorkflowNodeType;
   readonly readModelId: (data: WorkflowNodeType) => string;
   readonly readInterfaceId: (data: WorkflowNodeType) => string;
-  readonly readGenerationFields?: (model: T) => readonly UpstreamParamProfileField[];
+  readonly readGenerationFields?: (
+    model: T
+  ) => readonly UpstreamParamProfileField[];
   readonly buildDefaultParams?: (
     fields: readonly UpstreamParamProfileField[]
   ) => Record<string, unknown>;
@@ -118,10 +116,9 @@ export function useGenerativeModelCard<T extends OrgModelBindingRef>({
     materializedRef.current = "";
   }, [nodeId]);
 
-  const { models, isLoading, modelsError, refreshModels } = useModels(
-    orgId,
-    { enabled: listFetchEnabled && Boolean(orgId) }
-  );
+  const { models, isLoading, modelsError, refreshModels } = useModels(orgId, {
+    enabled: listFetchEnabled && Boolean(orgId),
+  });
 
   useEffect(() => {
     setOptimisticOptionId(null);
@@ -160,8 +157,7 @@ export function useGenerativeModelCard<T extends OrgModelBindingRef>({
 
   const bindingForResolution = optimisticBinding ?? nodeBinding;
 
-  const modelsPending =
-    !listFetchEnabled || (isLoading && models.length === 0);
+  const modelsPending = !listFetchEnabled || (isLoading && models.length === 0);
 
   const resolution = useMemo(() => {
     if (modelsPending || models.length === 0) {

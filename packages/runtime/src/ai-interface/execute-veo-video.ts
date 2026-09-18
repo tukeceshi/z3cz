@@ -39,7 +39,10 @@ const DEFAULT_TIMEOUT_MINUTES = 60;
 
 function buildVeoPollUrl(baseUrl: string, operationName: string): string {
   const base = baseUrl.replace(/\/$/, "");
-  if (operationName.startsWith("http://") || operationName.startsWith("https://")) {
+  if (
+    operationName.startsWith("http://") ||
+    operationName.startsWith("https://")
+  ) {
     return operationName;
   }
   if (operationName.startsWith("/")) {
@@ -166,7 +169,10 @@ export async function submitVeoVideoTask(params: {
 
   const operationName = parsed.name?.trim();
   if (!operationName) {
-    return { status: "failed", error: "No operation name in upstream response" };
+    return {
+      status: "failed",
+      error: "No operation name in upstream response",
+    };
   }
 
   return {

@@ -58,8 +58,6 @@ describe("continuation-store", () => {
 
   it("adds duration from timeout strings", () => {
     const now = new Date("2026-01-01T00:00:00.000Z");
-    expect(addDurationIso(now, "30 minutes")).toBe(
-      "2026-01-01T00:30:00.000Z"
-    );
+    expect(addDurationIso(now, "30 minutes")).toBe("2026-01-01T00:30:00.000Z");
   });
 });

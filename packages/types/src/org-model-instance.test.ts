@@ -33,10 +33,19 @@ describe("org-model-instance", () => {
     expect(entry).not.toBeNull();
 
     expect(
-      findOrgModelInstanceEntry([{ instanceId: "inst-1", canonicalId: entry!.canonicalId, config: entry! }], {
-        canonicalId: "seedance-1.5-pro",
-        enabledOnly: true,
-      })
+      findOrgModelInstanceEntry(
+        [
+          {
+            instanceId: "inst-1",
+            canonicalId: entry!.canonicalId,
+            config: entry!,
+          },
+        ],
+        {
+          canonicalId: "seedance-1.5-pro",
+          enabledOnly: true,
+        }
+      )
     ).toEqual({
       instanceId: "inst-1",
       canonicalId: "seedance-1.5-pro",
@@ -54,8 +63,8 @@ describe("org-model-instance", () => {
       },
     });
 
-    expect(findEnabledOrgModelInstanceByCanonicalId(entries, "glm-5-2")).toEqual(
-      entries[0]
-    );
+    expect(
+      findEnabledOrgModelInstanceByCanonicalId(entries, "glm-5-2")
+    ).toEqual(entries[0]);
   });
 });

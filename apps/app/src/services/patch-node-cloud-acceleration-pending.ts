@@ -20,7 +20,10 @@ import {
   readAiVideoResult,
   readAiVideoResultHistory,
 } from "@/components/workflow/ai-video-node-utils";
-import type { WorkflowNodeType, WorkflowParameter } from "@/components/workflow/workflow-types";
+import type {
+  WorkflowNodeType,
+  WorkflowParameter,
+} from "@/components/workflow/workflow-types";
 
 function collectGeneratingResourceIds(
   media: readonly WorkflowMediaValue[]
@@ -107,7 +110,9 @@ export function patchWorkflowNodeCloudAccelerationPending(
   }
 
   return {
-    ...(contentPatch.inputs ? { inputs: contentPatch.inputs as WorkflowParameter[] } : {}),
+    ...(contentPatch.inputs
+      ? { inputs: contentPatch.inputs as WorkflowParameter[] }
+      : {}),
     ...(contentPatch.outputs
       ? { outputs: contentPatch.outputs as WorkflowParameter[] }
       : {}),

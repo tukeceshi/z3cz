@@ -20,7 +20,10 @@ import { createProjectedModelFits } from "./generative-model-ref-fit";
 import { AI_IMAGE_PROMPT_HANDLE_ID } from "./ai-image-node-utils";
 import { AI_TEXT_OUTPUT_ID } from "./ai-text-node-utils";
 import type { WorkflowNodeType } from "./workflow-types";
-import { testWorkflowNodeData, testWorkflowParam } from "./workflow-test-fixtures";
+import {
+  testWorkflowNodeData,
+  testWorkflowParam,
+} from "./workflow-test-fixtures";
 
 function mockTextModel(
   canonicalId: string,
@@ -87,7 +90,9 @@ describe("resolveModelForNewReference", () => {
 
   it("auto-switches to the first fitting model when the current model does not fit", () => {
     const current = mockTextModel("no-video", { maxVideoReferences: 0 });
-    const replacement = mockTextModel("video-capable", { maxVideoReferences: 1 });
+    const replacement = mockTextModel("video-capable", {
+      maxVideoReferences: 1,
+    });
     const modelFits = createProjectedModelFits({
       targetType: AI_TEXT_NODE_TYPE,
       connection: {
@@ -159,7 +164,11 @@ describe("applySelectedModelRecord", () => {
           testWorkflowParam({ id: "model", value: "old-model" }),
           testWorkflowParam({ id: "ai_interface_id", value: "old-iface" }),
           testWorkflowParam({ id: "model_instance_id", value: "old-instance" }),
-          testWorkflowParam({ id: "params", type: "json", value: existingParams }),
+          testWorkflowParam({
+            id: "params",
+            type: "json",
+            value: existingParams,
+          }),
         ],
         outputs: [],
       });
@@ -191,9 +200,9 @@ describe("applySelectedModelRecord", () => {
       expect(
         patch.inputs?.find((input) => input.id === "model_instance_id")?.value
       ).toBe("picked-model");
-      expect(patch.inputs?.find((input) => input.id === "params")?.value).toEqual(
-        existingParams
-      );
+      expect(
+        patch.inputs?.find((input) => input.id === "params")?.value
+      ).toEqual(existingParams);
       expect(defaults?.[modality]).toEqual({
         canonicalId: "picked-model",
         interfaceId: "iface-1",

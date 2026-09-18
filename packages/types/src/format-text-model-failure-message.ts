@@ -66,7 +66,9 @@ export function buildTextModelInvocationErrorFromFailure(
     buildTextModelInvocationErrorParts({
       upstreamError: params.upstreamError,
       locale: params.locale,
-    }).join("\n") || params.upstreamError?.trim() || "生成失败"
+    }).join("\n") ||
+    params.upstreamError?.trim() ||
+    "生成失败"
   );
 }
 

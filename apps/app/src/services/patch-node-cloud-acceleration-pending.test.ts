@@ -51,15 +51,21 @@ describe("patchWorkflowNodeCloudAccelerationPending", () => {
         },
       ],
       outputs: [
-        testWorkflowParam({ id: "images", name: "images", type: "json", value: [] }),
+        testWorkflowParam({
+          id: "images",
+          name: "images",
+          type: "json",
+          value: [],
+        }),
       ],
     };
 
     const patch = patchWorkflowNodeCloudAccelerationPending(node);
     expect(patch).not.toBeNull();
 
-    const result = patch!.inputs!.find((input) => input.name === "images_result")
-      ?.value as {
+    const result = patch!.inputs!.find(
+      (input) => input.name === "images_result"
+    )?.value as {
       resourceId: string;
       generating?: boolean;
       cloudAccelerationStatus?: string;

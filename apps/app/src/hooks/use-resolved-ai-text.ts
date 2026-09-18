@@ -5,7 +5,10 @@ import { useParams } from "react-router";
 import { useAuth } from "@/components/auth-context";
 import { readAiTextResultReference } from "@/components/workflow/ai-text-persist-utils";
 import { readAiTextStagingDisplayState } from "@/components/workflow/ai-text-staging-display-state";
-import type { WorkflowNodeType, WorkflowParameter } from "@/components/workflow/workflow-types";
+import type {
+  WorkflowNodeType,
+  WorkflowParameter,
+} from "@/components/workflow/workflow-types";
 import { readAiTextFullBodyFromStaging } from "@/services/ai-text-cache-layer";
 import {
   AI_TEXT_DISPLAY_EVENT,
@@ -49,14 +52,12 @@ export function useResolvedAiText(
   useEffect(() => {
     const handleDisplay = () => setRevision((value) => value + 1);
     window.addEventListener(AI_TEXT_DISPLAY_EVENT, handleDisplay);
-    return () => window.removeEventListener(AI_TEXT_DISPLAY_EVENT, handleDisplay);
+    return () =>
+      window.removeEventListener(AI_TEXT_DISPLAY_EVENT, handleDisplay);
   }, []);
 
   const nodeState = readAiTextStagingDisplayState(params.nodeData?.metadata);
-  const state =
-    nodeState ??
-    hung?.state ??
-    (reference ? "loading" : "empty");
+  const state = nodeState ?? hung?.state ?? (reference ? "loading" : "empty");
 
   return {
     displayExcerpt: hung?.excerpt ?? "",

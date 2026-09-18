@@ -31,8 +31,8 @@ describe("generative edge side layout", () => {
     expect(
       generativeEdgePlusLeft("left") + GENERATIVE_EDGE_PLUS_PX
     ).toBeLessThanOrEqual(GENERATIVE_EDGE_PLUS_OUTER_PX);
-    expect(
-      generativeEdgePlusLeft("right") + GENERATIVE_EDGE_PLUS_PX
-    ).toBe(GENERATIVE_EDGE_SHELL_W_PX);
+    expect(generativeEdgePlusLeft("right") + GENERATIVE_EDGE_PLUS_PX).toBe(
+      GENERATIVE_EDGE_SHELL_W_PX
+    );
   });
 });

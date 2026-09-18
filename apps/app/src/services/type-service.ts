@@ -51,9 +51,7 @@ export const useNodeTypes = (
   const { data, error, isLoading, mutate } = useSWR(
     enabled ? swrKey : null,
     async () => {
-      const query = schemeId
-        ? `?schemeId=${encodeURIComponent(schemeId)}`
-        : "";
+      const query = schemeId ? `?schemeId=${encodeURIComponent(schemeId)}` : "";
       const response = await makeRequest<GetNodeTypesResponse>(
         `${API_ENDPOINT_BASE}${query}`
       );

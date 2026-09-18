@@ -32,7 +32,9 @@ export function createNodeRateLimitMiddleware(
         return `api:${authHeader.substring(7)}`;
       }
 
-      return c.req.header("x-forwarded-for") ?? c.req.header("x-real-ip") ?? "local";
+      return (
+        c.req.header("x-forwarded-for") ?? c.req.header("x-real-ip") ?? "local"
+      );
     },
   });
 }

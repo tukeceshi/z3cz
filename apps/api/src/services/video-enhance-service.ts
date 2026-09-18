@@ -102,9 +102,7 @@ export async function submitVideoEnhanceTask(
     metadataRaw: row.metadata,
   });
   if (!apiKey) {
-    throw new Error(
-      "AI MediaKit API key is not configured on this interface"
-    );
+    throw new Error("AI MediaKit API key is not configured on this interface");
   }
 
   const resolved = await resolveResourceRefs(env, {
@@ -239,9 +237,7 @@ export async function pollVideoEnhanceGenerationJob(
   job: GenerationJobRecord
 ): Promise<GenerationJobRecord> {
   const upstreamTaskId =
-    job.upstreamTaskId?.trim() ||
-    job.resultJson?.upstreamTaskId?.trim() ||
-    "";
+    job.upstreamTaskId?.trim() || job.resultJson?.upstreamTaskId?.trim() || "";
 
   if (job.resultJson?.jobKind !== VIDEO_ENHANCE_JOB_KIND || !upstreamTaskId) {
     return job;

@@ -108,7 +108,8 @@ export function FormPage() {
     } catch (err) {
       setState({
         status: "error",
-        message: err instanceof Error ? err.message : t("pages.form.submitFailed"),
+        message:
+          err instanceof Error ? err.message : t("pages.form.submitFailed"),
       });
     }
   }, [state, signedToken, values, t]);
@@ -153,7 +154,9 @@ export function FormPage() {
               <Check className="h-5 w-5 text-green-600" />
             </div>
             <CardTitle>{t("pages.form.successTitle")}</CardTitle>
-            <CardDescription>{t("pages.form.successDescription")}</CardDescription>
+            <CardDescription>
+              {t("pages.form.successDescription")}
+            </CardDescription>
           </CardHeader>
         )}
 

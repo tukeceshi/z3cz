@@ -1,4 +1,8 @@
-import type { Connection, Edge as ReactFlowEdge, Node as ReactFlowNode } from "@xyflow/react";
+import type {
+  Connection,
+  Edge as ReactFlowEdge,
+  Node as ReactFlowNode,
+} from "@xyflow/react";
 import {
   AI_IMAGE_NODE_TYPE,
   AI_TEXT_NODE_TYPE,
@@ -38,7 +42,11 @@ import {
 } from "./ai-text-reference-policy";
 import { AI_TEXT_KEYWORDS_HANDLE_ID } from "./ai-text-node-utils";
 import type { GenerativeReferenceModelCatalogs } from "./generative-reference-model-catalogs";
-import type { WorkflowEdgeType, WorkflowNodeType, WorkflowParameter } from "./workflow-types";
+import type {
+  WorkflowEdgeType,
+  WorkflowNodeType,
+  WorkflowParameter,
+} from "./workflow-types";
 
 /** Route text sources on image/video reference handles to prompt handles. */
 export function normalizeGenerativeConnection(
@@ -65,12 +73,7 @@ export function normalizeGenerativeConnection(
   return connection;
 }
 
-const BLOB_TYPES = new Set([
-  "image",
-  "audio",
-  "video",
-  "document",
-]);
+const BLOB_TYPES = new Set(["image", "audio", "video", "document"]);
 
 const VIRTUAL_REFERENCE_INPUTS: Readonly<
   Record<string, Pick<WorkflowParameter, "id" | "type" | "repeated">>
@@ -247,16 +250,9 @@ export function validateWorkflowConnection(
   );
   if (!endpoints) return false;
 
-  const {
-    inputParam,
-    outputParam,
-    inputNodeId,
-    inputHandleId,
-  } = endpoints;
+  const { inputParam, outputParam, inputNodeId, inputHandleId } = endpoints;
 
-  if (
-    !workflowParameterTypesConnect(outputParam.type, inputParam.type)
-  ) {
+  if (!workflowParameterTypesConnect(outputParam.type, inputParam.type)) {
     return false;
   }
 

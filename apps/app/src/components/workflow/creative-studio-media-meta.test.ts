@@ -30,7 +30,12 @@ function createImageNode(model = "current-panel-model"): WorkflowNodeType {
       },
     ],
     outputs: [
-      testWorkflowParam({ id: "images", name: "images", type: "image", value: [] }),
+      testWorkflowParam({
+        id: "images",
+        name: "images",
+        type: "image",
+        value: [],
+      }),
     ],
     executionState: "idle",
   };
@@ -46,7 +51,12 @@ describe("readStudioModelLabel", () => {
       name: "Text 1",
       nodeType: "ai-text",
       inputs: [
-        { id: "model", name: "model", type: "string", value: "deepseek-v4-flash" },
+        {
+          id: "model",
+          name: "model",
+          type: "string",
+          value: "deepseek-v4-flash",
+        },
         {
           id: "result_history",
           name: "result_history",

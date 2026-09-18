@@ -42,8 +42,14 @@ export const FEATURE_CATALOG: Record<ResourceFeatureId, FeatureCatalogEntry> = {
     labelKey: "sidebar.datasets",
     descriptionKey: "featureSettings.descriptions.datasets",
     envVars: [
-      { key: "CLOUDFLARE_ACCOUNT_ID", hintKey: "featureSettings.env.cloudflareAccountId" },
-      { key: "CLOUDFLARE_API_TOKEN", hintKey: "featureSettings.env.cloudflareApiToken" },
+      {
+        key: "CLOUDFLARE_ACCOUNT_ID",
+        hintKey: "featureSettings.env.cloudflareAccountId",
+      },
+      {
+        key: "CLOUDFLARE_API_TOKEN",
+        hintKey: "featureSettings.env.cloudflareApiToken",
+      },
     ],
   },
   integrations: {
@@ -83,8 +89,14 @@ export const FEATURE_CATALOG: Record<ResourceFeatureId, FeatureCatalogEntry> = {
     labelKey: "sidebar.aiInterfaces",
     descriptionKey: "featureSettings.descriptions.aiInterfaces",
     envVars: [
-      { key: "CLOUDFLARE_ACCOUNT_ID", hintKey: "featureSettings.env.cloudflareAccountId" },
-      { key: "CLOUDFLARE_API_TOKEN", hintKey: "featureSettings.env.cloudflareApiToken" },
+      {
+        key: "CLOUDFLARE_ACCOUNT_ID",
+        hintKey: "featureSettings.env.cloudflareAccountId",
+      },
+      {
+        key: "CLOUDFLARE_API_TOKEN",
+        hintKey: "featureSettings.env.cloudflareApiToken",
+      },
     ],
   },
   queues: {
@@ -96,17 +108,14 @@ export const FEATURE_CATALOG: Record<ResourceFeatureId, FeatureCatalogEntry> = {
   },
 };
 
-export function buildDockerCommand(featureId: ResourceFeatureId): string | null {
+export function buildDockerCommand(
+  featureId: ResourceFeatureId
+): string | null {
   const entry = FEATURE_CATALOG[featureId];
   if (entry.envVars.length === 0) {
     return null;
   }
 
   const envLines = entry.envVars.map((item) => `${item.key}=`).join("\n");
-  return [
-    "# .env.docker",
-    envLines,
-    "",
-    "docker compose up -d",
-  ].join("\n");
+  return ["# .env.docker", envLines, "", "docker compose up -d"].join("\n");
 }

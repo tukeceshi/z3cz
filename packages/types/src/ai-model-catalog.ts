@@ -46,10 +46,7 @@ export const VEO_BRAND_ONLY_CANONICAL_IDS = [
 ] as const;
 
 /** xAI Grok 官方 API 文字模型；不参与火山聚合 catalog 合并与向导。 */
-export const GROK_BRAND_ONLY_CANONICAL_IDS = [
-  "grok-4-5",
-  "grok-4-3",
-] as const;
+export const GROK_BRAND_ONLY_CANONICAL_IDS = ["grok-4-5", "grok-4-3"] as const;
 
 /** xAI Grok Imagine 官方 API 生图模型；不参与火山聚合 catalog 合并与向导。 */
 export const GROK_IMAGINE_IMAGE_BRAND_ONLY_CANONICAL_IDS = [
@@ -77,9 +74,7 @@ export const MINIMAX_SPEECH_BRAND_ONLY_CANONICAL_IDS = [
 ] as const;
 
 /** MiniMax 官方 API 视频模型；不参与火山聚合 catalog 合并与向导。 */
-export const MINIMAX_VIDEO_BRAND_ONLY_CANONICAL_IDS = [
-  "minimax-h3",
-] as const;
+export const MINIMAX_VIDEO_BRAND_ONLY_CANONICAL_IDS = ["minimax-h3"] as const;
 
 export function isMoonshotBrandOnlyCanonicalId(canonicalId: string): boolean {
   return (MOONSHOT_BRAND_ONLY_CANONICAL_IDS as readonly string[]).includes(
@@ -93,7 +88,9 @@ export function isOpenAiBrandOnlyCanonicalId(canonicalId: string): boolean {
   );
 }
 
-export function isOpenAiImageBrandOnlyCanonicalId(canonicalId: string): boolean {
+export function isOpenAiImageBrandOnlyCanonicalId(
+  canonicalId: string
+): boolean {
   return (OPENAI_IMAGE_BRAND_ONLY_CANONICAL_IDS as readonly string[]).includes(
     canonicalId
   );
@@ -148,9 +145,9 @@ export function isClaudeBrandOnlyCanonicalId(canonicalId: string): boolean {
 export function isMinimaxSpeechBrandOnlyCanonicalId(
   canonicalId: string
 ): boolean {
-  return (MINIMAX_SPEECH_BRAND_ONLY_CANONICAL_IDS as readonly string[]).includes(
-    canonicalId
-  );
+  return (
+    MINIMAX_SPEECH_BRAND_ONLY_CANONICAL_IDS as readonly string[]
+  ).includes(canonicalId);
 }
 
 export function isMinimaxVideoBrandOnlyCanonicalId(

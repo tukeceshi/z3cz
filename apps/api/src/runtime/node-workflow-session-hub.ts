@@ -125,7 +125,10 @@ class NodeWorkflowSessionHub {
 
     const initMessage: WorkflowInitMessage = {
       type: "init",
-      state: { ...session.workflowState, timestamp: session.workflowState.timestamp },
+      state: {
+        ...session.workflowState,
+        timestamp: session.workflowState.timestamp,
+      },
       public: publicState,
     };
     ws.send(JSON.stringify(initMessage));
@@ -239,7 +242,10 @@ class NodeWorkflowSessionHub {
         try {
           client.ws.send(payload);
         } catch (error) {
-          console.error("[NodeWorkflowSession] public broadcast failed:", error);
+          console.error(
+            "[NodeWorkflowSession] public broadcast failed:",
+            error
+          );
         }
       }
     }

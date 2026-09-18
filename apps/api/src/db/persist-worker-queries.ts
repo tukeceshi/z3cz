@@ -167,9 +167,7 @@ export function summarizePlatformPersistWorkerStatus(
   return "manual";
 }
 
-export async function getPlatformPersistWorkerSummary(
-  db: Database
-): Promise<{
+export async function getPlatformPersistWorkerSummary(db: Database): Promise<{
   readonly deployStatus: PersistWorkerDeployStatus;
   readonly lastHeartbeatAt: string | null;
 } | null> {
@@ -397,12 +395,18 @@ export async function updatePersistWorkerDeployState(
     .update(persistWorkers)
     .set({
       deployStatus: input.deployStatus,
-      ...(input.deployError !== undefined ? { deployError: input.deployError } : {}),
-      ...(input.lastDeployAt !== undefined ? { lastDeployAt: input.lastDeployAt } : {}),
+      ...(input.deployError !== undefined
+        ? { deployError: input.deployError }
+        : {}),
+      ...(input.lastDeployAt !== undefined
+        ? { lastDeployAt: input.lastDeployAt }
+        : {}),
       ...(input.initializedAt !== undefined
         ? { initializedAt: input.initializedAt }
         : {}),
-      ...(input.secretHash !== undefined ? { secretHash: input.secretHash } : {}),
+      ...(input.secretHash !== undefined
+        ? { secretHash: input.secretHash }
+        : {}),
       updatedAt: new Date(),
     })
     .where(eq(persistWorkers.id, id))
@@ -436,7 +440,10 @@ export function buildBootstrapPersistWorkerInput(
 } {
   const host = input.host.trim();
   const orgPrefix = organizationId
-    ? organizationId.replace(/[^a-z0-9]+/gi, "").slice(0, 12).toLowerCase()
+    ? organizationId
+        .replace(/[^a-z0-9]+/gi, "")
+        .slice(0, 12)
+        .toLowerCase()
     : "";
   const id = slugPersistWorkerId(
     input.id ?? (orgPrefix ? `${orgPrefix}-${host}` : host)
@@ -462,7 +469,9 @@ export async function updatePersistWorker(
       ...(input.maxConcurrentJobs !== undefined
         ? { maxConcurrentJobs: input.maxConcurrentJobs }
         : {}),
-      ...(input.secretHash !== undefined ? { secretHash: input.secretHash } : {}),
+      ...(input.secretHash !== undefined
+        ? { secretHash: input.secretHash }
+        : {}),
       updatedBy,
       updatedAt: new Date(),
     })
@@ -547,7 +556,10 @@ export async function decrementPersistWorkerActiveJobs(
 }
 
 export function generatePersistWorkerSecret(): string {
-  return crypto.randomUUID().replace(/-/g, "") + crypto.randomUUID().replace(/-/g, "");
+  return (
+    crypto.randomUUID().replace(/-/g, "") +
+    crypto.randomUUID().replace(/-/g, "")
+  );
 }
 
 export async function hashPersistWorkerSecret(secret: string): Promise<string> {

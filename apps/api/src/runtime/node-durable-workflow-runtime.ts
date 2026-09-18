@@ -64,7 +64,9 @@ class NodeDurableWorkflowRuntime extends Runtime<Bindings> {
     );
   }
 
-  protected override getExecutionEventInbox(_executionId: string): ExecutionEventInbox {
+  protected override getExecutionEventInbox(
+    _executionId: string
+  ): ExecutionEventInbox {
     return {
       drain: (executionId) => nodeWorkflowEventHub.drainInbox(executionId),
       push: (executionId, envelope) =>

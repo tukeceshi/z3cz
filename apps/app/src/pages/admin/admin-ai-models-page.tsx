@@ -164,7 +164,9 @@ type AdminModelModality = "text" | "image" | "video" | "audio";
 function ensureVideoGenerationFieldsForSave(
   fields: readonly UpstreamParamProfileField[]
 ): UpstreamParamProfileField[] {
-  const withoutCount = fields.filter((field) => field.name !== "generate_count");
+  const withoutCount = fields.filter(
+    (field) => field.name !== "generate_count"
+  );
   if (withoutCount.some((field) => field.name === "duration")) {
     return withoutCount.map((field) => ({ ...field }));
   }
@@ -174,7 +176,10 @@ function ensureVideoGenerationFieldsForSave(
   if (!durationTemplate) {
     return withoutCount.map((field) => ({ ...field }));
   }
-  return [...withoutCount.map((field) => ({ ...field })), { ...durationTemplate }];
+  return [
+    ...withoutCount.map((field) => ({ ...field })),
+    { ...durationTemplate },
+  ];
 }
 
 function bytesToMbInput(bytes: number): string {
@@ -194,7 +199,8 @@ export function AdminAiModelsPage() {
   const { t } = useTranslation();
   const setBreadcrumbs = useBreadcrumbsSetter();
   const [modality, setModality] = useState<AdminModelModality>("text");
-  const { models, isLoading, refreshModels } = useAdminPlatformAiModels(modality);
+  const { models, isLoading, refreshModels } =
+    useAdminPlatformAiModels(modality);
   const [savingId, setSavingId] = useState<string | null>(null);
   const [reorderingModels, setReorderingModels] = useState(false);
   const [settingsModel, setSettingsModel] = useState<PlatformAiModel | null>(
@@ -450,12 +456,10 @@ function TextModelSettingsDialog({
       description: model.description ?? "",
       rules: {
         ...baseRules,
-        promptMaxChars:
-          Number(promptMaxChars) || baseRules.promptMaxChars,
+        promptMaxChars: Number(promptMaxChars) || baseRules.promptMaxChars,
         keywordsMaxChars:
           Number(keywordsMaxChars) || baseRules.keywordsMaxChars,
-        outputMaxTokens:
-          Number(outputMaxTokens) || baseRules.outputMaxTokens,
+        outputMaxTokens: Number(outputMaxTokens) || baseRules.outputMaxTokens,
         outputMaxTokensLimit:
           Number(outputMaxTokensLimit) || baseRules.outputMaxTokensLimit,
         outputMaxChars: Math.min(
@@ -697,9 +701,7 @@ function ImageModelSettingsDialog({
     (next) => {
       setGenerationFields((fields) =>
         fields.map((field) =>
-          field.name === "generate_count"
-            ? { ...field, apiName: next }
-            : field
+          field.name === "generate_count" ? { ...field, apiName: next } : field
         )
       );
     }
@@ -733,7 +735,9 @@ function ImageModelSettingsDialog({
   return (
     <ModelSettingsDialogShell
       dialogWidth="800"
-      title={t("pages.adminAiModels.settingsTitle", { name: model.displayName })}
+      title={t("pages.adminAiModels.settingsTitle", {
+        name: model.displayName,
+      })}
       description={t("pages.adminAiModels.imageSettingsDescription")}
       saving={saving}
       onClose={onClose}
@@ -962,8 +966,10 @@ function VideoModelSettingsDialog({
           tiers: VIDEO_PRICE_ESTIMATE_RESOLUTIONS.map((resolution) => ({
             resolution,
             enabled: priceTierDrafts[resolution].enabled,
-            priceWithoutVideo: Number(priceTierDrafts[resolution].priceWithoutVideo) || 0,
-            priceWithVideo: Number(priceTierDrafts[resolution].priceWithVideo) || 0,
+            priceWithoutVideo:
+              Number(priceTierDrafts[resolution].priceWithoutVideo) || 0,
+            priceWithVideo:
+              Number(priceTierDrafts[resolution].priceWithVideo) || 0,
           })),
           promos: pricePromoDrafts.flatMap((draft) => {
             const discountFold = Number(draft.discountFold);
@@ -995,7 +1001,9 @@ function VideoModelSettingsDialog({
   return (
     <ModelSettingsDialogShell
       dialogWidth="800"
-      title={t("pages.adminAiModels.settingsTitle", { name: model.displayName })}
+      title={t("pages.adminAiModels.settingsTitle", {
+        name: model.displayName,
+      })}
       description={t("pages.adminAiModels.videoSettingsDescription")}
       saving={saving}
       onClose={onClose}
@@ -1130,7 +1138,9 @@ function VideoModelSettingsDialog({
                     }));
                   }}
                 />
-                <span className="text-sm font-medium">{formatVideoResolutionLabel(resolution)}</span>
+                <span className="text-sm font-medium">
+                  {formatVideoResolutionLabel(resolution)}
+                </span>
                 <Input
                   className={ADMIN_CONTROL_CLASS}
                   inputMode="decimal"
@@ -1396,7 +1406,9 @@ function AudioModelSettingsDialog({
   return (
     <ModelSettingsDialogShell
       dialogWidth="800"
-      title={t("pages.adminAiModels.settingsTitle", { name: model.displayName })}
+      title={t("pages.adminAiModels.settingsTitle", {
+        name: model.displayName,
+      })}
       description={t("pages.adminAiModels.audioSettingsDescription")}
       saving={saving}
       onClose={onClose}

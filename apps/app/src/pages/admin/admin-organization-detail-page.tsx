@@ -156,7 +156,9 @@ export function AdminOrganizationDetailPage() {
                   {organization.subscriptionStatus}
                 </Badge>
               ) : (
-                <Badge variant="outline">{t("admin.organizationDetail.trial")}</Badge>
+                <Badge variant="outline">
+                  {t("admin.organizationDetail.trial")}
+                </Badge>
               )}
               {organization.creditsExhausted && (
                 <Badge variant="destructive">

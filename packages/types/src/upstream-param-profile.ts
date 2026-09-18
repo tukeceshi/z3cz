@@ -1,8 +1,4 @@
-export type UpstreamParamFieldType =
-  | "string"
-  | "number"
-  | "boolean"
-  | "json";
+export type UpstreamParamFieldType = "string" | "number" | "boolean" | "json";
 
 export interface UpstreamParamProfileField {
   readonly name: string;
@@ -16,5 +12,9 @@ export interface UpstreamParamProfileField {
   readonly clientOnly?: boolean;
   readonly enumValues?: readonly string[];
   /** How a UI feature is translated into the provider request. */
-  readonly implementationMode?: "direct" | "ratio_prompt" | "pixel_size" | "sequential_count";
+  readonly implementationMode?:
+    | "direct"
+    | "ratio_prompt"
+    | "pixel_size"
+    | "sequential_count";
 }

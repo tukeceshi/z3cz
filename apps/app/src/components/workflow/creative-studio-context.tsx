@@ -141,9 +141,7 @@ export function CreativeStudioProvider({
   useEffect(() => {
     const persisted = readCreativeStudioPersistedState(workflowId);
     setViewMode(persisted.viewMode);
-    setStudioNodeId(
-      persisted.viewMode === "studio" ? persisted.nodeId : null
-    );
+    setStudioNodeId(persisted.viewMode === "studio" ? persisted.nodeId : null);
     setDetailNodeId(
       persisted.viewMode === "studio" ? persisted.detailNodeId : null
     );
@@ -398,9 +396,7 @@ export function useCreativeStudio(): CreativeStudioContextValue {
   return context;
 }
 
-export function useCreativeStudioOptional():
-  | CreativeStudioContextValue
-  | null {
+export function useCreativeStudioOptional(): CreativeStudioContextValue | null {
   return useContext(CreativeStudioContext);
 }
 

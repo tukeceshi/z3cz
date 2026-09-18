@@ -462,22 +462,26 @@ html.dark .studio-mdx-table-frame table :is(th, td)[data-active="true"] {
   display: none !important;
 }
 
-.studio-mdx-table-frame table :is(
-  [class*="tableToolsColumn"],
-  [class*="toolCell"],
-  [data-tool-cell="true"]
-) {
+.studio-mdx-table-frame
+  table
+  :is(
+    [class*="tableToolsColumn"],
+    [class*="toolCell"],
+    [data-tool-cell="true"]
+  ) {
   display: none !important;
 }
 
-.studio-mdx-table-frame .studio-mdx-editor :is(
-  [class*="toolbarRoot"],
-  [class*="addRowButton"],
-  [class*="addColumnButton"],
-  [class*="tableColumnEditorTrigger"],
-  [class*="tableRowEditorTrigger"],
-  [class*="iconButton"]
-) {
+.studio-mdx-table-frame
+  .studio-mdx-editor
+  :is(
+    [class*="toolbarRoot"],
+    [class*="addRowButton"],
+    [class*="addColumnButton"],
+    [class*="tableColumnEditorTrigger"],
+    [class*="tableRowEditorTrigger"],
+    [class*="iconButton"]
+  ) {
   display: none !important;
 }
 
@@ -884,14 +888,13 @@ html.studio-reference-dragging * {
 
   .landing-featured {
     font-family:
-      "TASA Orbiter",
-      -apple-system,
-      "PingFang SC",
-      "Microsoft YaHei",
+      "TASA Orbiter", -apple-system, "PingFang SC", "Microsoft YaHei",
       sans-serif;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
-    font-feature-settings: "tnum" 1, "lnum" 1;
+    font-feature-settings:
+      "tnum" 1,
+      "lnum" 1;
   }
 
   .landing-featured-bar {
@@ -900,10 +903,7 @@ html.studio-reference-dragging * {
 
   .landing-featured-bar-title {
     font-family:
-      "TASA Orbiter",
-      -apple-system,
-      "PingFang SC",
-      "Microsoft YaHei",
+      "TASA Orbiter", -apple-system, "PingFang SC", "Microsoft YaHei",
       sans-serif;
     font-size: 11px;
     font-weight: 500;
@@ -945,7 +945,9 @@ html.studio-reference-dragging * {
 
   .landing-featured-param {
     font-family: "Space Mono", ui-monospace, Menlo, monospace;
-    font-feature-settings: "tnum" 1, "lnum" 1;
+    font-feature-settings:
+      "tnum" 1,
+      "lnum" 1;
   }
 
   @keyframes landing-param-hint-shake {
@@ -987,14 +989,13 @@ html.studio-reference-dragging * {
 
   .landing-promo {
     font-family:
-      "TASA Orbiter",
-      -apple-system,
-      "PingFang SC",
-      "Microsoft YaHei",
+      "TASA Orbiter", -apple-system, "PingFang SC", "Microsoft YaHei",
       sans-serif;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
-    font-feature-settings: "tnum" 1, "lnum" 1;
+    font-feature-settings:
+      "tnum" 1,
+      "lnum" 1;
   }
 
   .landing-promo-header {
@@ -1019,10 +1020,7 @@ html.studio-reference-dragging * {
 
   .landing-promo-heading {
     font-family:
-      "TASA Orbiter",
-      -apple-system,
-      "PingFang SC",
-      "Microsoft YaHei",
+      "TASA Orbiter", -apple-system, "PingFang SC", "Microsoft YaHei",
       sans-serif;
     font-size: clamp(2rem, 3vw, 2.5rem);
     font-weight: 600;
@@ -1054,7 +1052,9 @@ html.studio-reference-dragging * {
     line-height: 1.25;
     letter-spacing: -0.01em;
     color: #6b6a63;
-    transition: color 0.15s ease, border-color 0.15s ease;
+    transition:
+      color 0.15s ease,
+      border-color 0.15s ease;
   }
 
   @media (min-width: 640px) {
@@ -1106,10 +1106,7 @@ html.studio-reference-dragging * {
   .landing-promo-card-title {
     min-width: 0;
     font-family:
-      "TASA Orbiter",
-      -apple-system,
-      "PingFang SC",
-      "Microsoft YaHei",
+      "TASA Orbiter", -apple-system, "PingFang SC", "Microsoft YaHei",
       sans-serif;
     font-size: 1.1875rem;
     font-weight: 600;
@@ -1210,4 +1207,3 @@ html.studio-reference-dragging * {
     transform: scaleX(1);
   }
 }
-

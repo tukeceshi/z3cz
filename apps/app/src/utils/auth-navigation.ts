@@ -21,13 +21,12 @@ export function getDashboardPath(user: JWTTokenPayload): string | null {
 }
 
 export function isSafeAppPath(path: string): boolean {
-  return path.startsWith("/") && !path.startsWith("//") && !path.includes("://");
+  return (
+    path.startsWith("/") && !path.startsWith("//") && !path.includes("://")
+  );
 }
 
-export function mapAuthErrorMessage(
-  error: unknown,
-  t: TranslateFn
-): string {
+export function mapAuthErrorMessage(error: unknown, t: TranslateFn): string {
   if (error instanceof AuthError && error.code === "EMAIL_NOT_FOUND") {
     return t("auth.errors.emailNotFound");
   }

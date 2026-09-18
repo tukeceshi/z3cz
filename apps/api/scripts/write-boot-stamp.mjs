@@ -4,14 +4,20 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import crypto from "node:crypto";
 
-const apiRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const apiRoot = path.resolve(
+  path.dirname(fileURLToPath(import.meta.url)),
+  ".."
+);
 const monorepoRoot = path.resolve(apiRoot, "..", "..");
 
 function hashFile(filePath) {
   if (!fs.existsSync(filePath)) {
     return "";
   }
-  return crypto.createHash("sha256").update(fs.readFileSync(filePath)).digest("hex");
+  return crypto
+    .createHash("sha256")
+    .update(fs.readFileSync(filePath))
+    .digest("hex");
 }
 
 function getCacheDir() {

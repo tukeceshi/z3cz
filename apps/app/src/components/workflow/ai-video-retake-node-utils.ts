@@ -79,10 +79,7 @@ export function parseAiVideoRetakeDraftValue(
   return parseAiVideoRetakeDraft(raw);
 }
 
-export function useAiVideoRetakeDraft(
-  nodeId: string,
-  data: WorkflowNodeType
-) {
+export function useAiVideoRetakeDraft(nodeId: string, data: WorkflowNodeType) {
   const { updateNodeData, disabled } = useWorkflow();
   const draft = useMemo(
     () => readAiVideoRetakeDraftFromInputs(data.inputs),
@@ -95,7 +92,9 @@ export function useAiVideoRetakeDraft(
       if (disabled || !updateNodeData) {
         return;
       }
-      updateNodeData(nodeId, (current) => withAiVideoRetakeDraft(current, patch));
+      updateNodeData(nodeId, (current) =>
+        withAiVideoRetakeDraft(current, patch)
+      );
     },
     [disabled, nodeId, updateNodeData]
   );

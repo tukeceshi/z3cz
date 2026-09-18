@@ -7,11 +7,7 @@ import {
 } from "./volcano-resource-package-usage";
 
 function packageHaystack(row: VolcanoResourcePackageRow): string {
-  return [
-    row.Product,
-    row.ConfigurationCode,
-    row.ConfigurationName,
-  ]
+  return [row.Product, row.ConfigurationCode, row.ConfigurationName]
     .filter(Boolean)
     .join(" ")
     .toLowerCase();

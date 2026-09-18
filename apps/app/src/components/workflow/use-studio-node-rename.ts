@@ -21,7 +21,9 @@ function stripLineBreaks(value: string): string {
   return value.replace(/\r?\n/g, " ");
 }
 
-export function syncStudioRenameTextareaHeight(textarea: HTMLTextAreaElement): void {
+export function syncStudioRenameTextareaHeight(
+  textarea: HTMLTextAreaElement
+): void {
   textarea.style.height = "0px";
   const next = Math.min(
     RENAME_MAX_HEIGHT_PX,

@@ -281,7 +281,11 @@ export type AgentChatStreamEvent =
       readonly thinking?: string;
       readonly invocationId: string;
     }
-  | { readonly type: "delta"; readonly text: string; readonly thinking?: string }
+  | {
+      readonly type: "delta";
+      readonly text: string;
+      readonly thinking?: string;
+    }
   | {
       readonly type: "done";
       readonly text: string;

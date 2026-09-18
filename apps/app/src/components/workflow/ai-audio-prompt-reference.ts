@@ -1,8 +1,8 @@
-import {
-  AI_AUDIO_NODE_TYPE,
-  AI_TEXT_NODE_TYPE,
-} from "@dafthunk/types";
-import type { Edge as ReactFlowEdge, Node as ReactFlowNode } from "@xyflow/react";
+import { AI_AUDIO_NODE_TYPE, AI_TEXT_NODE_TYPE } from "@dafthunk/types";
+import type {
+  Edge as ReactFlowEdge,
+  Node as ReactFlowNode,
+} from "@xyflow/react";
 
 import { AI_TEXT_OUTPUT_ID } from "./ai-text-node-utils";
 import { readAiTextGeneratingStreamSync } from "./resolve-ai-text-result";
@@ -247,5 +247,7 @@ export function isAiAudioPromptReferenceTarget(
   nodeType: string | undefined,
   handleId: string | null | undefined
 ): boolean {
-  return nodeType === AI_AUDIO_NODE_TYPE && handleId === AI_AUDIO_PROMPT_HANDLE_ID;
+  return (
+    nodeType === AI_AUDIO_NODE_TYPE && handleId === AI_AUDIO_PROMPT_HANDLE_ID
+  );
 }

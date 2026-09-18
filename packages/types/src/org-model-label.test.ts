@@ -14,9 +14,9 @@ describe("org-model-label", () => {
     expect(
       formatCanvasModelLabel({ channelKind: "aggregate", alias: "DeepSeek" })
     ).toBe("[聚合] DeepSeek");
-    expect(formatCanvasModelLabel({ channelKind: "api", alias: "DeepSeek" })).toBe(
-      "[API] DeepSeek"
-    );
+    expect(
+      formatCanvasModelLabel({ channelKind: "api", alias: "DeepSeek" })
+    ).toBe("[API] DeepSeek");
   });
 
   it("round-trips option ids", () => {
@@ -77,6 +77,8 @@ describe("org-model-label", () => {
     expect(
       pickLegacyOrgModelInterfaceId(bindings, "gpt-image-1", "iface-b")
     ).toBe("iface-b");
-    expect(pickLegacyOrgModelInterfaceId(bindings, "gpt-image-1")).toBeUndefined();
+    expect(
+      pickLegacyOrgModelInterfaceId(bindings, "gpt-image-1")
+    ).toBeUndefined();
   });
 });

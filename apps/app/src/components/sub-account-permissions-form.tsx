@@ -42,7 +42,9 @@ export function SubAccountPermissionsForm({
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-4">
-        <Label htmlFor="perm-workflows">{t("pages.members.permissions.workflows")}</Label>
+        <Label htmlFor="perm-workflows">
+          {t("pages.members.permissions.workflows")}
+        </Label>
         <Select
           value={value.workflows}
           onValueChange={(workflows: "view" | "edit") => update({ workflows })}
@@ -52,8 +54,12 @@ export function SubAccountPermissionsForm({
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="view">{t("pages.members.permissions.viewOnly")}</SelectItem>
-            <SelectItem value="edit">{t("pages.members.permissions.edit")}</SelectItem>
+            <SelectItem value="view">
+              {t("pages.members.permissions.viewOnly")}
+            </SelectItem>
+            <SelectItem value="edit">
+              {t("pages.members.permissions.edit")}
+            </SelectItem>
           </SelectContent>
         </Select>
       </div>

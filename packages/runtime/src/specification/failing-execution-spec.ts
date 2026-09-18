@@ -282,7 +282,7 @@ export function testFailingExecution(
     });
 
     it("should handle workflow with error in middle node blocking dependent nodes", async () => {
-      // Graph: addition â†?subtraction (missing input b) â†?multiplication
+      // Graph: addition â†’subtraction (missing input b) â†’multiplication
       // Expected: subtraction executes (nodes validate their own inputs), multiplication may skip if subtraction fails
       const workflow = {
         id: "test-workflow-7",

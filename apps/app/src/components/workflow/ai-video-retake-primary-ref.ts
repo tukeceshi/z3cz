@@ -3,7 +3,10 @@ import {
   type AiVideoRetakeDraft,
   type WorkflowMediaValue,
 } from "@dafthunk/types";
-import type { Edge as ReactFlowEdge, Node as ReactFlowNode } from "@xyflow/react";
+import type {
+  Edge as ReactFlowEdge,
+  Node as ReactFlowNode,
+} from "@xyflow/react";
 
 import {
   AI_VIDEO_REFERENCE_HANDLE_ID,
@@ -33,7 +36,9 @@ function resolveVideoMediaFromEdge(params: {
   readonly edge: FlowEdgeRef;
   readonly nodes: readonly FlowNodeRef[];
 }): WorkflowMediaValue | undefined {
-  const sourceNode = params.nodes.find((node) => node.id === params.edge.source);
+  const sourceNode = params.nodes.find(
+    (node) => node.id === params.edge.source
+  );
   if (!sourceNode) {
     return undefined;
   }
@@ -72,7 +77,10 @@ export function resolveRetakePrimaryVideoRef(params: {
   readonly edges: readonly FlowEdgeRef[];
   readonly nodes: readonly FlowNodeRef[];
   readonly draft?: AiVideoRetakeDraft;
-  readonly inputs?: readonly { readonly id: string; readonly value?: unknown }[];
+  readonly inputs?: readonly {
+    readonly id: string;
+    readonly value?: unknown;
+  }[];
 }): RetakePrimaryVideoRef | null {
   const draft =
     params.draft ??
@@ -114,7 +122,10 @@ export function isRetakePrimaryVideoEdge(params: {
   readonly targetNodeId: string;
   readonly edges: readonly FlowEdgeRef[];
   readonly nodes: readonly FlowNodeRef[];
-  readonly inputs?: readonly { readonly id: string; readonly value?: unknown }[];
+  readonly inputs?: readonly {
+    readonly id: string;
+    readonly value?: unknown;
+  }[];
 }): boolean {
   const primary = resolveRetakePrimaryVideoRef({
     targetNodeId: params.targetNodeId,
@@ -148,10 +159,12 @@ export function collectRetakeSupplementalVideoMedia(params: {
   readonly targetNodeId: string;
   readonly edges: readonly FlowEdgeRef[];
   readonly nodes: readonly FlowNodeRef[];
-  readonly inputs?: readonly { readonly id: string; readonly value?: unknown }[];
+  readonly inputs?: readonly {
+    readonly id: string;
+    readonly value?: unknown;
+  }[];
 }): readonly WorkflowMediaValue[] {
-  const primaryEdgeId =
-    resolveRetakePrimaryVideoRef(params)?.edgeId ?? null;
+  const primaryEdgeId = resolveRetakePrimaryVideoRef(params)?.edgeId ?? null;
   const chips = collectGenerativeReferenceChips({
     nodeId: params.targetNodeId,
     targetHandle: AI_VIDEO_REFERENCE_HANDLE_ID,
@@ -162,9 +175,7 @@ export function collectRetakeSupplementalVideoMedia(params: {
   return chips
     .filter(
       (chip) =>
-        chip.kind === "video" &&
-        chip.media &&
-        chip.edgeId !== primaryEdgeId
+        chip.kind === "video" && chip.media && chip.edgeId !== primaryEdgeId
     )
     .map((chip) => chip.media!);
 }
@@ -173,10 +184,12 @@ export function collectRetakeSupplementalReferenceMedia(params: {
   readonly targetNodeId: string;
   readonly edges: readonly FlowEdgeRef[];
   readonly nodes: readonly FlowNodeRef[];
-  readonly inputs?: readonly { readonly id: string; readonly value?: unknown }[];
+  readonly inputs?: readonly {
+    readonly id: string;
+    readonly value?: unknown;
+  }[];
 }): readonly WorkflowMediaValue[] {
-  const primaryEdgeId =
-    resolveRetakePrimaryVideoRef(params)?.edgeId ?? null;
+  const primaryEdgeId = resolveRetakePrimaryVideoRef(params)?.edgeId ?? null;
   const chips = collectGenerativeReferenceChips({
     nodeId: params.targetNodeId,
     targetHandle: AI_VIDEO_REFERENCE_HANDLE_ID,

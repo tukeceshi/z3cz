@@ -29,7 +29,8 @@ function rowToOrgInterface(
     hasApiKey: row.apiKeyEncrypted.length > 0,
     apiKeyHint: readApiKeyHint(metadata),
     metadata,
-    volcanoSetupStatus: (row.volcanoSetupStatus as VolcanoSetupStatus | null) ?? null,
+    volcanoSetupStatus:
+      (row.volcanoSetupStatus as VolcanoSetupStatus | null) ?? null,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
   };
@@ -280,11 +281,7 @@ export async function resolveOrganizationAiInterfaceRow(
     };
     const provider = providerByLegacyTemplate[params.templateId];
     if (provider) {
-      return getOrganizationAiInterfaceDefaultRow(
-        db,
-        organizationId,
-        provider
-      );
+      return getOrganizationAiInterfaceDefaultRow(db, organizationId, provider);
     }
   }
 

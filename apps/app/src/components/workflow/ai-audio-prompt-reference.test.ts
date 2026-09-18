@@ -1,7 +1,4 @@
-import {
-  AI_AUDIO_NODE_TYPE,
-  AI_TEXT_NODE_TYPE,
-} from "@dafthunk/types";
+import { AI_AUDIO_NODE_TYPE, AI_TEXT_NODE_TYPE } from "@dafthunk/types";
 import { describe, expect, it } from "vitest";
 
 import { AI_AUDIO_PROMPT_HANDLE_ID } from "./ai-audio-node-utils";
@@ -26,10 +23,7 @@ function mockTextNode(id: string) {
   };
 }
 
-function mockAudioNode(
-  id: string,
-  metadata?: Record<string, string>
-) {
+function mockAudioNode(id: string, metadata?: Record<string, string>) {
   return {
     id,
     data: {

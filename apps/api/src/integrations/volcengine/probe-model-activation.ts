@@ -91,7 +91,11 @@ async function postInferenceProbe(
   apiKey: string,
   path: string,
   body: Record<string, unknown>
-): Promise<{ httpStatus: number; errorCode: string | undefined; message: string | null }> {
+): Promise<{
+  httpStatus: number;
+  errorCode: string | undefined;
+  message: string | null;
+}> {
   const response = await fetch(`${VOLCANO_ARK_INFERENCE_BASE_URL}${path}`, {
     method: "POST",
     headers: {

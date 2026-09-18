@@ -129,7 +129,7 @@ export function testConcurrentErrors(
       expect(div2Result).toBeDefined();
     });
 
-    it("should handle cascading errors (error â†?skipped â†?skipped)", async () => {
+    it("should handle cascading errors (error â†’skipped â†’skipped)", async () => {
       const workflow = {
         id: "test-workflow-cascade",
         name: "Cascading Errors Workflow",

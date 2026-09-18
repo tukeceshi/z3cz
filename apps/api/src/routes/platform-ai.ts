@@ -152,7 +152,10 @@ import {
   runCanvasImageGenerationJob,
 } from "../services/canvas-image-generation-job";
 import { runAfterResponse } from "../utils/run-after-response";
-import { persistGeneratingNodeContentToWorkflow, persistTextGeneratingPlaceholder } from "../services/persist-generating-node-content";
+import {
+  persistGeneratingNodeContentToWorkflow,
+  persistTextGeneratingPlaceholder,
+} from "../services/persist-generating-node-content";
 import { submitVideoSubtitleEraseTask } from "../services/video-subtitle-erase-service";
 import { markMediaResourcesFailed } from "../services/mark-media-resources-failed";
 import { registerGeneratingPlaceholderResources } from "../services/register-generating-placeholder-resources";
@@ -160,9 +163,7 @@ import {
   presignTosMediaDownloadUrls,
   presignTosMediaUpload,
 } from "../services/tos-media-presign";
-import {
-  resolveResourceRefs,
-} from "../services/resolve-resource-refs";
+import { resolveResourceRefs } from "../services/resolve-resource-refs";
 import { submitVideoEnhanceTask } from "../services/video-enhance-service";
 import { submitVideoConcatTask } from "../services/video-concat-service";
 import { submitVideoTrimTask } from "../services/video-trim-service";
@@ -206,7 +207,10 @@ platformAiRoutes.post(
     const body = c.req.valid("json");
     const origin = body.origin?.trim().replace(/\/$/, "");
 
-    if (origin && shouldThrottleDirectUploadCorsEnsure(organizationId, origin)) {
+    if (
+      origin &&
+      shouldThrottleDirectUploadCorsEnsure(organizationId, origin)
+    ) {
       return c.json({ applied: false, throttled: true, origin });
     }
 
@@ -214,10 +218,14 @@ platformAiRoutes.post(
       const result = await ensureOrgDirectUploadCors(c.env, organizationId, {
         extraOrigins: origin ? [origin] : undefined,
       });
-      const health = await getOrgCloudStorageStatusResponse(c.env, organizationId, {
-        force: true,
-        extraCorsOrigins: origin ? [origin] : undefined,
-      });
+      const health = await getOrgCloudStorageStatusResponse(
+        c.env,
+        organizationId,
+        {
+          force: true,
+          extraCorsOrigins: origin ? [origin] : undefined,
+        }
+      );
 
       return c.json({
         applied: result.applied,
@@ -241,7 +249,9 @@ const tosPresignUploadSchema = z.object({
   mimeType: z.string().min(1),
   contentLength: z.number().int().positive(),
   workflowId: z.string().optional(),
-  mediaKind: z.enum(["ai-image", "ai-video", "ai-audio", "reference"]).optional(),
+  mediaKind: z
+    .enum(["ai-image", "ai-video", "ai-audio", "reference"])
+    .optional(),
   objectId: z.string().min(1).optional(),
 });
 
@@ -325,7 +335,9 @@ platformAiRoutes.post(
       return c.json(result);
     } catch (error) {
       const message =
-        error instanceof Error ? error.message : "Failed to resolve resource refs";
+        error instanceof Error
+          ? error.message
+          : "Failed to resolve resource refs";
       return c.json({ error: message }, 400);
     }
   }
@@ -458,7 +470,10 @@ platformAiRoutes.get("/video-models/:canonicalId/resolve", async (c) => {
   );
 
   if (!resolved) {
-    return c.json({ error: "Model is not available for this organization" }, 404);
+    return c.json(
+      { error: "Model is not available for this organization" },
+      404
+    );
   }
 
   return c.json({
@@ -482,7 +497,10 @@ platformAiRoutes.get("/image-models/:canonicalId/resolve", async (c) => {
   );
 
   if (!resolved) {
-    return c.json({ error: "Model is not available for this organization" }, 404);
+    return c.json(
+      { error: "Model is not available for this organization" },
+      404
+    );
   }
 
   return c.json({
@@ -506,7 +524,10 @@ platformAiRoutes.get("/audio-models/:canonicalId/resolve", async (c) => {
   );
 
   if (!resolved) {
-    return c.json({ error: "Model is not available for this organization" }, 404);
+    return c.json(
+      { error: "Model is not available for this organization" },
+      404
+    );
   }
 
   return c.json({
@@ -530,7 +551,10 @@ platformAiRoutes.get("/text-models/:canonicalId/resolve", async (c) => {
   );
 
   if (!resolved) {
-    return c.json({ error: "Model is not available for this organization" }, 404);
+    return c.json(
+      { error: "Model is not available for this organization" },
+      404
+    );
   }
 
   return c.json({
@@ -541,7 +565,10 @@ platformAiRoutes.get("/text-models/:canonicalId/resolve", async (c) => {
 
 platformAiRoutes.get("/model-calls", async (c) => {
   const organizationId = c.get("organizationId")!;
-  const limit = Math.min(Math.max(1, Number(c.req.query("limit") ?? "20")), 100);
+  const limit = Math.min(
+    Math.max(1, Number(c.req.query("limit") ?? "20")),
+    100
+  );
   const offset = Math.max(0, Number(c.req.query("offset") ?? "0"));
   const dateFrom = c.req.query("dateFrom");
   const dateTo = c.req.query("dateTo");
@@ -549,12 +576,13 @@ platformAiRoutes.get("/model-calls", async (c) => {
   const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
   const validatedDateFrom =
     dateFrom && dateRegex.test(dateFrom) ? dateFrom : undefined;
-  const validatedDateTo =
-    dateTo && dateRegex.test(dateTo) ? dateTo : undefined;
+  const validatedDateTo = dateTo && dateRegex.test(dateTo) ? dateTo : undefined;
   const hasDateFilter =
     validatedDateFrom !== undefined || validatedDateTo !== undefined;
   const tzOffsetMinutes =
-    hasDateFilter && tzOffsetRaw !== undefined ? Number(tzOffsetRaw) : undefined;
+    hasDateFilter && tzOffsetRaw !== undefined
+      ? Number(tzOffsetRaw)
+      : undefined;
 
   const db = createDatabase(c.env);
   const result = await listAiModelInvocations(db, organizationId, {
@@ -622,11 +650,16 @@ platformAiRoutes.post(
     );
 
     if (!modelOption?.selectable) {
-      return c.json({ error: "Model is not available for this organization" }, 400);
+      return c.json(
+        { error: "Model is not available for this organization" },
+        400
+      );
     }
 
     const mediaCounts = countGenerateAiTextMediaReferences(body);
-    if (mediaCounts.imageCount > modelOption.parameterRules.maxImageReferences) {
+    if (
+      mediaCounts.imageCount > modelOption.parameterRules.maxImageReferences
+    ) {
       return c.json(
         {
           error: `Model allows at most ${modelOption.parameterRules.maxImageReferences} image references`,
@@ -634,7 +667,9 @@ platformAiRoutes.post(
         400
       );
     }
-    if (mediaCounts.videoCount > modelOption.parameterRules.maxVideoReferences) {
+    if (
+      mediaCounts.videoCount > modelOption.parameterRules.maxVideoReferences
+    ) {
       return c.json(
         {
           error: `Model allows at most ${modelOption.parameterRules.maxVideoReferences} video references`,
@@ -770,11 +805,16 @@ platformAiRoutes.post(
     );
 
     if (!modelOption?.selectable) {
-      return c.json({ error: "Model is not available for this organization" }, 400);
+      return c.json(
+        { error: "Model is not available for this organization" },
+        400
+      );
     }
 
     const mediaCounts = countGenerateAiTextMediaReferences(body);
-    if (mediaCounts.imageCount > modelOption.parameterRules.maxImageReferences) {
+    if (
+      mediaCounts.imageCount > modelOption.parameterRules.maxImageReferences
+    ) {
       return c.json(
         {
           error: `Model allows at most ${modelOption.parameterRules.maxImageReferences} image references`,
@@ -782,7 +822,9 @@ platformAiRoutes.post(
         400
       );
     }
-    if (mediaCounts.videoCount > modelOption.parameterRules.maxVideoReferences) {
+    if (
+      mediaCounts.videoCount > modelOption.parameterRules.maxVideoReferences
+    ) {
       return c.json(
         {
           error: `Model allows at most ${modelOption.parameterRules.maxVideoReferences} video references`,
@@ -952,7 +994,9 @@ platformAiRoutes.post(
                 invocationId,
                 aiInterfaceId: prepared.prepared.candidate.interfaceId,
                 resourceId: persisted?.resourceId ?? textResourceId,
-                ...(persisted ? { contentSha256: persisted.contentSha256 } : {}),
+                ...(persisted
+                  ? { contentSha256: persisted.contentSha256 }
+                  : {}),
               });
               continue;
             }
@@ -1127,7 +1171,10 @@ platformAiRoutes.post(
     );
 
     if (!resolvedModel) {
-      return c.json({ error: "Model is not available for this organization" }, 400);
+      return c.json(
+        { error: "Model is not available for this organization" },
+        400
+      );
     }
 
     if (prompt.length > resolvedModel.parameterRules.promptMaxChars) {
@@ -1358,7 +1405,10 @@ platformAiRoutes.post(
     );
 
     if (!resolvedModel) {
-      return c.json({ error: "Model is not available for this organization" }, 400);
+      return c.json(
+        { error: "Model is not available for this organization" },
+        400
+      );
     }
 
     if (prompt.length > resolvedModel.parameterRules.promptMaxChars) {
@@ -1472,14 +1522,14 @@ platformAiRoutes.post(
       },
       () =>
         executeMinimaxSpeech({
-      apiKey: iface.apiKey,
-      baseUrl: iface.baseUrl,
-      providerModelId: resolvedModel.providerModelId,
-      text: prompt,
-      parameterRules: resolvedModel.parameterRules,
-      generationParams: body.params,
-      upstreamLog,
-      useFullSubmitUrl: iface.useFullSubmitUrl,
+          apiKey: iface.apiKey,
+          baseUrl: iface.baseUrl,
+          providerModelId: resolvedModel.providerModelId,
+          text: prompt,
+          parameterRules: resolvedModel.parameterRules,
+          generationParams: body.params,
+          upstreamLog,
+          useFullSubmitUrl: iface.useFullSubmitUrl,
         })
     );
 
@@ -1661,7 +1711,10 @@ platformAiRoutes.post(
     );
 
     if (!resolvedModel) {
-      return c.json({ error: "Model is not available for this organization" }, 400);
+      return c.json(
+        { error: "Model is not available for this organization" },
+        400
+      );
     }
 
     const referenceValidation = validateSubmitAiVideoReferences({
@@ -1806,20 +1859,20 @@ platformAiRoutes.post(
         },
         () =>
           submitOrgVideoTask({
-        apiKey: iface.apiKey,
-        baseUrl: iface.baseUrl,
-        canonicalId: resolvedModel.canonicalId,
-        providerModelId: inferenceModelId,
-        prompt,
-        parameterRules: resolvedModel.parameterRules,
-        generationParams: body.params,
-        referenceImageUrls: body.referenceImageUrls,
-        referenceImageInline: body.referenceImageInline,
-        referenceVideoUrls: body.referenceVideoUrls,
-        referenceAudioUrls: body.referenceAudioUrls,
-        upstreamLog,
-        videoEndpoints: iface.videoEndpoints,
-        formatTransform: iface.formatTransform,
+            apiKey: iface.apiKey,
+            baseUrl: iface.baseUrl,
+            canonicalId: resolvedModel.canonicalId,
+            providerModelId: inferenceModelId,
+            prompt,
+            parameterRules: resolvedModel.parameterRules,
+            generationParams: body.params,
+            referenceImageUrls: body.referenceImageUrls,
+            referenceImageInline: body.referenceImageInline,
+            referenceVideoUrls: body.referenceVideoUrls,
+            referenceAudioUrls: body.referenceAudioUrls,
+            upstreamLog,
+            videoEndpoints: iface.videoEndpoints,
+            formatTransform: iface.formatTransform,
           })
       );
     } catch (error) {
@@ -2045,7 +2098,9 @@ const submitSubtitleEraseSchema = z.object({
   sourceVideoResourceId: z.string().min(1),
   mode: z.enum(VOLCANO_MEDIKIT_SUBTITLE_ERASE_MODES),
   eraseMode: z.enum(VOLCANO_MEDIKIT_SUBTITLE_ERASE_SCOPES).optional(),
-  modelVersion: z.enum(VOLCANO_MEDIKIT_SUBTITLE_ERASE_MODEL_VERSIONS).optional(),
+  modelVersion: z
+    .enum(VOLCANO_MEDIKIT_SUBTITLE_ERASE_MODEL_VERSIONS)
+    .optional(),
   outputEncodeMode: z
     .enum(VOLCANO_MEDIKIT_SUBTITLE_ERASE_OUTPUT_ENCODE_MODES)
     .optional(),
@@ -2455,24 +2510,27 @@ platformAiRoutes.post("/generation-jobs/:jobId/cancel", async (c) => {
   return c.json(response);
 });
 
-platformAiRoutes.post("/generation-jobs/cancel-by-client-request", async (c) => {
-  const organizationId = c.get("organizationId")!;
-  const body = await c.req.json<{ clientRequestId?: string }>();
-  const clientRequestId = body.clientRequestId?.trim();
-  if (!clientRequestId) {
-    return c.json({ error: "clientRequestId is required" }, 400);
-  }
+platformAiRoutes.post(
+  "/generation-jobs/cancel-by-client-request",
+  async (c) => {
+    const organizationId = c.get("organizationId")!;
+    const body = await c.req.json<{ clientRequestId?: string }>();
+    const clientRequestId = body.clientRequestId?.trim();
+    if (!clientRequestId) {
+      return c.json({ error: "clientRequestId is required" }, 400);
+    }
 
-  const response = await cancelUserGenerationJobByClientRequestId(
-    c.env,
-    organizationId,
-    clientRequestId
-  );
-  if (!response) {
-    return c.json({ error: "Generation job not found" }, 404);
+    const response = await cancelUserGenerationJobByClientRequestId(
+      c.env,
+      organizationId,
+      clientRequestId
+    );
+    if (!response) {
+      return c.json({ error: "Generation job not found" }, 404);
+    }
+    return c.json(response);
   }
-  return c.json(response);
-});
+);
 
 platformAiRoutes.post(
   "/generation-jobs/:jobId/claim-client-upload",
@@ -2604,7 +2662,10 @@ platformAiRoutes.get("/ai-video/tasks/:taskId", async (c) => {
     return c.json({ error: "Could not resolve AI interface" }, 400);
   }
 
-  if (trackedJob?.status === "generating" || trackedJob?.status === "cancelling") {
+  if (
+    trackedJob?.status === "generating" ||
+    trackedJob?.status === "cancelling"
+  ) {
     const job = await pollVideoGenerationJob(c.env, db, trackedJob);
 
     if (job.status === "cancelled") {
@@ -2650,14 +2711,14 @@ platformAiRoutes.get("/ai-video/tasks/:taskId", async (c) => {
     },
     () =>
       pollOrgVideoTask({
-    apiKey: iface.apiKey,
-    canonicalId: modelCanonicalId,
-    baseUrl: iface.baseUrl,
-    upstreamTaskId: taskId,
-    videoPollUrl: trackedJob?.resultJson?.videoPollUrl,
-    videoEndpoints: iface.videoEndpoints,
-    formatTransform: iface.formatTransform,
-    upstreamLog: pollLog,
+        apiKey: iface.apiKey,
+        canonicalId: modelCanonicalId,
+        baseUrl: iface.baseUrl,
+        upstreamTaskId: taskId,
+        videoPollUrl: trackedJob?.resultJson?.videoPollUrl,
+        videoEndpoints: iface.videoEndpoints,
+        formatTransform: iface.formatTransform,
+        upstreamLog: pollLog,
       })
   );
 
@@ -2742,14 +2803,14 @@ platformAiRoutes.get("/ai-video/tasks/:taskId", async (c) => {
       },
       () =>
         downloadOrgVideo({
-      apiKey: iface.apiKey,
-      canonicalId: modelCanonicalId,
-      videoUrl,
-      storageMode: storageResolution.storageMode,
-      objectStore,
-      organizationId,
-      workflowId,
-      cloudUpload: storageResolution.cloudUpload,
+          apiKey: iface.apiKey,
+          canonicalId: modelCanonicalId,
+          videoUrl,
+          storageMode: storageResolution.storageMode,
+          objectStore,
+          organizationId,
+          workflowId,
+          cloudUpload: storageResolution.cloudUpload,
         })
     );
 
@@ -2777,7 +2838,8 @@ platformAiRoutes.get("/ai-video/tasks/:taskId", async (c) => {
 
 platformAiRoutes.get("/media/proxy", async (c) => {
   const upstreamUrl = c.req.query("url")?.trim();
-  const mimeType = c.req.query("mimeType")?.trim() || "application/octet-stream";
+  const mimeType =
+    c.req.query("mimeType")?.trim() || "application/octet-stream";
 
   if (!upstreamUrl) {
     return c.json({ error: "url query parameter is required" }, 400);
@@ -2796,10 +2858,7 @@ platformAiRoutes.get("/media/proxy", async (c) => {
 
   const response = await fetch(upstreamUrl);
   if (!response.ok) {
-    return c.json(
-      { error: `Upstream fetch failed (${response.status})` },
-      502
-    );
+    return c.json({ error: `Upstream fetch failed (${response.status})` }, 502);
   }
 
   return new Response(response.body, {
@@ -2957,7 +3016,10 @@ platformAiRoutes.post(
     );
 
     if (!modelOption?.selectable) {
-      return c.json({ error: "Model is not available for this organization" }, 400);
+      return c.json(
+        { error: "Model is not available for this organization" },
+        400
+      );
     }
 
     const lastUser = [...body.messages]
@@ -3095,25 +3157,28 @@ platformAiRoutes.get("/agent-chat/generate-stream/:invocationId", async (c) => {
   return replayFinishedAgentChatSse(invocation);
 });
 
-platformAiRoutes.post("/agent-chat/generate-stream/:invocationId/stop", async (c) => {
-  const organizationId = c.get("organizationId")!;
-  const invocationId = c.req.param("invocationId");
-  const stopped = await stopAgentChatLiveJob(invocationId, organizationId);
-  if (stopped) {
-    return c.json({ text: stopped.text });
-  }
+platformAiRoutes.post(
+  "/agent-chat/generate-stream/:invocationId/stop",
+  async (c) => {
+    const organizationId = c.get("organizationId")!;
+    const invocationId = c.req.param("invocationId");
+    const stopped = await stopAgentChatLiveJob(invocationId, organizationId);
+    if (stopped) {
+      return c.json({ text: stopped.text });
+    }
 
-  const db = createDatabase(c.env);
-  const invocation = await getAiModelInvocation(
-    db,
-    organizationId,
-    invocationId
-  );
-  if (!invocation) {
-    return c.json({ error: "Generation is no longer running" }, 404);
+    const db = createDatabase(c.env);
+    const invocation = await getAiModelInvocation(
+      db,
+      organizationId,
+      invocationId
+    );
+    if (!invocation) {
+      return c.json({ error: "Generation is no longer running" }, 404);
+    }
+    return c.json({ text: invocation.content });
   }
-  return c.json({ text: invocation.content });
-});
+);
 
 platformAiRoutes.get("/agent-chats", async (c) => {
   const organizationId = c.get("organizationId")!;

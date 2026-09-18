@@ -1,5 +1,12 @@
 import type { ObjectReference } from "@dafthunk/types";
-import { AI_AUDIO_NODE_TYPE, AI_GENERATIVE_NODE_TYPES, AI_IMAGE_NODE_TYPE, AI_TEXT_NODE_TYPE, AI_VIDEO_NODE_TYPE, readNodeLayoutFromMetadata } from "@dafthunk/types";
+import {
+  AI_AUDIO_NODE_TYPE,
+  AI_GENERATIVE_NODE_TYPES,
+  AI_IMAGE_NODE_TYPE,
+  AI_TEXT_NODE_TYPE,
+  AI_VIDEO_NODE_TYPE,
+  readNodeLayoutFromMetadata,
+} from "@dafthunk/types";
 import { Handle, Position, useNodes, useViewport } from "@xyflow/react";
 import { AsteriskIcon } from "lucide-react";
 // @ts-ignore - https://github.com/lucide-icons/lucide/issues/2867#issuecomment-2847105863
@@ -60,14 +67,15 @@ import { useOptionalVideoTrimSession } from "./video-trim-session-context";
 import { useOptionalSubtitleEraseSession } from "./video-subtitle-erase-session-context";
 import { isWorkflowBottomPanelVisible } from "./ai-generative-panel-utils";
 import { isAiVideoResultSiblingNodeId } from "./create-ai-video-node-from-manual-upload";
-import { shouldShowGenerativeBottomPanel, isGenerativeManualContent } from "./generative-card-mode-utils";
+import {
+  shouldShowGenerativeBottomPanel,
+  isGenerativeManualContent,
+} from "./generative-card-mode-utils";
 import {
   GENERATIVE_NODE_CARD_CLASS,
   GENERATIVE_NODE_CARD_RADIUS_CLASS,
 } from "./generative-card-styles";
-import {
-  readGenerativeProgressPhase,
-} from "./generative-progress-utils";
+import { readGenerativeProgressPhase } from "./generative-progress-utils";
 import { GenerativeCloudJobResumeHost } from "./generative-cloud-job-resume-host";
 import { WorkflowNodeGenerativeBusyOverlay } from "./generative-busy-overlay";
 import {
@@ -130,119 +138,122 @@ export const TypeBadge = memo(
     selected?: boolean;
     isConnected?: boolean;
   }) => {
-  const iconSize = "size-2.5!";
+    const iconSize = "size-2.5!";
 
-  const icon: Partial<Record<InputOutputType, React.ReactNode>> = {
-    string: <TypeIcon className={iconSize} />,
-    number: <HashIcon className={iconSize} />,
-    boolean: <CheckIcon className={iconSize} />,
-    blob: <FileIcon className={iconSize} />,
-    image: <ImageIcon className={iconSize} />,
-    document: <FileTextIcon className={iconSize} />,
-    audio: <MusicIcon className={iconSize} />,
-    video: <VideoIcon className={iconSize} />,
-    json: <BracesIcon className={iconSize} />,
-    date: <CalendarIcon className={iconSize} />,
-    geojson: <GlobeIcon className={iconSize} />,
-    secret: <LockIcon className={iconSize} />,
-    schema: <TablePropertiesIcon className={iconSize} />,
-    database: <DatabaseIcon className={iconSize} />,
-    dataset: <FolderSearchIcon className={iconSize} />,
-    queue: <LayersIcon className={iconSize} />,
-    integration: <LinkIcon className={iconSize} />,
-    any: <AsteriskIcon className={iconSize} />,
-  };
+    const icon: Partial<Record<InputOutputType, React.ReactNode>> = {
+      string: <TypeIcon className={iconSize} />,
+      number: <HashIcon className={iconSize} />,
+      boolean: <CheckIcon className={iconSize} />,
+      blob: <FileIcon className={iconSize} />,
+      image: <ImageIcon className={iconSize} />,
+      document: <FileTextIcon className={iconSize} />,
+      audio: <MusicIcon className={iconSize} />,
+      video: <VideoIcon className={iconSize} />,
+      json: <BracesIcon className={iconSize} />,
+      date: <CalendarIcon className={iconSize} />,
+      geojson: <GlobeIcon className={iconSize} />,
+      secret: <LockIcon className={iconSize} />,
+      schema: <TablePropertiesIcon className={iconSize} />,
+      database: <DatabaseIcon className={iconSize} />,
+      dataset: <FolderSearchIcon className={iconSize} />,
+      queue: <LayersIcon className={iconSize} />,
+      integration: <LinkIcon className={iconSize} />,
+      any: <AsteriskIcon className={iconSize} />,
+    };
 
-  const handleClick = (e: React.MouseEvent<HTMLSpanElement>) => {
-    if (disabled) return;
+    const handleClick = (e: React.MouseEvent<HTMLSpanElement>) => {
+      if (disabled) return;
 
-    if (position === Position.Left && parameter && onInputClick) {
-      onInputClick(parameter, e.currentTarget);
-    } else if (position === Position.Right && parameter && onOutputClick) {
-      onOutputClick(parameter, e.currentTarget);
-    }
-  };
+      if (position === Position.Left && parameter && onInputClick) {
+        onInputClick(parameter, e.currentTarget);
+      } else if (position === Position.Right && parameter && onOutputClick) {
+        onOutputClick(parameter, e.currentTarget);
+      }
+    };
 
-  // Check if the parameter has a value set
-  const hasValue = parameter && parameter.value !== undefined;
-  const isActive = hasValue || isConnected;
-  // Determine if this is an input parameter
-  const isInput = position === Position.Left;
+    // Check if the parameter has a value set
+    const hasValue = parameter && parameter.value !== undefined;
+    const isActive = hasValue || isConnected;
+    // Determine if this is an input parameter
+    const isInput = position === Position.Left;
 
-  // Check if this parameter accepts multiple connections
-  const repeated = parameter?.repeated || false;
+    // Check if this parameter accepts multiple connections
+    const repeated = parameter?.repeated || false;
 
-  // Check if this is a required input with no value and no connection
-  const isRequiredAndEmpty =
-    isInput && parameter?.required && !hasValue && !isConnected;
+    // Check if this is a required input with no value and no connection
+    const isRequiredAndEmpty =
+      isInput && parameter?.required && !hasValue && !isConnected;
 
-  return (
-    <div className="relative inline-flex items-center justify-center">
-      {/* Multiple connections indicator background ring */}
-      {repeated && (
-        <div
+    return (
+      <div className="relative inline-flex items-center justify-center">
+        {/* Multiple connections indicator background ring */}
+        {repeated && (
+          <div
+            className={cn(
+              "absolute inset-0 rounded-lg border shadow-xs bg-background",
+              {
+                "border-border": !selected && executionState === "idle",
+                "border-yellow-400":
+                  !selected &&
+                  (executionState === "executing" ||
+                    executionState === "pending"),
+                "border-green-500": !selected && executionState === "completed",
+                "border-red-500": !selected && executionState === "error",
+                "border-blue-400": !selected && executionState === "skipped",
+              },
+              selected && WORKFLOW_NODE_SELECTED_BORDER_CLASS
+            )}
+            style={{
+              width: "20px",
+              height: "20px",
+              transform: "translate(-50%, -50%)",
+            }}
+          />
+        )}
+        <Handle
+          type={position === Position.Left ? "target" : "source"}
+          position={position}
+          id={id}
           className={cn(
-            "absolute inset-0 rounded-lg border shadow-xs bg-background",
+            "w-4! h-4! border! rounded-md! inline-flex! items-center! justify-center! p shadow-xs!",
             {
-              "border-border": !selected && executionState === "idle",
-              "border-yellow-400":
+              "bg-neutral-200! dark:bg-neutral-700!": isActive,
+              "bg-white! dark:bg-neutral-900!": !isActive,
+              "border-border!": !selected && executionState === "idle",
+              "border-yellow-400!":
                 !selected &&
                 (executionState === "executing" ||
                   executionState === "pending"),
-              "border-green-500": !selected && executionState === "completed",
-              "border-red-500": !selected && executionState === "error",
-              "border-blue-400": !selected && executionState === "skipped",
+              "border-green-500!": !selected && executionState === "completed",
+              "border-red-500!": !selected && executionState === "error",
+              "border-blue-400!": !selected && executionState === "skipped",
             },
-            selected && WORKFLOW_NODE_SELECTED_BORDER_CLASS
+            selected && WORKFLOW_NODE_HANDLE_SELECTED_BORDER_CLASS,
+            className
           )}
-          style={{
-            width: "20px",
-            height: "20px",
-            transform: "translate(-50%, -50%)",
-          }}
-        />
-      )}
-      <Handle
-        type={position === Position.Left ? "target" : "source"}
-        position={position}
-        id={id}
-        className={cn(
-          "w-4! h-4! border! rounded-md! inline-flex! items-center! justify-center! p shadow-xs!",
-          {
-            "bg-neutral-200! dark:bg-neutral-700!": isActive,
-            "bg-white! dark:bg-neutral-900!": !isActive,
-            "border-border!": !selected && executionState === "idle",
-            "border-yellow-400!":
-              !selected &&
-              (executionState === "executing" || executionState === "pending"),
-            "border-green-500!": !selected && executionState === "completed",
-            "border-red-500!": !selected && executionState === "error",
-            "border-blue-400!": !selected && executionState === "skipped",
-          },
-          selected && WORKFLOW_NODE_HANDLE_SELECTED_BORDER_CLASS,
-          className
-        )}
-        isConnectableStart={!disabled}
-        isConnectable={!disabled}
-        onClick={handleClick}
-      >
-        <span
-          className={cn(
-            "inline-flex items-center justify-center text-xs font-medium pointer-events-none",
-            {
-              "text-red-500 dark:text-red-400": isRequiredAndEmpty,
-              "text-neutral-800 dark:text-neutral-300":
-                !isRequiredAndEmpty && (isConnected || hasValue),
-              "text-neutral-600 dark:text-neutral-400":
-                !isRequiredAndEmpty && !isConnected && (!isInput || !hasValue),
-            }
-          )}
+          isConnectableStart={!disabled}
+          isConnectable={!disabled}
+          onClick={handleClick}
         >
-          {icon[type] ?? icon.any}
-        </span>
-      </Handle>
-    </div>
-  );
+          <span
+            className={cn(
+              "inline-flex items-center justify-center text-xs font-medium pointer-events-none",
+              {
+                "text-red-500 dark:text-red-400": isRequiredAndEmpty,
+                "text-neutral-800 dark:text-neutral-300":
+                  !isRequiredAndEmpty && (isConnected || hasValue),
+                "text-neutral-600 dark:text-neutral-400":
+                  !isRequiredAndEmpty &&
+                  !isConnected &&
+                  (!isInput || !hasValue),
+              }
+            )}
+          >
+            {icon[type] ?? icon.any}
+          </span>
+        </Handle>
+      </div>
+    );
   }
 );
 
@@ -358,11 +369,7 @@ export const WorkflowNode = memo(
     id: string;
     dragging?: boolean;
   }) => {
-    const {
-      updateNodeData,
-      disabled,
-      nodeTypes,
-    } = useWorkflowActions();
+    const { updateNodeData, disabled, nodeTypes } = useWorkflowActions();
     const { t } = useTranslation();
     const { organization } = useAuth();
     const orgId = organization?.id;
@@ -403,8 +410,7 @@ export const WorkflowNode = memo(
     const subtitleEraseSession = useOptionalSubtitleEraseSession();
     const isSubtitleErasePanelActive =
       subtitleEraseSession?.isSubtitleEraseActiveForNode(id) ?? false;
-    const isRetakePanel =
-      isAiVideoNode && isAiVideoRetakePanel(data.metadata);
+    const isRetakePanel = isAiVideoNode && isAiVideoRetakePanel(data.metadata);
     const isRetakePanelActive = isRetakePanel && selected;
     const showBottomPanelContent =
       isTrimPanelActive ||
@@ -510,10 +516,11 @@ export const WorkflowNode = memo(
       setActiveOutputId(param.id);
     };
 
-    const isAiGenerative = (AI_GENERATIVE_NODE_TYPES as readonly string[]).includes(nodeType);
+    const isAiGenerative = (
+      AI_GENERATIVE_NODE_TYPES as readonly string[]
+    ).includes(nodeType);
     const isExecuting =
-      data.executionState === "executing" ||
-      data.executionState === "pending";
+      data.executionState === "executing" || data.executionState === "pending";
     const progressPhase = readGenerativeProgressPhase(data.metadata);
     const aiImageCardDisplay = isAiImageNode
       ? readAiImageCardDisplay(data.inputs, data.outputs, data.metadata)
@@ -543,8 +550,10 @@ export const WorkflowNode = memo(
     const generativeCardPhase =
       aiImageCardDisplay?.cardPhase ?? aiVideoCardDisplay?.cardPhase ?? null;
     const isAiTextBusy = isAiTextNode && isAiTextGenerating(data.metadata);
-    const isAiImageBusy = isAiImageNode && (aiImageCardDisplay?.isBusy ?? false);
-    const isAiVideoBusy = isAiVideoNode && (aiVideoCardDisplay?.isBusy ?? false);
+    const isAiImageBusy =
+      isAiImageNode && (aiImageCardDisplay?.isBusy ?? false);
+    const isAiVideoBusy =
+      isAiVideoNode && (aiVideoCardDisplay?.isBusy ?? false);
     const isAiAudioBusy =
       isAiAudioNode &&
       (isAiAudioGenerating(data.metadata) || progressPhase !== undefined);
@@ -571,426 +580,486 @@ export const WorkflowNode = memo(
     return (
       <TooltipProvider>
         <div className={cn("relative", WORKFLOW_NODE_CARD_INTERACT_CLASS)}>
-        <div className={cn("relative", (isAiTextNode || isAiImageNode || isAiVideoNode || isAiAudioNode) && "inline-block")}>
-        <div
-          className={cn(
-            "absolute left-0 z-10",
-            isGenerativeCanvasNode && showBottomPanelHost
-              ? "bottom-full mb-1"
-              : "-top-5"
-          )}
-        >
           <div
             className={cn(
-              "flex items-center gap-1 px-1 py-0.5 rounded-sm",
-              "bg-card/40 backdrop-blur-sm"
+              "relative",
+              (isAiTextNode ||
+                isAiImageNode ||
+                isAiVideoNode ||
+                isAiAudioNode) &&
+                "inline-block"
             )}
           >
-            <DynamicIcon
-              name={headerIconName as any}
-              className={cn(
-                "h-2.5 w-2.5 shrink-0 text-muted-foreground/70",
-                resolvedNodeType?.trigger || resolvedNodeType?.responder
-                  ? "text-emerald-500/70"
-                  : "text-blue-500/70"
-              )}
-            />
-            <span className="text-[10px] font-medium text-muted-foreground/70 truncate max-w-[140px]">
-              {nodeDisplayName}
-            </span>
-            {resolvedNodeType?.subscription && (
-              <SubscriptionBadge variant="muted" size="sm" />
-            )}
-          </div>
-        </div>
-
-        {isGenerativeCanvasNode && showBottomPanelHost && showTopToolbarContent ? (
-          <div className="absolute left-1/2 z-10 -translate-x-1/2 bottom-full mb-7">
-            <WorkflowNodeTopToolbarHost
-              nodeId={id}
-              data={data as unknown as WorkflowNodeType}
-              createObjectUrl={data.createObjectUrl}
-              contentVisible={showTopToolbarContent}
-              isDragging={isDragging}
-            />
-          </div>
-        ) : null}
-
-        <div
-          className={cn(
-            "bg-card shadow-xs border relative",
-            isGenerativeCanvasNode
-              ? GENERATIVE_NODE_CARD_CLASS
-              : "rounded-md",
-            isAiTextNode && "ai-text-node-card group/aitext flex flex-col",
-            isAiImageNode && "ai-image-node-card group/aiimage",
-            isAiVideoNode && "ai-video-node-card group/aivideo",
-            isAiAudioNode && "ai-audio-node-card group/aiaudio",
-            {
-            "w-[220px]": !isAiGenerative && !isAiTextNode && !isAiImageNode && !isAiVideoNode && !isAiAudioNode,
-            "w-[280px]": isAiGenerative && !isAiTextNode && !isAiImageNode && !isAiVideoNode && !isAiAudioNode,
-            "border-border": !selected && data.executionState === "idle" && !isAiTextBusy && !isAiImageBusy && !isAiVideoBusy && !isAiAudioBusy,
-            "border-yellow-400":
-              !selected && (isExecuting || isAiTextBusy || isAiImageBusy || isAiVideoBusy || isAiAudioBusy),
-            "border-green-500":
-              !selected && data.executionState === "completed" && !isAiTextBusy && !isAiImageBusy && !isAiVideoBusy && !isAiAudioBusy,
-            "border-red-500": !selected && isError,
-            "border-blue-400": !selected && data.executionState === "skipped",
-          },
-          selected && WORKFLOW_NODE_SELECTED_BORDER_CLASS,
-          {
-            "generative-connect-target": isGenerativeConnectionTarget,
-          }
-          )}
-          style={
-            isAiTextNode
-              ? generativeCardBoxStyle(
-                  persistedLayout,
-                  AI_TEXT_CARD_WIDTH_PX,
-                  AI_TEXT_CARD_HEIGHT_PX
-                )
-              : isAiImageNode
-                ? generativeCardBoxStyle(
-                    persistedLayout,
-                    AI_IMAGE_CARD_WIDTH_PX,
-                    AI_IMAGE_CARD_HEIGHT_PX
-                  )
-                : isAiVideoNode
-                  ? generativeCardBoxStyle(
-                      persistedLayout,
-                      AI_VIDEO_CARD_WIDTH_PX,
-                      AI_VIDEO_CARD_HEIGHT_PX
-                    )
-                  : isAiAudioNode
-                    ? generativeCardBoxStyle(
-                        persistedLayout,
-                        AI_AUDIO_CARD_WIDTH_PX,
-                        AI_AUDIO_CARD_HEIGHT_PX
-                      )
-                    : undefined
-          }
-        >
-          {/* Execution / generate overlay */}
-          <WorkflowNodeGenerativeBusyOverlay
-            visible={showProgressOverlay}
-            isAiImageNode={isAiImageNode}
-            isAiVideoNode={isAiVideoNode}
-            isAiAudioNode={isAiAudioNode}
-            isAiImageBusy={isAiImageBusy}
-            isAiVideoBusy={isAiVideoBusy}
-            isAiAudioBusy={isAiAudioBusy}
-            metadata={data.metadata}
-            nodeId={id}
-            cardPhase={generativeCardPhase}
-            roundedClass={
-              isGenerativeCanvasNode
-                ? GENERATIVE_NODE_CARD_RADIUS_CLASS
-                : "rounded-md"
-            }
-          />
-
-          {(isAiImageNode || isAiVideoNode || isAiAudioNode) && !disabled ? (
-            <GenerativeCloudJobResumeHost
-              nodeId={id}
-              modality={
-                isAiImageNode ? "image" : isAiVideoNode ? "video" : "audio"
-              }
-              data={data as unknown as WorkflowNodeType}
-            />
-          ) : null}
-
-          {/* Error overlay — generative nodes render errors inside their widgets */}
-          {isError && data.error && !isAiTextNode && !isAiImageNode && !isAiVideoNode && !isAiAudioNode ? (
-            <div className="absolute inset-0 z-10 flex items-start justify-start rounded-md bg-red-500/10 p-2">
-              <p className="text-[10px] text-red-600 dark:text-red-400 line-clamp-3">
-                {data.error}
-              </p>
-            </div>
-          ) : null}
-
-          {/* Widget — AI text keeps the whole card draggable; only controls use nodrag */}
-          {widget && (
             <div
               className={cn(
-                "px-0 py-0",
-                isAiTextNode && "flex-1 min-h-0 overflow-hidden border-b",
-                (isAiImageNode || isAiVideoNode || isAiAudioNode) &&
-                  cn("h-full overflow-hidden", GENERATIVE_NODE_CARD_RADIUS_CLASS),
-                !isAiTextNode &&
-                  !isAiImageNode &&
-                  !isAiVideoNode &&
-                  !isAiAudioNode &&
-                  "border-b",
-                !isAiTextNode && !isAiImageNode && !isAiVideoNode && !isAiAudioNode && "nodrag"
+                "absolute left-0 z-10",
+                isGenerativeCanvasNode && showBottomPanelHost
+                  ? "bottom-full mb-1"
+                  : "-top-5"
               )}
             >
-              {createElement(widget.Component, {
-                ...widget.config,
-                onChange: !disabled ? handleWidgetChange : () => {},
-                disabled,
-                createObjectUrl: data.createObjectUrl,
-                ...(isAiTextNode
-                  ? {
-                      selected: selected ?? false,
-                      onEmptyOutputEditingChange: setEmptyTextEditing,
-                    }
-                  : {}),
-              })}
+              <div
+                className={cn(
+                  "flex items-center gap-1 px-1 py-0.5 rounded-sm",
+                  "bg-card/40 backdrop-blur-sm"
+                )}
+              >
+                <DynamicIcon
+                  name={headerIconName as any}
+                  className={cn(
+                    "h-2.5 w-2.5 shrink-0 text-muted-foreground/70",
+                    resolvedNodeType?.trigger || resolvedNodeType?.responder
+                      ? "text-emerald-500/70"
+                      : "text-blue-500/70"
+                  )}
+                />
+                <span className="text-[10px] font-medium text-muted-foreground/70 truncate max-w-[140px]">
+                  {nodeDisplayName}
+                </span>
+                {resolvedNodeType?.subscription && (
+                  <SubscriptionBadge variant="muted" size="sm" />
+                )}
+              </div>
             </div>
-          )}
 
-          {/* Resource Selectors (database, dataset, queue, email, integration) */}
-          {resourceInputs.length > 0 && (
-            <div className="px-2 py-2 nodrag border-b space-y-1 [&_button]:text-xs [&_button]:h-7">
-              {resourceInputs.map((input) => {
-                const isConnected = isWorkflowHandleConnected(
-                  connectedHandleKeys,
-                  id,
-                  input.id
-                );
-                return (
-                  <Field
-                    key={input.id}
-                    parameter={input}
-                    value={input.value}
-                    onChange={(value) => {
-                      if (disabled || !updateNodeData) return;
-                      updateNodeInput(
-                        id,
-                        input.id,
-                        value,
-                        data.inputs,
-                        updateNodeData
-                      );
-                    }}
-                    onClear={() => {
-                      if (disabled || !updateNodeData) return;
-                      clearNodeInput(id, input.id, data.inputs, updateNodeData);
-                    }}
-                    disabled={disabled}
-                    connected={isConnected}
-                  />
-                );
-              })}
-            </div>
-          )}
+            {isGenerativeCanvasNode &&
+            showBottomPanelHost &&
+            showTopToolbarContent ? (
+              <div className="absolute left-1/2 z-10 -translate-x-1/2 bottom-full mb-7">
+                <WorkflowNodeTopToolbarHost
+                  nodeId={id}
+                  data={data as unknown as WorkflowNodeType}
+                  createObjectUrl={data.createObjectUrl}
+                  contentVisible={showTopToolbarContent}
+                  isDragging={isDragging}
+                />
+              </div>
+            ) : null}
 
-          {/* Parameters — hidden on generative canvas cards (config lives in bottom panel). */}
-          {(!isAiTextNode && !isAiImageNode && !isAiVideoNode && !isAiAudioNode) ? (
-          <div className="py-2 grid grid-cols-2 justify-between gap-3">
-            {/* Input Parameters */}
-            <div className="flex flex-col gap-1 flex-1">
-              {data.inputs
-                .filter((input) => !input.hidden)
-                .map((input, index) => (
-                  <div
-                    key={`input-${input.id}-${index}`}
-                    className="flex items-center gap-3 text-xs relative"
-                  >
-                    <TypeBadge
-                      type={input.type}
-                      position={Position.Left}
-                      id={input.id}
-                      nodeId={id}
-                      parameter={input}
-                      onInputClick={handleInputClick}
-                      disabled={disabled}
-                      executionState={data.executionState}
-                      selected={selected}
-                      isConnected={isWorkflowHandleConnected(
-                        connectedHandleKeys,
-                        id,
-                        input.id
-                      )}
-                    />
-                    <span className="text-xs text-foreground font-medium font-mono truncate">
-                      {input.name}
-                    </span>
+            <div
+              className={cn(
+                "bg-card shadow-xs border relative",
+                isGenerativeCanvasNode
+                  ? GENERATIVE_NODE_CARD_CLASS
+                  : "rounded-md",
+                isAiTextNode && "ai-text-node-card group/aitext flex flex-col",
+                isAiImageNode && "ai-image-node-card group/aiimage",
+                isAiVideoNode && "ai-video-node-card group/aivideo",
+                isAiAudioNode && "ai-audio-node-card group/aiaudio",
+                {
+                  "w-[220px]":
+                    !isAiGenerative &&
+                    !isAiTextNode &&
+                    !isAiImageNode &&
+                    !isAiVideoNode &&
+                    !isAiAudioNode,
+                  "w-[280px]":
+                    isAiGenerative &&
+                    !isAiTextNode &&
+                    !isAiImageNode &&
+                    !isAiVideoNode &&
+                    !isAiAudioNode,
+                  "border-border":
+                    !selected &&
+                    data.executionState === "idle" &&
+                    !isAiTextBusy &&
+                    !isAiImageBusy &&
+                    !isAiVideoBusy &&
+                    !isAiAudioBusy,
+                  "border-yellow-400":
+                    !selected &&
+                    (isExecuting ||
+                      isAiTextBusy ||
+                      isAiImageBusy ||
+                      isAiVideoBusy ||
+                      isAiAudioBusy),
+                  "border-green-500":
+                    !selected &&
+                    data.executionState === "completed" &&
+                    !isAiTextBusy &&
+                    !isAiImageBusy &&
+                    !isAiVideoBusy &&
+                    !isAiAudioBusy,
+                  "border-red-500": !selected && isError,
+                  "border-blue-400":
+                    !selected && data.executionState === "skipped",
+                },
+                selected && WORKFLOW_NODE_SELECTED_BORDER_CLASS,
+                {
+                  "generative-connect-target": isGenerativeConnectionTarget,
+                }
+              )}
+              style={
+                isAiTextNode
+                  ? generativeCardBoxStyle(
+                      persistedLayout,
+                      AI_TEXT_CARD_WIDTH_PX,
+                      AI_TEXT_CARD_HEIGHT_PX
+                    )
+                  : isAiImageNode
+                    ? generativeCardBoxStyle(
+                        persistedLayout,
+                        AI_IMAGE_CARD_WIDTH_PX,
+                        AI_IMAGE_CARD_HEIGHT_PX
+                      )
+                    : isAiVideoNode
+                      ? generativeCardBoxStyle(
+                          persistedLayout,
+                          AI_VIDEO_CARD_WIDTH_PX,
+                          AI_VIDEO_CARD_HEIGHT_PX
+                        )
+                      : isAiAudioNode
+                        ? generativeCardBoxStyle(
+                            persistedLayout,
+                            AI_AUDIO_CARD_WIDTH_PX,
+                            AI_AUDIO_CARD_HEIGHT_PX
+                          )
+                        : undefined
+              }
+            >
+              {/* Execution / generate overlay */}
+              <WorkflowNodeGenerativeBusyOverlay
+                visible={showProgressOverlay}
+                isAiImageNode={isAiImageNode}
+                isAiVideoNode={isAiVideoNode}
+                isAiAudioNode={isAiAudioNode}
+                isAiImageBusy={isAiImageBusy}
+                isAiVideoBusy={isAiVideoBusy}
+                isAiAudioBusy={isAiAudioBusy}
+                metadata={data.metadata}
+                nodeId={id}
+                cardPhase={generativeCardPhase}
+                roundedClass={
+                  isGenerativeCanvasNode
+                    ? GENERATIVE_NODE_CARD_RADIUS_CLASS
+                    : "rounded-md"
+                }
+              />
+
+              {(isAiImageNode || isAiVideoNode || isAiAudioNode) &&
+              !disabled ? (
+                <GenerativeCloudJobResumeHost
+                  nodeId={id}
+                  modality={
+                    isAiImageNode ? "image" : isAiVideoNode ? "video" : "audio"
+                  }
+                  data={data as unknown as WorkflowNodeType}
+                />
+              ) : null}
+
+              {/* Error overlay — generative nodes render errors inside their widgets */}
+              {isError &&
+              data.error &&
+              !isAiTextNode &&
+              !isAiImageNode &&
+              !isAiVideoNode &&
+              !isAiAudioNode ? (
+                <div className="absolute inset-0 z-10 flex items-start justify-start rounded-md bg-red-500/10 p-2">
+                  <p className="text-[10px] text-red-600 dark:text-red-400 line-clamp-3">
+                    {data.error}
+                  </p>
+                </div>
+              ) : null}
+
+              {/* Widget — AI text keeps the whole card draggable; only controls use nodrag */}
+              {widget && (
+                <div
+                  className={cn(
+                    "px-0 py-0",
+                    isAiTextNode && "flex-1 min-h-0 overflow-hidden border-b",
+                    (isAiImageNode || isAiVideoNode || isAiAudioNode) &&
+                      cn(
+                        "h-full overflow-hidden",
+                        GENERATIVE_NODE_CARD_RADIUS_CLASS
+                      ),
+                    !isAiTextNode &&
+                      !isAiImageNode &&
+                      !isAiVideoNode &&
+                      !isAiAudioNode &&
+                      "border-b",
+                    !isAiTextNode &&
+                      !isAiImageNode &&
+                      !isAiVideoNode &&
+                      !isAiAudioNode &&
+                      "nodrag"
+                  )}
+                >
+                  {createElement(widget.Component, {
+                    ...widget.config,
+                    onChange: !disabled ? handleWidgetChange : () => {},
+                    disabled,
+                    createObjectUrl: data.createObjectUrl,
+                    ...(isAiTextNode
+                      ? {
+                          selected: selected ?? false,
+                          onEmptyOutputEditingChange: setEmptyTextEditing,
+                        }
+                      : {}),
+                  })}
+                </div>
+              )}
+
+              {/* Resource Selectors (database, dataset, queue, email, integration) */}
+              {resourceInputs.length > 0 && (
+                <div className="px-2 py-2 nodrag border-b space-y-1 [&_button]:text-xs [&_button]:h-7">
+                  {resourceInputs.map((input) => {
+                    const isConnected = isWorkflowHandleConnected(
+                      connectedHandleKeys,
+                      id,
+                      input.id
+                    );
+                    return (
+                      <Field
+                        key={input.id}
+                        parameter={input}
+                        value={input.value}
+                        onChange={(value) => {
+                          if (disabled || !updateNodeData) return;
+                          updateNodeInput(
+                            id,
+                            input.id,
+                            value,
+                            data.inputs,
+                            updateNodeData
+                          );
+                        }}
+                        onClear={() => {
+                          if (disabled || !updateNodeData) return;
+                          clearNodeInput(
+                            id,
+                            input.id,
+                            data.inputs,
+                            updateNodeData
+                          );
+                        }}
+                        disabled={disabled}
+                        connected={isConnected}
+                      />
+                    );
+                  })}
+                </div>
+              )}
+
+              {/* Parameters — hidden on generative canvas cards (config lives in bottom panel). */}
+              {!isAiTextNode &&
+              !isAiImageNode &&
+              !isAiVideoNode &&
+              !isAiAudioNode ? (
+                <div className="py-2 grid grid-cols-2 justify-between gap-3">
+                  {/* Input Parameters */}
+                  <div className="flex flex-col gap-1 flex-1">
+                    {data.inputs
+                      .filter((input) => !input.hidden)
+                      .map((input, index) => (
+                        <div
+                          key={`input-${input.id}-${index}`}
+                          className="flex items-center gap-3 text-xs relative"
+                        >
+                          <TypeBadge
+                            type={input.type}
+                            position={Position.Left}
+                            id={input.id}
+                            nodeId={id}
+                            parameter={input}
+                            onInputClick={handleInputClick}
+                            disabled={disabled}
+                            executionState={data.executionState}
+                            selected={selected}
+                            isConnected={isWorkflowHandleConnected(
+                              connectedHandleKeys,
+                              id,
+                              input.id
+                            )}
+                          />
+                          <span className="text-xs text-foreground font-medium font-mono truncate">
+                            {input.name}
+                          </span>
+                        </div>
+                      ))}
                   </div>
-                ))}
+
+                  {/* Output Parameters */}
+                  <div className="flex flex-col gap-1 flex-1 items-end">
+                    {data.outputs
+                      .filter((output) => !output.hidden)
+                      .map((output, index) => (
+                        <div
+                          key={`output-${output.id}-${index}`}
+                          className="flex items-center gap-3 text-xs relative"
+                        >
+                          <span className="text-xs text-foreground font-medium font-mono truncate">
+                            {output.name}
+                          </span>
+                          <TypeBadge
+                            type={output.type}
+                            position={Position.Right}
+                            id={output.id}
+                            nodeId={id}
+                            parameter={output}
+                            onOutputClick={handleOutputClick}
+                            disabled={disabled}
+                            executionState={data.executionState}
+                            selected={selected}
+                            isConnected={isWorkflowHandleConnected(
+                              connectedHandleKeys,
+                              id,
+                              output.id
+                            )}
+                          />
+                        </div>
+                      ))}
+                  </div>
+                </div>
+              ) : null}
             </div>
 
-            {/* Output Parameters */}
-            <div className="flex flex-col gap-1 flex-1 items-end">
-              {data.outputs
-                .filter((output) => !output.hidden)
-                .map((output, index) => (
-                  <div
-                    key={`output-${output.id}-${index}`}
-                    className="flex items-center gap-3 text-xs relative"
-                  >
-                    <span className="text-xs text-foreground font-medium font-mono truncate">
-                      {output.name}
-                    </span>
-                    <TypeBadge
-                      type={output.type}
-                      position={Position.Right}
-                      id={output.id}
-                      nodeId={id}
-                      parameter={output}
-                      onOutputClick={handleOutputClick}
-                      disabled={disabled}
-                      executionState={data.executionState}
-                      selected={selected}
-                      isConnected={isWorkflowHandleConnected(
-                        connectedHandleKeys,
-                        id,
-                        output.id
-                      )}
-                    />
-                  </div>
-                ))}
-            </div>
+            {generativeEdgeModality ? (
+              <GenerativeConnectionSides
+                modality={generativeEdgeModality}
+                disabled={disabled}
+                leftDisabled={
+                  generativeEdgeModality === "audio" &&
+                  isGenerativeManualContent(data.metadata)
+                }
+              />
+            ) : null}
+
+            {showBottomPanelHost ? (
+              <WorkflowNodeBottomPanelHost
+                nodeId={id}
+                data={bottomPanelData}
+                createObjectUrl={data.createObjectUrl}
+                contentVisible={showBottomPanelContent}
+                isDragging={isDragging}
+              />
+            ) : null}
           </div>
+
+          {activeInputId !== null ? (
+            <Dialog
+              open={activeInputId !== null}
+              onOpenChange={(open) => !open && setActiveInputId(null)}
+            >
+              <DialogContent
+                className="sm:max-w-md pt-4"
+                aria-describedby={undefined}
+              >
+                <DialogTitle className="sr-only">
+                  {data.inputs.find((i) => i.id === activeInputId)?.name ||
+                    t("workflow.node.editInput")}
+                </DialogTitle>
+                {(() => {
+                  const activeInput = data.inputs.find(
+                    (i) => i.id === activeInputId
+                  );
+                  if (!activeInput) return null;
+
+                  const isInputConnected = isWorkflowHandleConnected(
+                    connectedHandleKeys,
+                    id,
+                    activeInput.id
+                  );
+
+                  return (
+                    <PropertyField
+                      parameter={activeInput}
+                      value={activeInput.value}
+                      onChange={(value) => {
+                        const typedValue = convertValueByType(
+                          value as string,
+                          activeInput.type || "string"
+                        );
+                        updateNodeInput(
+                          id,
+                          activeInput.id,
+                          typedValue,
+                          data.inputs,
+                          updateNodeData
+                        );
+                      }}
+                      onClear={() => {
+                        clearNodeInput(
+                          id,
+                          activeInput.id,
+                          data.inputs,
+                          updateNodeData
+                        );
+                      }}
+                      onToggleVisibility={() => {
+                        if (!updateNodeData) return;
+                        updateNodeData(id, (currentData) => {
+                          const updatedInputs = currentData.inputs.map(
+                            (input) =>
+                              input.id === activeInput.id
+                                ? { ...input, hidden: !input.hidden }
+                                : input
+                          );
+                          return { inputs: updatedInputs };
+                        });
+                      }}
+                      disabled={disabled}
+                      connected={isInputConnected}
+                      createObjectUrl={data.createObjectUrl}
+                      autoFocus
+                    />
+                  );
+                })()}
+              </DialogContent>
+            </Dialog>
           ) : null}
-        </div>
 
-        {generativeEdgeModality ? (
-          <GenerativeConnectionSides
-            modality={generativeEdgeModality}
-            disabled={disabled}
-            leftDisabled={
-              generativeEdgeModality === "audio" &&
-              isGenerativeManualContent(data.metadata)
-            }
-          />
-        ) : null}
+          {activeOutputId !== null ? (
+            <Dialog
+              open={activeOutputId !== null}
+              onOpenChange={(open) => !open && setActiveOutputId(null)}
+            >
+              <DialogContent
+                className="sm:max-w-md pt-4"
+                aria-describedby={undefined}
+              >
+                <DialogTitle className="sr-only">
+                  {data.outputs.find((o) => o.id === activeOutputId)?.name ||
+                    t("workflow.node.viewOutput")}
+                </DialogTitle>
+                {(() => {
+                  const activeOutput = data.outputs.find(
+                    (o) => o.id === activeOutputId
+                  );
+                  if (!activeOutput) return null;
 
-        {showBottomPanelHost ? (
-          <WorkflowNodeBottomPanelHost
-            nodeId={id}
-            data={bottomPanelData}
-            createObjectUrl={data.createObjectUrl}
-            contentVisible={showBottomPanelContent}
-            isDragging={isDragging}
-          />
-        ) : null}
-        </div>
+                  const isOutputConnected = isWorkflowHandleConnected(
+                    connectedHandleKeys,
+                    id,
+                    activeOutput.id
+                  );
 
-        {activeInputId !== null ? (
-        <Dialog
-          open={activeInputId !== null}
-          onOpenChange={(open) => !open && setActiveInputId(null)}
-        >
-          <DialogContent
-            className="sm:max-w-md pt-4"
-            aria-describedby={undefined}
-          >
-            <DialogTitle className="sr-only">
-              {data.inputs.find((i) => i.id === activeInputId)?.name ||
-                t("workflow.node.editInput")}
-            </DialogTitle>
-            {(() => {
-              const activeInput = data.inputs.find(
-                (i) => i.id === activeInputId
-              );
-              if (!activeInput) return null;
-
-              const isInputConnected = isWorkflowHandleConnected(
-                connectedHandleKeys,
-                id,
-                activeInput.id
-              );
-
-              return (
-                <PropertyField
-                  parameter={activeInput}
-                  value={activeInput.value}
-                  onChange={(value) => {
-                    const typedValue = convertValueByType(
-                      value as string,
-                      activeInput.type || "string"
-                    );
-                    updateNodeInput(
-                      id,
-                      activeInput.id,
-                      typedValue,
-                      data.inputs,
-                      updateNodeData
-                    );
-                  }}
-                  onClear={() => {
-                    clearNodeInput(
-                      id,
-                      activeInput.id,
-                      data.inputs,
-                      updateNodeData
-                    );
-                  }}
-                  onToggleVisibility={() => {
-                    if (!updateNodeData) return;
-                    updateNodeData(id, (currentData) => {
-                      const updatedInputs = currentData.inputs.map((input) =>
-                        input.id === activeInput.id
-                          ? { ...input, hidden: !input.hidden }
-                          : input
-                      );
-                      return { inputs: updatedInputs };
-                    });
-                  }}
-                  disabled={disabled}
-                  connected={isInputConnected}
-                  createObjectUrl={data.createObjectUrl}
-                  autoFocus
-                />
-              );
-            })()}
-          </DialogContent>
-        </Dialog>
-        ) : null}
-
-        {activeOutputId !== null ? (
-        <Dialog
-          open={activeOutputId !== null}
-          onOpenChange={(open) => !open && setActiveOutputId(null)}
-        >
-          <DialogContent
-            className="sm:max-w-md pt-4"
-            aria-describedby={undefined}
-          >
-            <DialogTitle className="sr-only">
-              {data.outputs.find((o) => o.id === activeOutputId)?.name ||
-                t("workflow.node.viewOutput")}
-            </DialogTitle>
-            {(() => {
-              const activeOutput = data.outputs.find(
-                (o) => o.id === activeOutputId
-              );
-              if (!activeOutput) return null;
-
-              const isOutputConnected = isWorkflowHandleConnected(
-                connectedHandleKeys,
-                id,
-                activeOutput.id
-              );
-
-              return (
-                <PropertyField
-                  parameter={activeOutput}
-                  value={activeOutput.value}
-                  onChange={() => {}}
-                  onClear={() => {}}
-                  onToggleVisibility={() => {
-                    if (!updateNodeData) return;
-                    updateNodeData(id, (currentData) => {
-                      const updatedOutputs = currentData.outputs.map(
-                        (output) =>
-                          output.id === activeOutput.id
-                            ? { ...output, hidden: !output.hidden }
-                            : output
-                      );
-                      return { outputs: updatedOutputs };
-                    });
-                  }}
-                  disabled={disabled}
-                  connected={isOutputConnected}
-                  createObjectUrl={data.createObjectUrl}
-                />
-              );
-            })()}
-          </DialogContent>
-        </Dialog>
-        ) : null}
+                  return (
+                    <PropertyField
+                      parameter={activeOutput}
+                      value={activeOutput.value}
+                      onChange={() => {}}
+                      onClear={() => {}}
+                      onToggleVisibility={() => {
+                        if (!updateNodeData) return;
+                        updateNodeData(id, (currentData) => {
+                          const updatedOutputs = currentData.outputs.map(
+                            (output) =>
+                              output.id === activeOutput.id
+                                ? { ...output, hidden: !output.hidden }
+                                : output
+                          );
+                          return { outputs: updatedOutputs };
+                        });
+                      }}
+                      disabled={disabled}
+                      connected={isOutputConnected}
+                      createObjectUrl={data.createObjectUrl}
+                    />
+                  );
+                })()}
+              </DialogContent>
+            </Dialog>
+          ) : null}
         </div>
       </TooltipProvider>
     );

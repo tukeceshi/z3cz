@@ -24,7 +24,9 @@ export interface HeartbeatState {
   settled: Set<string>;
 }
 
-export function createHeartbeatState(execution: ExecutionState): HeartbeatState {
+export function createHeartbeatState(
+  execution: ExecutionState
+): HeartbeatState {
   return {
     execution,
     continuations: new Map(),

@@ -13,10 +13,7 @@ const STAGE_KEY_MAP: Record<StageKey, `admin.stages.${StageKey}`> = {
   dormant: "admin.stages.dormant",
 };
 
-export function getListStageLabel(
-  t: TranslateFn,
-  stage: ListStage
-): string {
+export function getListStageLabel(t: TranslateFn, stage: ListStage): string {
   return t(STAGE_KEY_MAP[stage]);
 }
 

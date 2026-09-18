@@ -22,10 +22,7 @@ import {
   DialogDescription,
   DialogTitle,
 } from "@/components/ui/dialog";
-import {
-  getDashboardPath,
-  isSafeAppPath,
-} from "@/utils/auth-navigation";
+import { getDashboardPath, isSafeAppPath } from "@/utils/auth-navigation";
 import {
   registerLoginDialogOpener,
   type OpenLoginOptions,
@@ -68,7 +65,8 @@ export function LoginDialogProvider({ children }: { children: ReactNode }) {
   const openLogin = useCallback((options?: OpenLoginOptions) => {
     setState((current) => ({
       open: true,
-      goToConsole: options?.goToConsole ?? (current.open && current.goToConsole),
+      goToConsole:
+        options?.goToConsole ?? (current.open && current.goToConsole),
       dismissible:
         options?.dismissible === false
           ? false
@@ -127,10 +125,10 @@ export function LoginDialogProvider({ children }: { children: ReactNode }) {
   // /login then sends admins to /admin and everyone else to the org console
   const oauthReturnTo = state.goToConsole
     ? "/login"
-    : state.returnTo ??
+    : (state.returnTo ??
       (typeof window === "undefined"
         ? undefined
-        : `${window.location.pathname}${window.location.search}`);
+        : `${window.location.pathname}${window.location.search}`));
 
   const contextValue = useMemo<LoginDialogContextValue>(
     () => ({

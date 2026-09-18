@@ -128,8 +128,9 @@ describe("agent capabilities catalog", () => {
         ?.function.description
     ).toContain("是不是空的");
     expect(
-      withCanvas.find((tool) => tool.function.name === "canvas_resolve_resource")
-        ?.function.description
+      withCanvas.find(
+        (tool) => tool.function.name === "canvas_resolve_resource"
+      )?.function.description
     ).toContain("地址");
     expect(
       ask.find((tool) => tool.function.name === READ_URL_TOOL)?.function
@@ -216,14 +217,16 @@ describe("agent capabilities catalog", () => {
   });
 
   it("turns on only the scheduler until canvas or animation is scheduled", () => {
-    expect(activeAgentRoles().map((role) => role.id)).toEqual([AGENT_ROLE_BASE]);
+    expect(activeAgentRoles().map((role) => role.id)).toEqual([
+      AGENT_ROLE_BASE,
+    ]);
     expect(activeAgentRoles({ canvas: true }).map((role) => role.id)).toEqual([
       AGENT_ROLE_BASE,
       AGENT_ROLE_CANVAS,
     ]);
-    expect(activeAgentRoles({ animation: true }).map((role) => role.id)).toEqual(
-      [AGENT_ROLE_BASE, AGENT_ROLE_ANIMATION]
-    );
+    expect(
+      activeAgentRoles({ animation: true }).map((role) => role.id)
+    ).toEqual([AGENT_ROLE_BASE, AGENT_ROLE_ANIMATION]);
     expect(
       activeAgentRoles({ canvas: true, animation: true }).map((role) => role.id)
     ).toEqual([AGENT_ROLE_BASE, AGENT_ROLE_CANVAS, AGENT_ROLE_ANIMATION]);

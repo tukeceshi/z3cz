@@ -186,7 +186,9 @@ describe("findFirstWorkflowCoverCandidate", () => {
         {
           name: AI_IMAGE_RESULT_INPUT,
           type: "json",
-          value: [{ resourceId: "portrait", mimeType: "image/png", kind: "cloud" }],
+          value: [
+            { resourceId: "portrait", mimeType: "image/png", kind: "cloud" },
+          ],
         },
       ],
       portraitLayout

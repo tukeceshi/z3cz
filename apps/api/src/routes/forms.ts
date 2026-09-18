@@ -111,8 +111,7 @@ formRoutes.post("/:signedToken", async (c) => {
         if (!schema || !organizationId) {
           return c.json({ error: "Form is not ready for file uploads." }, 409);
         }
-        const fields =
-          (JSON.parse(schema) as { fields: Field[] }).fields ?? [];
+        const fields = (JSON.parse(schema) as { fields: Field[] }).fields ?? [];
         const objectStore = new CloudflareObjectStore(c.env.RESSOURCES);
         const form = await c.req.formData();
         try {

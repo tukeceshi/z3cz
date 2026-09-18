@@ -12,7 +12,10 @@ import { decryptSecret } from "../utils/encryption";
 import { sha256HexFromText } from "../utils/text-content-utils";
 import { recordCloudStorageHealthFromError } from "./probe-org-cloud-storage-health";
 import { resolveOrgCloudStorage } from "./resolve-org-cloud-storage";
-import { presignTosMediaDownloadUrls, presignTosMediaUpload } from "./tos-media-presign";
+import {
+  presignTosMediaDownloadUrls,
+  presignTosMediaUpload,
+} from "./tos-media-presign";
 
 export interface SaveTextContentParams {
   readonly organizationId: string;
@@ -126,7 +129,10 @@ async function allocateTextContentStorage(
     readonly workflowId?: string;
     readonly objectId?: string;
   }
-): Promise<{ readonly resourceId: string; readonly storageKey: string } | null> {
+): Promise<{
+  readonly resourceId: string;
+  readonly storageKey: string;
+} | null> {
   const presigned = await presignTosMediaUpload(env, {
     organizationId: params.organizationId,
     workflowId: params.workflowId,
@@ -244,7 +250,10 @@ export async function persistGeneratedTextContent(
     readonly mimeType: string;
     readonly resourceId?: string;
   }
-): Promise<{ readonly resourceId: string; readonly contentSha256: string } | null> {
+): Promise<{
+  readonly resourceId: string;
+  readonly contentSha256: string;
+} | null> {
   const result = await saveTextContent(env, {
     organizationId: params.organizationId,
     workflowId: params.workflowId,
@@ -269,11 +278,7 @@ export async function streamTextContentSync(
   }
 ): Promise<ReadableStream<Uint8Array>> {
   const db = createDatabase(env);
-  const row = await getCatalogRow(
-    db,
-    params.organizationId,
-    params.resourceId
-  );
+  const row = await getCatalogRow(db, params.organizationId, params.resourceId);
 
   return new ReadableStream<Uint8Array>({
     async start(controller) {
@@ -323,11 +328,7 @@ export async function readTextContentBody(
   }
 ): Promise<string | null> {
   const db = createDatabase(env);
-  const row = await getCatalogRow(
-    db,
-    params.organizationId,
-    params.resourceId
-  );
+  const row = await getCatalogRow(db, params.organizationId, params.resourceId);
   if (!row?.storageKey) {
     return null;
   }

@@ -55,7 +55,9 @@ describe("generative-progress-utils", () => {
     });
     expect(readGenerativeDownloadPercent(withPercent)).toBe(42);
 
-    const uploading = withGenerativeProgress(withPercent, { phase: "uploading" });
+    const uploading = withGenerativeProgress(withPercent, {
+      phase: "uploading",
+    });
     expect(readGenerativeDownloadPercent(uploading)).toBeUndefined();
 
     const clearedPercent = withGenerativeProgress(withPercent, {
@@ -126,9 +128,10 @@ describe("generative-progress-utils", () => {
   });
 
   it("formats elapsed minutes and seconds", () => {
-    expect(
-      formatGenerativeProgressElapsed(1_000, 1_000 + 200_000)
-    ).toEqual({ minutes: 3, seconds: 20 });
+    expect(formatGenerativeProgressElapsed(1_000, 1_000 + 200_000)).toEqual({
+      minutes: 3,
+      seconds: 20,
+    });
   });
 
   it("allows cancel only during queued and generating phases", () => {
@@ -167,7 +170,9 @@ describe("generative-progress-utils", () => {
       })
     ).toBe(false);
 
-    const queuedMetadata = withGenerativeProgress(undefined, { phase: "queued" });
+    const queuedMetadata = withGenerativeProgress(undefined, {
+      phase: "queued",
+    });
     expect(
       isVideoStopButtonVisible({
         metadata: queuedMetadata,
@@ -251,10 +256,14 @@ describe("generative-progress-utils", () => {
     const cleared = withGenerativeUploadProgress(uploading, false);
     expect(readGenerativeProgressPhase(cleared)).toBeUndefined();
 
-    const generating = withGenerativeProgress(undefined, { phase: "generating" });
-    expect(readGenerativeProgressPhase(
-      withGenerativeUploadProgress(generating, false)
-    )).toBe("generating");
+    const generating = withGenerativeProgress(undefined, {
+      phase: "generating",
+    });
+    expect(
+      readGenerativeProgressPhase(
+        withGenerativeUploadProgress(generating, false)
+      )
+    ).toBe("generating");
   });
 
   it("sets and clears trim progress for manual upload cards", () => {

@@ -2,7 +2,10 @@ import { AI_IMAGE_NODE_TYPE, AI_TEXT_NODE_TYPE } from "@dafthunk/types";
 import type { Node } from "@xyflow/react";
 import { describe, expect, it } from "vitest";
 
-import { AI_IMAGE_PROMPT_HANDLE_ID, AI_IMAGE_REFERENCE_HANDLE_ID } from "./ai-image-node-utils";
+import {
+  AI_IMAGE_PROMPT_HANDLE_ID,
+  AI_IMAGE_REFERENCE_HANDLE_ID,
+} from "./ai-image-node-utils";
 import { AI_TEXT_OUTPUT_ID } from "./ai-text-node-utils";
 import {
   mergePreparedWorkflowEdge,
@@ -20,7 +23,9 @@ function node(id: string, nodeType: string): Node<WorkflowNodeType> {
       nodeType,
       name: id,
       inputs: [],
-      outputs: [{ id: AI_TEXT_OUTPUT_ID, name: AI_TEXT_OUTPUT_ID, type: "string" }],
+      outputs: [
+        { id: AI_TEXT_OUTPUT_ID, name: AI_TEXT_OUTPUT_ID, type: "string" },
+      ],
     }),
   };
 }
@@ -73,7 +78,10 @@ describe("mergePreparedWorkflowEdge", () => {
         sourceHandle: AI_TEXT_OUTPUT_ID,
         targetHandle: AI_IMAGE_PROMPT_HANDLE_ID,
       },
-      nodes: [node("text-1", AI_TEXT_NODE_TYPE), node("image-1", AI_IMAGE_NODE_TYPE)],
+      nodes: [
+        node("text-1", AI_TEXT_NODE_TYPE),
+        node("image-1", AI_IMAGE_NODE_TYPE),
+      ],
       edges: [],
       createObjectUrl: () => "blob:test",
     });
@@ -109,7 +117,10 @@ describe("validateWorkflowConnection normalization", () => {
         sourceHandle: AI_TEXT_OUTPUT_ID,
         targetHandle: AI_IMAGE_REFERENCE_HANDLE_ID,
       },
-      nodes: [node("text-1", AI_TEXT_NODE_TYPE), node("image-1", AI_IMAGE_NODE_TYPE)],
+      nodes: [
+        node("text-1", AI_TEXT_NODE_TYPE),
+        node("image-1", AI_IMAGE_NODE_TYPE),
+      ],
       edges: [],
     });
 

@@ -213,7 +213,9 @@ export class CloudflareAiInterfaceService implements AiInterfaceService {
         params.organizationId
       );
       let videoEndpoints = resolveVideoEndpointsFromMetadata(row.metadata);
-      const useFullSubmitUrl = resolveUseFullSubmitUrlFromMetadata(row.metadata);
+      const useFullSubmitUrl = resolveUseFullSubmitUrlFromMetadata(
+        row.metadata
+      );
       const formatTransform = await resolveFormatTransformFromMetadata(
         this.env,
         row.metadata,

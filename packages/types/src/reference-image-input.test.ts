@@ -18,9 +18,6 @@ describe("reference-image-input", () => {
         referenceImageUrls: ["https://example.com/a.jpg"],
         referenceImageInline: [{ mimeType: "image/jpeg", data: "xyz" }],
       })
-    ).toEqual([
-      "https://example.com/a.jpg",
-      "data:image/jpeg;base64,xyz",
-    ]);
+    ).toEqual(["https://example.com/a.jpg", "data:image/jpeg;base64,xyz"]);
   });
 });

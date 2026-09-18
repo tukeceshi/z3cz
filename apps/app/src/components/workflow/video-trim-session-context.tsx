@@ -97,9 +97,8 @@ interface VideoTrimSessionContextValue {
   readonly setDraftRange: (range: VideoTrimRangeSec) => void;
 }
 
-const VideoTrimSessionContext = createContext<VideoTrimSessionContextValue | null>(
-  null
-);
+const VideoTrimSessionContext =
+  createContext<VideoTrimSessionContextValue | null>(null);
 
 function rangesEqual(a: VideoTrimRangeSec, b: VideoTrimRangeSec): boolean {
   return a.startSec === b.startSec && a.endSec === b.endSec;
@@ -214,7 +213,10 @@ export function VideoTrimSessionProvider({
           next = { ...next, draftRange: patch.draftRange };
         }
 
-        if (patch.loadPhase !== undefined && patch.loadPhase !== current.loadPhase) {
+        if (
+          patch.loadPhase !== undefined &&
+          patch.loadPhase !== current.loadPhase
+        ) {
           next = { ...next, loadPhase: patch.loadPhase };
         }
 
@@ -238,36 +240,39 @@ export function VideoTrimSessionProvider({
     []
   );
 
-  const setDraftRange = useCallback((range: VideoTrimRangeSec) => {
-    patchTrimSession({ draftRange: range });
-  }, [patchTrimSession]);
-
-  const setPlaybackPaused = useCallback((paused: boolean) => {
-    patchTrimSession({ playbackPaused: paused });
-  }, [patchTrimSession]);
-
-  const commitDraftRange = useCallback(
-    (range?: VideoTrimRangeSec) => {
-      setSession((current) => {
-        if (!current) {
-          return current;
-        }
-        const nextRange = range ?? current.draftRange;
-        if (
-          rangesEqual(nextRange, current.committedRange) &&
-          rangesEqual(nextRange, current.draftRange)
-        ) {
-          return current;
-        }
-        return {
-          ...current,
-          committedRange: nextRange,
-          draftRange: nextRange,
-        };
-      });
+  const setDraftRange = useCallback(
+    (range: VideoTrimRangeSec) => {
+      patchTrimSession({ draftRange: range });
     },
-    []
+    [patchTrimSession]
   );
+
+  const setPlaybackPaused = useCallback(
+    (paused: boolean) => {
+      patchTrimSession({ playbackPaused: paused });
+    },
+    [patchTrimSession]
+  );
+
+  const commitDraftRange = useCallback((range?: VideoTrimRangeSec) => {
+    setSession((current) => {
+      if (!current) {
+        return current;
+      }
+      const nextRange = range ?? current.draftRange;
+      if (
+        rangesEqual(nextRange, current.committedRange) &&
+        rangesEqual(nextRange, current.draftRange)
+      ) {
+        return current;
+      }
+      return {
+        ...current,
+        committedRange: nextRange,
+        draftRange: nextRange,
+      };
+    });
+  }, []);
 
   const isTrimActiveForNode = useCallback(
     (nodeId: string) => session?.sourceNodeId === nodeId,
@@ -327,7 +332,9 @@ export function VideoTrimSessionProvider({
 export function useVideoTrimSession(): VideoTrimSessionContextValue {
   const context = useContext(VideoTrimSessionContext);
   if (!context) {
-    throw new Error("useVideoTrimSession must be used within VideoTrimSessionProvider");
+    throw new Error(
+      "useVideoTrimSession must be used within VideoTrimSessionProvider"
+    );
   }
   return context;
 }

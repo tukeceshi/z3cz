@@ -219,10 +219,10 @@ async function getRawVolcanoApiKeyFallback(
         apiKey: inlineApiKey,
         expiresAt: normalizeExpiresAt(
           typeof item === "object" && item !== null
-            ? (item as Record<string, unknown>).ExpiredTime ??
+            ? ((item as Record<string, unknown>).ExpiredTime ??
                 (item as Record<string, unknown>).expiredTime ??
                 (item as Record<string, unknown>).ExpiresAt ??
-                (item as Record<string, unknown>).expiresAt
+                (item as Record<string, unknown>).expiresAt)
             : undefined
         ),
         scope: "model",

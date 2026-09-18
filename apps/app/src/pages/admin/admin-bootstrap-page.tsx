@@ -93,9 +93,7 @@ function BootstrapSettingsForm({
   const knownTosRegion = Boolean(selectedTosRegion);
 
   const handleStorageProviderChange = (value: string) => {
-    const next = readStorageProvider(
-      value === "tos" ? "tos" : "r2"
-    );
+    const next = readStorageProvider(value === "tos" ? "tos" : "r2");
     setStorageProvider(next);
     setR2Only(false);
     if (next === "tos" && tosRegion.trim().length === 0) {
@@ -227,7 +225,10 @@ function BootstrapSettingsForm({
         <Label htmlFor="bootstrap_storage_provider">
           {t("bootstrapAdmin.storageProvider")}
         </Label>
-        <Select value={storageProvider} onValueChange={handleStorageProviderChange}>
+        <Select
+          value={storageProvider}
+          onValueChange={handleStorageProviderChange}
+        >
           <SelectTrigger id="bootstrap_storage_provider">
             <SelectValue>
               {storageProvider === "tos"

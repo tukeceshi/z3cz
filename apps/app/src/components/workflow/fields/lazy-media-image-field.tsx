@@ -13,7 +13,10 @@ interface LazyMediaImageFieldProps {
   readonly scrollRoot?: HTMLElement | null;
 }
 
-function isElementVisible(element: HTMLElement, root: HTMLElement | null): boolean {
+function isElementVisible(
+  element: HTMLElement,
+  root: HTMLElement | null
+): boolean {
   const targetRect = element.getBoundingClientRect();
   if (targetRect.width <= 0 || targetRect.height <= 0) return false;
 
@@ -67,11 +70,7 @@ export function LazyMediaImageField({
   return (
     <div ref={containerRef} className={className}>
       {visible ? (
-        <MediaImageField
-          value={value}
-          className="h-full w-full"
-          size={size}
-        />
+        <MediaImageField value={value} className="h-full w-full" size={size} />
       ) : (
         <div className="h-full w-full rounded-md bg-muted/60" />
       )}

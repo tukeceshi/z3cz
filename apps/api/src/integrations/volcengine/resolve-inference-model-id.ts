@@ -9,10 +9,7 @@ import {
 import type { Database } from "../../db";
 import { getOrganizationAiInterfaceRow } from "../../db/ai-interface-queries";
 import { parseSingleModelMetadata } from "../single-model/metadata";
-import {
-  isVolcanoMetadata,
-  parseInterfaceMetadata,
-} from "./metadata";
+import { isVolcanoMetadata, parseInterfaceMetadata } from "./metadata";
 
 /**
  * Resolve the chat/inference `model` field after `ensureVolcanoApiKey` may have
@@ -63,7 +60,10 @@ export async function resolveVolcanoInferenceModelIdAfterEnsure(params: {
         (entry) =>
           entry.instanceId === params.instanceId && entry.config.enabled
       )
-    : findEnabledOrgModelInstanceByCanonicalId(volcanoEntries, params.canonicalId);
+    : findEnabledOrgModelInstanceByCanonicalId(
+        volcanoEntries,
+        params.canonicalId
+      );
   const providerModelId = readOrgModelUpstreamId(found?.config);
   if (!providerModelId || !found) {
     return null;

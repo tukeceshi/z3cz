@@ -56,7 +56,10 @@ import type { WorkflowNodeType } from "@/components/workflow/workflow-types";
 import { useWorkflow } from "@/components/workflow/workflow-context";
 import { useTranslation } from "@/components/locale-provider";
 import { useAppToast } from "@/hooks/use-app-toast";
-import { useGenerativeCloudJobProgress, type ResolveGenerativeJobMediaResult } from "@/hooks/use-generative-cloud-job";
+import {
+  useGenerativeCloudJobProgress,
+  type ResolveGenerativeJobMediaResult,
+} from "@/hooks/use-generative-cloud-job";
 import { useSyncGeneratingResourceRefs } from "@/hooks/use-sync-generating-resource-refs";
 import { tryClaimGenerativeJobFinalize } from "@/services/generative-cloud-job-resume-registry";
 import { persistMediaForNodeInBackground } from "@/services/ensure-resource-cached";
@@ -169,94 +172,21 @@ export function GenerativeCloudJobResumeHost({
 
   const handleResumeSuccess = useCallback(
     async (result: ResolveGenerativeJobMediaResult) => {
-      if (!updateNodeData || result.media.length === 0 || !orgId || !workflowId) {
+      if (
+        !updateNodeData ||
+        result.media.length === 0 ||
+        !orgId ||
+        !workflowId
+      ) {
         return;
       }
 
-        const jobId = readResumeJobId(modality, data.metadata, data.inputs);
-        const canWriteHistory = !jobId || tryClaimGenerativeJobFinalize(jobId);
+      const jobId = readResumeJobId(modality, data.metadata, data.inputs);
+      const canWriteHistory = !jobId || tryClaimGenerativeJobFinalize(jobId);
 
-        if (!canWriteHistory) {
-          updateNodeData(nodeId, (current) => {
-            const cleared = clearGenerativeProgress(current.metadata);
-            const withBusy = applyBusyMetadata(cleared, false);
-            const withError =
-              modality === "image"
-                ? withAiImageGenerateError(withBusy, null)
-                : modality === "video"
-                  ? withAiVideoGenerateError(withBusy, null)
-                  : withAiAudioGenerateError(withBusy, null);
-            return { metadata: withError };
-          });
-          return;
-        }
-
-        const nodeType =
-          modality === "image"
-            ? "ai-image"
-            : modality === "video"
-              ? "ai-video"
-              : "ai-audio";
-
-        persistMediaForNodeInBackground({
-          organizationId: orgId,
-          workflowId,
-          media: result.media,
-          nodeType,
-          cloudConfigured,
-        });
-
+      if (!canWriteHistory) {
         updateNodeData(nodeId, (current) => {
-          const prompt = readGenerativePrompt(current.inputs).trim();
-          const params =
-            modality === "image"
-              ? readAiImageGenerationParams(current.inputs)
-              : modality === "video"
-                ? readAiVideoGenerationParams(current.inputs)
-                : readAiAudioGenerationParams(current.inputs);
-
-          const withResult =
-            modality === "image"
-              ? withAiImageGeneratedResult(current, result.media, {
-                  prompt,
-                  params,
-                  platformModelId: result.modelCanonicalId,
-                  requestSnapshot: result.requestSnapshot,
-                  jobId: readResumeJobId(
-                    modality,
-                    current.metadata,
-                    current.inputs
-                  ),
-                })
-              : modality === "video"
-                ? appendAiVideoGeneratedHistoryItems(
-                    current,
-                    [result.media[0]!],
-                    {
-                      prompt,
-                      params,
-                      jobId: readResumeJobId(
-                        modality,
-                        current.metadata,
-                        current.inputs
-                      ),
-                    }
-                  )
-                : appendAiAudioGeneratedHistoryItems(
-                    current,
-                    [result.media[0]!],
-                    {
-                      prompt,
-                      params,
-                      jobId: readResumeJobId(
-                        modality,
-                        current.metadata,
-                        current.inputs
-                      ),
-                    }
-                  );
-
-          const cleared = clearGenerativeProgress(withResult.metadata);
+          const cleared = clearGenerativeProgress(current.metadata);
           const withBusy = applyBusyMetadata(cleared, false);
           const withError =
             modality === "image"
@@ -264,23 +194,101 @@ export function GenerativeCloudJobResumeHost({
               : modality === "video"
                 ? withAiVideoGenerateError(withBusy, null)
                 : withAiAudioGenerateError(withBusy, null);
-
-          return { ...withResult, metadata: withError };
+          return { metadata: withError };
         });
+        return;
+      }
 
-        if (modality === "image") {
-          if (result.media.length > 1) {
-            toast.success("workflow.aiImagePanel.generatedBatch", {
-              count: result.media.length,
-            });
-          } else {
-            toast.success("workflow.aiImagePanel.generated");
-          }
-        } else if (modality === "video") {
-          toast.success("workflow.aiVideoPanel.generated");
+      const nodeType =
+        modality === "image"
+          ? "ai-image"
+          : modality === "video"
+            ? "ai-video"
+            : "ai-audio";
+
+      persistMediaForNodeInBackground({
+        organizationId: orgId,
+        workflowId,
+        media: result.media,
+        nodeType,
+        cloudConfigured,
+      });
+
+      updateNodeData(nodeId, (current) => {
+        const prompt = readGenerativePrompt(current.inputs).trim();
+        const params =
+          modality === "image"
+            ? readAiImageGenerationParams(current.inputs)
+            : modality === "video"
+              ? readAiVideoGenerationParams(current.inputs)
+              : readAiAudioGenerationParams(current.inputs);
+
+        const withResult =
+          modality === "image"
+            ? withAiImageGeneratedResult(current, result.media, {
+                prompt,
+                params,
+                platformModelId: result.modelCanonicalId,
+                requestSnapshot: result.requestSnapshot,
+                jobId: readResumeJobId(
+                  modality,
+                  current.metadata,
+                  current.inputs
+                ),
+              })
+            : modality === "video"
+              ? appendAiVideoGeneratedHistoryItems(
+                  current,
+                  [result.media[0]!],
+                  {
+                    prompt,
+                    params,
+                    jobId: readResumeJobId(
+                      modality,
+                      current.metadata,
+                      current.inputs
+                    ),
+                  }
+                )
+              : appendAiAudioGeneratedHistoryItems(
+                  current,
+                  [result.media[0]!],
+                  {
+                    prompt,
+                    params,
+                    jobId: readResumeJobId(
+                      modality,
+                      current.metadata,
+                      current.inputs
+                    ),
+                  }
+                );
+
+        const cleared = clearGenerativeProgress(withResult.metadata);
+        const withBusy = applyBusyMetadata(cleared, false);
+        const withError =
+          modality === "image"
+            ? withAiImageGenerateError(withBusy, null)
+            : modality === "video"
+              ? withAiVideoGenerateError(withBusy, null)
+              : withAiAudioGenerateError(withBusy, null);
+
+        return { ...withResult, metadata: withError };
+      });
+
+      if (modality === "image") {
+        if (result.media.length > 1) {
+          toast.success("workflow.aiImagePanel.generatedBatch", {
+            count: result.media.length,
+          });
         } else {
-          toast.success("workflow.aiAudioPanel.generated");
+          toast.success("workflow.aiImagePanel.generated");
         }
+      } else if (modality === "video") {
+        toast.success("workflow.aiVideoPanel.generated");
+      } else {
+        toast.success("workflow.aiAudioPanel.generated");
+      }
     },
     [
       applyBusyMetadata,

@@ -145,7 +145,9 @@ export async function buildReplicateInput(
   nodeInputs: ReadonlyArray<{ name: string; type: string; repeated?: boolean }>,
   objectStore: ObjectStore
 ): Promise<Record<string, string | number | boolean | string[]>> {
-  const paramByName = new Map(nodeInputs.map((parameter) => [parameter.name, parameter]));
+  const paramByName = new Map(
+    nodeInputs.map((parameter) => [parameter.name, parameter])
+  );
 
   const entries = await Promise.all(
     Object.entries(context.inputs)
@@ -183,7 +185,9 @@ export function parseReplicateSubmitParams(
 ): ReplicateSubmitParams | { error: string } {
   const modelInput = inputs.model;
   if (typeof modelInput !== "string" || !modelInput.trim()) {
-    return { error: "Model identifier is required (e.g., 'stability-ai/sdxl')" };
+    return {
+      error: "Model identifier is required (e.g., 'stability-ai/sdxl')",
+    };
   }
 
   const trimmedModel = modelInput.trim();
@@ -329,9 +333,7 @@ async function tryProcessMultiOutput(
 
   const entries = await Promise.all(
     context.nodeOutputs.map(
-      async (
-        outputDef
-      ): Promise<readonly [string, ParameterValue] | null> => {
+      async (outputDef): Promise<readonly [string, ParameterValue] | null> => {
         const value = obj[outputDef.name];
         if (value === undefined || value === null) return null;
 
@@ -348,7 +350,9 @@ async function tryProcessMultiOutput(
   );
 
   const results = Object.fromEntries(
-    entries.filter((entry): entry is readonly [string, ParameterValue] => entry !== null)
+    entries.filter(
+      (entry): entry is readonly [string, ParameterValue] => entry !== null
+    )
   );
 
   if (Object.keys(results).length === 0) {

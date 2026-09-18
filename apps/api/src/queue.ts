@@ -82,13 +82,7 @@ export async function handleQueueMessages(
           await processVolcanoSetupMessage(message, env);
           continue;
         }
-        await processWorkflowQueueMessage(
-          message,
-          env,
-          ctx,
-          db,
-          workflowStore
-        );
+        await processWorkflowQueueMessage(message, env, ctx, db, workflowStore);
       } catch (messageError) {
         console.error("Error processing queue message:", messageError);
         message.retry();

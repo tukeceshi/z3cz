@@ -194,7 +194,8 @@ function QueuesPageContent() {
   };
 
   const columns = useMemo(
-    () => createColumns(openSnippetsDialog, openEditDialog, openDeleteDialog, t),
+    () =>
+      createColumns(openSnippetsDialog, openEditDialog, openDeleteDialog, t),
     [openSnippetsDialog, openEditDialog, openDeleteDialog, t]
   );
 
@@ -202,7 +203,10 @@ function QueuesPageContent() {
     return <InsetLoading title={t("pages.queues.title")} />;
   } else if (queuesError) {
     return (
-      <InsetError title={t("pages.queues.title")} errorMessage={queuesError.message} />
+      <InsetError
+        title={t("pages.queues.title")}
+        errorMessage={queuesError.message}
+      />
     );
   }
 

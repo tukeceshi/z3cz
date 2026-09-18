@@ -104,9 +104,7 @@ interface SyncTextFromCloudParams {
   readonly localSha?: string;
 }
 
-async function syncTextFromCloud(
-  params: SyncTextFromCloudParams
-): Promise<{
+async function syncTextFromCloud(params: SyncTextFromCloudParams): Promise<{
   readonly text: string | null;
   readonly conflict: boolean;
 }> {
@@ -235,8 +233,7 @@ async function writeAiTextToIndexedDb(
     return false;
   }
 
-  const mimeType =
-    params.reference.mimeType ?? inferAiTextMimeType(body);
+  const mimeType = params.reference.mimeType ?? inferAiTextMimeType(body);
   const blob = new Blob([body], { type: mimeType });
 
   const stored = await cacheMediaFromBlob({

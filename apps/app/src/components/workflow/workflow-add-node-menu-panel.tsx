@@ -75,7 +75,8 @@ export function WorkflowAddNodeMenuPanel({
               "flex w-full items-center gap-2 rounded-lg px-2 py-2 text-left text-sm",
               "text-neutral-900 hover:bg-neutral-100",
               "dark:text-neutral-100 dark:hover:bg-neutral-800",
-              highlightedType === item.type && "bg-neutral-100 dark:bg-neutral-800"
+              highlightedType === item.type &&
+                "bg-neutral-100 dark:bg-neutral-800"
             )}
             onClick={() => onSelect(item.type)}
           >

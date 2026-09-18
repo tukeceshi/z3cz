@@ -68,14 +68,16 @@ function readModelId(data: WorkflowNodeType): string {
 }
 
 function readInterfaceId(data: WorkflowNodeType): string {
-  const value = data.inputs?.find((input) => input.id === "ai_interface_id")
-    ?.value;
+  const value = data.inputs?.find(
+    (input) => input.id === "ai_interface_id"
+  )?.value;
   return typeof value === "string" ? value : "";
 }
 
 function readInstanceId(data: WorkflowNodeType): string {
-  const value = data.inputs?.find((input) => input.id === "model_instance_id")
-    ?.value;
+  const value = data.inputs?.find(
+    (input) => input.id === "model_instance_id"
+  )?.value;
   return typeof value === "string" ? value : "";
 }
 
@@ -126,9 +128,7 @@ export function applySelectedModelRecord<T extends OrgModelBindingRef>(params: {
 
   return {
     inputs: nextInputs,
-    ...(Object.keys(nextMetadata).length > 0
-      ? { metadata: nextMetadata }
-      : {}),
+    ...(Object.keys(nextMetadata).length > 0 ? { metadata: nextMetadata } : {}),
   };
 }
 
@@ -193,12 +193,16 @@ export function applyModelBindingToNodeData<T extends OrgModelBindingRef>(
   if (params.updateWorkflowDefault && params.onGenerativeDefaultChange) {
     const paramsEntry = readNodeGenerationParams(nextInputs);
     params.onGenerativeDefaultChange(
-      writeWorkflowGenerativeDefault(params.generativeDefaults, params.modality, {
-        canonicalId: model.canonicalId,
-        interfaceId: model.interfaceId,
-        instanceId: model.instanceId,
-        params: paramsEntry,
-      })
+      writeWorkflowGenerativeDefault(
+        params.generativeDefaults,
+        params.modality,
+        {
+          canonicalId: model.canonicalId,
+          interfaceId: model.interfaceId,
+          instanceId: model.instanceId,
+          params: paramsEntry,
+        }
+      )
     );
   }
 
@@ -214,9 +218,7 @@ export function applyModelBindingToNodeData<T extends OrgModelBindingRef>(
 
   return {
     inputs: nextInputs,
-    ...(Object.keys(nextMetadata).length > 0
-      ? { metadata: nextMetadata }
-      : {}),
+    ...(Object.keys(nextMetadata).length > 0 ? { metadata: nextMetadata } : {}),
   };
 }
 
@@ -229,13 +231,13 @@ export interface ResolveModelForNewReferenceResult<
 }
 
 /** Pick a model for a new reference: node binding first, then list order. */
-export function resolveModelForNewReference<T extends OrgModelBindingRef>(
-  params: {
-    readonly models: readonly T[];
-    readonly targetNodeData: WorkflowNodeType;
-    readonly modelFits: (model: T) => boolean;
-  }
-): ResolveModelForNewReferenceResult<T> {
+export function resolveModelForNewReference<
+  T extends OrgModelBindingRef,
+>(params: {
+  readonly models: readonly T[];
+  readonly targetNodeData: WorkflowNodeType;
+  readonly modelFits: (model: T) => boolean;
+}): ResolveModelForNewReferenceResult<T> {
   const candidateModels = isAiVideoEnhancePanel(params.targetNodeData.metadata)
     ? params.models.filter((model) =>
         isVideoEnhanceModelCanonicalId(model.canonicalId)

@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 
-import { AI_TEXT_EXCERPT_MAX_CHARS, buildAiTextExcerpt } from "./ai-text-storage";
+import {
+  AI_TEXT_EXCERPT_MAX_CHARS,
+  buildAiTextExcerpt,
+} from "./ai-text-storage";
 
 describe("ai-text-storage", () => {
   it("truncates long excerpts", () => {

@@ -45,7 +45,8 @@ export const AI_AUDIO_OUTPUT = "audios" as const;
 export const AI_TEXT_RESULT_INPUT = "result" as const;
 export const AI_TEXT_HISTORY_INPUT = "result_history" as const;
 
-export const GENERATIVE_CONTENT_MODE_META_KEY = "generativeContentMode" as const;
+export const GENERATIVE_CONTENT_MODE_META_KEY =
+  "generativeContentMode" as const;
 
 export interface GenerativeHistoryAppendMeta {
   readonly prompt?: string;
@@ -101,7 +102,10 @@ function upsertNodeInput(
   ];
 }
 
-function readJsonInput<T>(inputs: readonly Parameter[], name: string): T | null {
+function readJsonInput<T>(
+  inputs: readonly Parameter[],
+  name: string
+): T | null {
   const input = inputs.find((entry) => entry.name === name);
   if (!input || input.value == null) {
     return null;
@@ -137,7 +141,10 @@ export function buildGeneratingResourceRefs(
 }
 
 function readImageHistory(inputs: readonly Parameter[]): AiImageResultHistory {
-  const raw = readJsonInput<AiImageResultHistory>(inputs, AI_IMAGE_HISTORY_INPUT);
+  const raw = readJsonInput<AiImageResultHistory>(
+    inputs,
+    AI_IMAGE_HISTORY_INPUT
+  );
   if (!raw || !Array.isArray(raw.items)) {
     return { items: [], selectedId: null };
   }
@@ -148,7 +155,10 @@ function readImageHistory(inputs: readonly Parameter[]): AiImageResultHistory {
 }
 
 function readVideoHistory(inputs: readonly Parameter[]): AiVideoResultHistory {
-  const raw = readJsonInput<AiVideoResultHistory>(inputs, AI_VIDEO_HISTORY_INPUT);
+  const raw = readJsonInput<AiVideoResultHistory>(
+    inputs,
+    AI_VIDEO_HISTORY_INPUT
+  );
   if (!raw || !Array.isArray(raw.items)) {
     return { items: [], selectedId: null };
   }
@@ -159,7 +169,10 @@ function readVideoHistory(inputs: readonly Parameter[]): AiVideoResultHistory {
 }
 
 function readAudioHistory(inputs: readonly Parameter[]): AiAudioResultHistory {
-  const raw = readJsonInput<AiAudioResultHistory>(inputs, AI_AUDIO_HISTORY_INPUT);
+  const raw = readJsonInput<AiAudioResultHistory>(
+    inputs,
+    AI_AUDIO_HISTORY_INPUT
+  );
   if (!raw || !Array.isArray(raw.items)) {
     return { items: [], selectedId: null };
   }
@@ -241,9 +254,15 @@ function applyMediaResultToNode(
           return { ...item, images: [...nextMedia] };
         }
         if ("videos" in item) {
-          return { ...(item as AiVideoResultHistoryItem), videos: [...nextMedia] };
+          return {
+            ...(item as AiVideoResultHistoryItem),
+            videos: [...nextMedia],
+          };
         }
-        return { ...(item as AiAudioResultHistoryItem), audios: [...nextMedia] };
+        return {
+          ...(item as AiAudioResultHistoryItem),
+          audios: [...nextMedia],
+        };
       }
     );
   }
@@ -344,7 +363,7 @@ function applyCloudAccelerationStatusToMediaList(
 
 function cloudAccelerationMediaListChanged(
   previous: readonly WorkflowMediaValue[],
-  next: readonly WorkflowMediaValue[],
+  next: readonly WorkflowMediaValue[]
 ): boolean {
   if (previous.length !== next.length) {
     return true;
@@ -388,9 +407,11 @@ export function patchNodeMediaCloudAccelerationStatus(
           params.status
         )
       : result;
-    const historyChanged = nextItems.some(
-      (item, index) =>
-        cloudAccelerationMediaListChanged(history.items[index]!.images, item.images)
+    const historyChanged = nextItems.some((item, index) =>
+      cloudAccelerationMediaListChanged(
+        history.items[index]!.images,
+        item.images
+      )
     );
     const resultChanged =
       Array.isArray(result) &&
@@ -406,7 +427,12 @@ export function patchNodeMediaCloudAccelerationStatus(
       "json"
     );
     if (resultChanged && nextResult) {
-      inputs = upsertNodeInput(inputs, AI_IMAGE_RESULT_INPUT, [...nextResult], "json");
+      inputs = upsertNodeInput(
+        inputs,
+        AI_IMAGE_RESULT_INPUT,
+        [...nextResult],
+        "json"
+      );
     }
     const outputs = node.outputs.map((output) =>
       output.name === AI_IMAGE_OUTPUT && Array.isArray(nextResult)
@@ -437,9 +463,11 @@ export function patchNodeMediaCloudAccelerationStatus(
           params.status
         )
       : result;
-    const historyChanged = nextItems.some(
-      (item, index) =>
-        cloudAccelerationMediaListChanged(history.items[index]!.videos, item.videos)
+    const historyChanged = nextItems.some((item, index) =>
+      cloudAccelerationMediaListChanged(
+        history.items[index]!.videos,
+        item.videos
+      )
     );
     const resultChanged =
       Array.isArray(result) &&
@@ -455,7 +483,12 @@ export function patchNodeMediaCloudAccelerationStatus(
       "json"
     );
     if (resultChanged && nextResult) {
-      inputs = upsertNodeInput(inputs, AI_VIDEO_RESULT_INPUT, [...nextResult], "json");
+      inputs = upsertNodeInput(
+        inputs,
+        AI_VIDEO_RESULT_INPUT,
+        [...nextResult],
+        "json"
+      );
     }
     const outputs = node.outputs.map((output) =>
       output.name === AI_VIDEO_OUTPUT && Array.isArray(nextResult)
@@ -539,11 +572,14 @@ export function patchNodeMediaCancellingStatus(
       AI_IMAGE_RESULT_INPUT
     );
     const nextResult = Array.isArray(result)
-      ? applyCancellingStatusToMediaList(result, resourceIdSet, params.cancelling)
+      ? applyCancellingStatusToMediaList(
+          result,
+          resourceIdSet,
+          params.cancelling
+        )
       : result;
-    const historyChanged = nextItems.some(
-      (item, index) =>
-        cancellingMediaListChanged(history.items[index]!.images, item.images)
+    const historyChanged = nextItems.some((item, index) =>
+      cancellingMediaListChanged(history.items[index]!.images, item.images)
     );
     const resultChanged =
       Array.isArray(result) &&
@@ -559,7 +595,12 @@ export function patchNodeMediaCancellingStatus(
       "json"
     );
     if (resultChanged && nextResult) {
-      inputs = upsertNodeInput(inputs, AI_IMAGE_RESULT_INPUT, [...nextResult], "json");
+      inputs = upsertNodeInput(
+        inputs,
+        AI_IMAGE_RESULT_INPUT,
+        [...nextResult],
+        "json"
+      );
     }
     const outputs = node.outputs.map((output) =>
       output.name === AI_IMAGE_OUTPUT && Array.isArray(nextResult)
@@ -584,11 +625,14 @@ export function patchNodeMediaCancellingStatus(
       AI_VIDEO_RESULT_INPUT
     );
     const nextResult = Array.isArray(result)
-      ? applyCancellingStatusToMediaList(result, resourceIdSet, params.cancelling)
+      ? applyCancellingStatusToMediaList(
+          result,
+          resourceIdSet,
+          params.cancelling
+        )
       : result;
-    const historyChanged = nextItems.some(
-      (item, index) =>
-        cancellingMediaListChanged(history.items[index]!.videos, item.videos)
+    const historyChanged = nextItems.some((item, index) =>
+      cancellingMediaListChanged(history.items[index]!.videos, item.videos)
     );
     const resultChanged =
       Array.isArray(result) &&
@@ -604,7 +648,12 @@ export function patchNodeMediaCancellingStatus(
       "json"
     );
     if (resultChanged && nextResult) {
-      inputs = upsertNodeInput(inputs, AI_VIDEO_RESULT_INPUT, [...nextResult], "json");
+      inputs = upsertNodeInput(
+        inputs,
+        AI_VIDEO_RESULT_INPUT,
+        [...nextResult],
+        "json"
+      );
     }
     const outputs = node.outputs.map((output) =>
       output.name === AI_VIDEO_OUTPUT && Array.isArray(nextResult)
@@ -629,11 +678,14 @@ export function patchNodeMediaCancellingStatus(
       AI_AUDIO_RESULT_INPUT
     );
     const nextResult = Array.isArray(result)
-      ? applyCancellingStatusToMediaList(result, resourceIdSet, params.cancelling)
+      ? applyCancellingStatusToMediaList(
+          result,
+          resourceIdSet,
+          params.cancelling
+        )
       : result;
-    const historyChanged = nextItems.some(
-      (item, index) =>
-        cancellingMediaListChanged(history.items[index]!.audios, item.audios)
+    const historyChanged = nextItems.some((item, index) =>
+      cancellingMediaListChanged(history.items[index]!.audios, item.audios)
     );
     const resultChanged =
       Array.isArray(result) &&
@@ -649,7 +701,12 @@ export function patchNodeMediaCancellingStatus(
       "json"
     );
     if (resultChanged && nextResult) {
-      inputs = upsertNodeInput(inputs, AI_AUDIO_RESULT_INPUT, [...nextResult], "json");
+      inputs = upsertNodeInput(
+        inputs,
+        AI_AUDIO_RESULT_INPUT,
+        [...nextResult],
+        "json"
+      );
     }
     const outputs = node.outputs.map((output) =>
       output.name === AI_AUDIO_OUTPUT && Array.isArray(nextResult)
@@ -684,9 +741,8 @@ export function patchNodeMediaResourceKinds(
     const nextResult = Array.isArray(result)
       ? applyKindToMediaList(result, kindsById)
       : result;
-    const historyChanged = nextItems.some(
-      (item, index) =>
-        mediaKindListChanged(history.items[index]!.images, item.images)
+    const historyChanged = nextItems.some((item, index) =>
+      mediaKindListChanged(history.items[index]!.images, item.images)
     );
     const resultChanged =
       Array.isArray(result) &&
@@ -702,7 +758,12 @@ export function patchNodeMediaResourceKinds(
       "json"
     );
     if (resultChanged && nextResult) {
-      inputs = upsertNodeInput(inputs, AI_IMAGE_RESULT_INPUT, [...nextResult], "json");
+      inputs = upsertNodeInput(
+        inputs,
+        AI_IMAGE_RESULT_INPUT,
+        [...nextResult],
+        "json"
+      );
     }
     const outputs = node.outputs.map((output) =>
       output.name === AI_IMAGE_OUTPUT && Array.isArray(nextResult)
@@ -725,9 +786,8 @@ export function patchNodeMediaResourceKinds(
     const nextResult = Array.isArray(result)
       ? applyKindToMediaList(result, kindsById)
       : result;
-    const historyChanged = nextItems.some(
-      (item, index) =>
-        mediaKindListChanged(history.items[index]!.videos, item.videos)
+    const historyChanged = nextItems.some((item, index) =>
+      mediaKindListChanged(history.items[index]!.videos, item.videos)
     );
     const resultChanged =
       Array.isArray(result) &&
@@ -743,7 +803,12 @@ export function patchNodeMediaResourceKinds(
       "json"
     );
     if (resultChanged && nextResult) {
-      inputs = upsertNodeInput(inputs, AI_VIDEO_RESULT_INPUT, [...nextResult], "json");
+      inputs = upsertNodeInput(
+        inputs,
+        AI_VIDEO_RESULT_INPUT,
+        [...nextResult],
+        "json"
+      );
     }
     const outputs = node.outputs.map((output) =>
       output.name === AI_VIDEO_OUTPUT && Array.isArray(nextResult)
@@ -766,9 +831,8 @@ export function patchNodeMediaResourceKinds(
     const nextResult = Array.isArray(result)
       ? applyKindToMediaList(result, kindsById)
       : result;
-    const historyChanged = nextItems.some(
-      (item, index) =>
-        mediaKindListChanged(history.items[index]!.audios, item.audios)
+    const historyChanged = nextItems.some((item, index) =>
+      mediaKindListChanged(history.items[index]!.audios, item.audios)
     );
     const resultChanged =
       Array.isArray(result) &&
@@ -784,7 +848,12 @@ export function patchNodeMediaResourceKinds(
       "json"
     );
     if (resultChanged && nextResult) {
-      inputs = upsertNodeInput(inputs, AI_AUDIO_RESULT_INPUT, [...nextResult], "json");
+      inputs = upsertNodeInput(
+        inputs,
+        AI_AUDIO_RESULT_INPUT,
+        [...nextResult],
+        "json"
+      );
     }
     const outputs = node.outputs.map((output) =>
       output.name === AI_AUDIO_OUTPUT && Array.isArray(nextResult)
@@ -819,7 +888,11 @@ export function patchNodeMediaResourceKinds(
 }
 
 function historyContainsGeneratingResourceIds(
-  items: readonly { readonly images?: readonly WorkflowMediaValue[]; readonly videos?: readonly WorkflowMediaValue[]; readonly audios?: readonly WorkflowMediaValue[] }[],
+  items: readonly {
+    readonly images?: readonly WorkflowMediaValue[];
+    readonly videos?: readonly WorkflowMediaValue[];
+    readonly audios?: readonly WorkflowMediaValue[];
+  }[],
   resourceIds: readonly string[]
 ): boolean {
   if (resourceIds.length === 0) {
@@ -847,18 +920,23 @@ function historyContainsJobId(
   return items.some((item) => item.jobId === jobId);
 }
 
-function finalizeGeneratingHistoryItems<TItem extends {
-  readonly id: string;
-  readonly jobId?: string;
-  readonly images?: readonly WorkflowMediaValue[];
-  readonly videos?: readonly WorkflowMediaValue[];
-  readonly audios?: readonly WorkflowMediaValue[];
-}>(params: {
+function finalizeGeneratingHistoryItems<
+  TItem extends {
+    readonly id: string;
+    readonly jobId?: string;
+    readonly images?: readonly WorkflowMediaValue[];
+    readonly videos?: readonly WorkflowMediaValue[];
+    readonly audios?: readonly WorkflowMediaValue[];
+  },
+>(params: {
   readonly items: readonly TItem[];
   readonly jobId?: string;
   readonly resourceIds?: readonly string[];
   readonly getMedia: (item: TItem) => readonly WorkflowMediaValue[];
-  readonly setMedia: (item: TItem, media: readonly WorkflowMediaValue[]) => TItem;
+  readonly setMedia: (
+    item: TItem,
+    media: readonly WorkflowMediaValue[]
+  ) => TItem;
   readonly finalMedia: readonly WorkflowMediaValue[];
 }): {
   readonly items: readonly TItem[];
@@ -908,7 +986,8 @@ function finalizeGeneratingHistoryItems<TItem extends {
     }
     return params.setMedia(item, [stripTransientMediaFlags(image)]);
   });
-  const primaryId = params.items.find((item) => pendingIds.has(item.id))?.id ?? null;
+  const primaryId =
+    params.items.find((item) => pendingIds.has(item.id))?.id ?? null;
   return {
     items: nextItems,
     selectedId: primaryId,
@@ -935,7 +1014,11 @@ export function finalizeImageGeneratingContent(
     jobId: params.jobId,
     resourceIds: params.resourceIds,
     getMedia: (item) => item.images,
-    setMedia: (item, images) => ({ ...item, images: [...images], jobId: undefined }),
+    setMedia: (item, images) => ({
+      ...item,
+      images: [...images],
+      jobId: undefined,
+    }),
     finalMedia,
   });
 
@@ -951,7 +1034,12 @@ export function finalizeImageGeneratingContent(
     selectedId: finalized.selectedId ?? history.selectedId,
   };
 
-  let inputs = upsertNodeInput(node.inputs, AI_IMAGE_HISTORY_INPUT, nextHistory, "json");
+  let inputs = upsertNodeInput(
+    node.inputs,
+    AI_IMAGE_HISTORY_INPUT,
+    nextHistory,
+    "json"
+  );
   inputs = upsertNodeInput(inputs, "manual_images", [], "json");
 
   const mediaResult = applyMediaResultToNode(
@@ -1002,7 +1090,11 @@ export function finalizeVideoGeneratingContent(
     jobId: params.jobId,
     resourceIds: params.resourceIds,
     getMedia: (item) => item.videos,
-    setMedia: (item, videos) => ({ ...item, videos: [...videos], jobId: undefined }),
+    setMedia: (item, videos) => ({
+      ...item,
+      videos: [...videos],
+      jobId: undefined,
+    }),
     finalMedia,
   });
 
@@ -1018,7 +1110,12 @@ export function finalizeVideoGeneratingContent(
     selectedId: finalized.selectedId ?? history.selectedId,
   };
 
-  let inputs = upsertNodeInput(node.inputs, AI_VIDEO_HISTORY_INPUT, nextHistory, "json");
+  let inputs = upsertNodeInput(
+    node.inputs,
+    AI_VIDEO_HISTORY_INPUT,
+    nextHistory,
+    "json"
+  );
   inputs = upsertNodeInput(inputs, "manual_videos", [], "json");
 
   const mediaResult = applyMediaResultToNode(
@@ -1088,7 +1185,12 @@ export function appendImageGeneratingContent(
     selectedId: primary.id,
   };
 
-  let inputs = upsertNodeInput(node.inputs, AI_IMAGE_HISTORY_INPUT, nextHistory, "json");
+  let inputs = upsertNodeInput(
+    node.inputs,
+    AI_IMAGE_HISTORY_INPUT,
+    nextHistory,
+    "json"
+  );
   inputs = upsertNodeInput(inputs, "manual_images", [], "json");
 
   const mediaResult = applyMediaResultToNode(
@@ -1145,7 +1247,12 @@ export function appendVideoGeneratingContent(
     selectedId: item.id,
   };
 
-  let inputs = upsertNodeInput(node.inputs, AI_VIDEO_HISTORY_INPUT, nextHistory, "json");
+  let inputs = upsertNodeInput(
+    node.inputs,
+    AI_VIDEO_HISTORY_INPUT,
+    nextHistory,
+    "json"
+  );
   inputs = upsertNodeInput(inputs, "manual_videos", [], "json");
 
   const mediaResult = applyMediaResultToNode(
@@ -1202,7 +1309,12 @@ export function appendAudioGeneratingContent(
     selectedId: item.id,
   };
 
-  let inputs = upsertNodeInput(node.inputs, AI_AUDIO_HISTORY_INPUT, nextHistory, "json");
+  let inputs = upsertNodeInput(
+    node.inputs,
+    AI_AUDIO_HISTORY_INPUT,
+    nextHistory,
+    "json"
+  );
   inputs = upsertNodeInput(inputs, "manual_audios", [], "json");
 
   const mediaResult = applyMediaResultToNode(
@@ -1278,7 +1390,9 @@ export function buildWorkflowNodeContentPatch(
   const inputs: Record<string, unknown> = {};
   let inputsChanged = false;
   for (const name of inputNames) {
-    const prevValue = previous.inputs.find((input) => input.name === name)?.value;
+    const prevValue = previous.inputs.find(
+      (input) => input.name === name
+    )?.value;
     const nextValue = next.inputs.find((input) => input.name === name)?.value;
     if (JSON.stringify(prevValue) !== JSON.stringify(nextValue)) {
       inputs[name] = nextValue;
@@ -1294,8 +1408,12 @@ export function buildWorkflowNodeContentPatch(
   const outputs: Record<string, unknown> = {};
   let outputsChanged = false;
   for (const name of outputNames) {
-    const prevValue = previous.outputs.find((output) => output.name === name)?.value;
-    const nextValue = next.outputs.find((output) => output.name === name)?.value;
+    const prevValue = previous.outputs.find(
+      (output) => output.name === name
+    )?.value;
+    const nextValue = next.outputs.find(
+      (output) => output.name === name
+    )?.value;
     if (JSON.stringify(prevValue) !== JSON.stringify(nextValue)) {
       outputs[name] = nextValue;
       outputsChanged = true;
@@ -1320,31 +1438,29 @@ export function buildWorkflowNodeContentPatch(
 function isInFlightHistoryMedia(
   media: readonly WorkflowMediaValue[] | undefined
 ): boolean {
-  return (
-    hasGeneratingResource(media) || hasCloudAcceleratingResource(media)
-  );
+  return hasGeneratingResource(media) || hasCloudAcceleratingResource(media);
 }
 
 function collectInFlightHistoryItemIds(node: Node): readonly string[] {
   switch (node.type) {
     case AI_IMAGE_NODE_TYPE: {
-      return readImageHistory(node.inputs).items
-        .filter((item) => isInFlightHistoryMedia(item.images))
+      return readImageHistory(node.inputs)
+        .items.filter((item) => isInFlightHistoryMedia(item.images))
         .map((item) => item.id);
     }
     case AI_VIDEO_NODE_TYPE: {
-      return readVideoHistory(node.inputs).items
-        .filter((item) => isInFlightHistoryMedia(item.videos))
+      return readVideoHistory(node.inputs)
+        .items.filter((item) => isInFlightHistoryMedia(item.videos))
         .map((item) => item.id);
     }
     case AI_AUDIO_NODE_TYPE: {
-      return readAudioHistory(node.inputs).items
-        .filter((item) => hasGeneratingResource(item.audios))
+      return readAudioHistory(node.inputs)
+        .items.filter((item) => hasGeneratingResource(item.audios))
         .map((item) => item.id);
     }
     case AI_TEXT_NODE_TYPE: {
-      return readTextHistory(node.inputs).items
-        .filter((item) => !item.text && !item.contentSha256)
+      return readTextHistory(node.inputs)
+        .items.filter((item) => !item.text && !item.contentSha256)
         .map((item) => item.id);
     }
     default:
@@ -1372,9 +1488,7 @@ function mergeInFlightMediaNode(params: {
   readonly historyInput: string;
   readonly resultInput: string;
   readonly outputName: string;
-  readonly readHistory: (
-    inputs: readonly Parameter[]
-  ) => {
+  readonly readHistory: (inputs: readonly Parameter[]) => {
     readonly items: readonly { readonly id: string }[];
     readonly selectedId: string | null;
   };
@@ -1394,10 +1508,7 @@ function mergeInFlightMediaNode(params: {
       ? persistedHistory.selectedId
       : (incomingHistory.selectedId ?? persistedHistory.selectedId);
 
-  const mergedItems = mergeHistoryItems(
-    missing,
-    incomingHistory.items
-  );
+  const mergedItems = mergeHistoryItems(missing, incomingHistory.items);
   let inputs = upsertNodeInput(
     params.incoming.inputs,
     params.historyInput,
@@ -1513,7 +1624,11 @@ export function mergeGenerativeNodeContentOnSave(
         persisted.inputs,
         AI_TEXT_RESULT_INPUT
       );
-      if (persistedResult && isResourceIdReference(persistedResult) && persistedResult.generating) {
+      if (
+        persistedResult &&
+        isResourceIdReference(persistedResult) &&
+        persistedResult.generating
+      ) {
         inputs = upsertNodeInput(
           inputs,
           AI_TEXT_RESULT_INPUT,

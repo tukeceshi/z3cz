@@ -1,11 +1,7 @@
 import { and, count, desc, eq, isNull } from "drizzle-orm";
 
 import type { Database } from "./index";
-import {
-  workflowFolders,
-  workflows,
-  type WorkflowFolderRow,
-} from "./schema";
+import { workflowFolders, workflows, type WorkflowFolderRow } from "./schema";
 
 export async function listWorkflowFolders(
   db: Database,

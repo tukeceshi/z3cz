@@ -81,7 +81,10 @@ function IntegrationsPageContent() {
 
   if (error) {
     return (
-      <InsetError title={t("pages.integrations.title")} errorMessage={error.message} />
+      <InsetError
+        title={t("pages.integrations.title")}
+        errorMessage={error.message}
+      />
     );
   }
 
@@ -114,7 +117,9 @@ function IntegrationsPageContent() {
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>{t("pages.integrations.disconnectTitle")}</AlertDialogTitle>
+            <AlertDialogTitle>
+              {t("pages.integrations.disconnectTitle")}
+            </AlertDialogTitle>
             <AlertDialogDescription>
               {t("pages.integrations.disconnectDescription")}
             </AlertDialogDescription>

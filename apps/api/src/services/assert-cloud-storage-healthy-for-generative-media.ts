@@ -7,9 +7,7 @@ import {
 import type { Bindings } from "../context";
 import { createDatabase } from "../db";
 import { listOrganizationAiInterfaces } from "../db/ai-interface-queries";
-import {
-  CloudStorageUnhealthyError,
-} from "./classify-cloud-storage-health";
+import { CloudStorageUnhealthyError } from "./classify-cloud-storage-health";
 import { blocksGenerativeMediaForHealth } from "@dafthunk/types";
 import {
   getOrRefreshOrgCloudStorageHealth,

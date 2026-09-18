@@ -5,7 +5,9 @@ import { buildBodyFromSlots } from "./build-body";
 describe("buildBodyFromSlots openai-messages", () => {
   it("sends a conversation history when messages are provided", () => {
     const body = buildBodyFromSlots({
-      slots: [{ kind: "openai-messages", to: "messages", promptField: "prompt" }],
+      slots: [
+        { kind: "openai-messages", to: "messages", promptField: "prompt" },
+      ],
       inputs: {
         messages: [
           { role: "user", content: "hello" },
@@ -28,7 +30,9 @@ describe("buildBodyFromSlots openai-messages", () => {
 
   it("falls back to a single prompt when messages are absent", () => {
     const body = buildBodyFromSlots({
-      slots: [{ kind: "openai-messages", to: "messages", promptField: "prompt" }],
+      slots: [
+        { kind: "openai-messages", to: "messages", promptField: "prompt" },
+      ],
       inputs: { prompt: "only prompt" },
       model: "demo",
       fields: [],
@@ -41,7 +45,9 @@ describe("buildBodyFromSlots openai-messages", () => {
 
   it("keeps empty assistant content when tool_calls are present", () => {
     const body = buildBodyFromSlots({
-      slots: [{ kind: "openai-messages", to: "messages", promptField: "prompt" }],
+      slots: [
+        { kind: "openai-messages", to: "messages", promptField: "prompt" },
+      ],
       inputs: {
         messages: [
           { role: "user", content: "看画布" },

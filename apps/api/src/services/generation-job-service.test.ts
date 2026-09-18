@@ -167,8 +167,8 @@ describe("stable persist resource ids", () => {
   });
 
   it("keeps persist object id equal to pending resource id", () => {
-    expect(
-      persistObjectIdForPendingMedia({ resourceId: "res-1" })
-    ).toBe("res-1");
+    expect(persistObjectIdForPendingMedia({ resourceId: "res-1" })).toBe(
+      "res-1"
+    );
   });
 });

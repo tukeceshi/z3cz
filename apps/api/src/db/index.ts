@@ -11,13 +11,11 @@ interface GlobalDbState {
 }
 
 const globalForDb = globalThis as GlobalDbState;
-const nodeClients =
-  globalForDb.__dafthunkPg ?? new Map<string, postgres.Sql>();
+const nodeClients = globalForDb.__dafthunkPg ?? new Map<string, postgres.Sql>();
 globalForDb.__dafthunkPg = nodeClients;
 
 function getConnectionString(env: DatabaseEnv): string {
-  const connectionString =
-    env.HYPERDRIVE?.connectionString ?? env.DATABASE_URL;
+  const connectionString = env.HYPERDRIVE?.connectionString ?? env.DATABASE_URL;
   if (!connectionString) {
     throw new Error(
       "Database connection requires HYPERDRIVE binding or DATABASE_URL"

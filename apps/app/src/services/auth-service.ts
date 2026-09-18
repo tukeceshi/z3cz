@@ -11,11 +11,7 @@ import { mutate } from "swr";
 import { AUTH_USER_KEY } from "@/components/auth-context";
 import { buildApiUrl } from "@/config/api";
 
-import {
-  ApiRequestError,
-  makeRequest,
-  refreshAccessToken,
-} from "./utils";
+import { ApiRequestError, makeRequest, refreshAccessToken } from "./utils";
 
 // Error types for better error handling
 export class AuthError extends Error {
@@ -160,7 +156,10 @@ export const authService = {
       mutate(AUTH_USER_KEY, response.user, { revalidate: false });
       return response.user;
     } catch (error) {
-      if (error instanceof ApiRequestError && error.code === "EMAIL_NOT_FOUND") {
+      if (
+        error instanceof ApiRequestError &&
+        error.code === "EMAIL_NOT_FOUND"
+      ) {
         throw new AuthError(error.message, "EMAIL_NOT_FOUND");
       }
       if (error instanceof ApiRequestError) {

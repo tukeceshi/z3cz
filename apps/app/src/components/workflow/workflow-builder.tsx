@@ -16,7 +16,16 @@ import type {
   Node as ReactFlowNode,
 } from "@xyflow/react";
 import { ReactFlowProvider } from "@xyflow/react";
-import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type ComponentProps } from "react";
+import {
+  lazy,
+  Suspense,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ComponentProps,
+} from "react";
 
 import { useTranslation } from "@/components/locale-provider";
 import { Spinner } from "@/components/ui/spinner";
@@ -27,7 +36,10 @@ import { cn } from "@/utils/utils";
 
 import { DetachNodesConfirmDialog } from "./detach-nodes-confirm-dialog";
 import { writeSkipDetachWithRecordsConfirm } from "./detach-confirm-preference";
-import type { DetachConfirmSource, PendingDetachConfirm } from "./use-graph-history";
+import type {
+  DetachConfirmSource,
+  PendingDetachConfirm,
+} from "./use-graph-history";
 import { useKeyboardShortcuts } from "./use-keyboard-shortcuts";
 import { useWorkflowState } from "./use-workflow-state";
 import { useOptionalCanvasMaintenance } from "@/contexts/canvas-maintenance-context";
@@ -44,7 +56,10 @@ import type { AddGenerativeNodesBatchItem } from "./use-graph-operations";
 import { useCanvasGenerativeFileDrop } from "./studio-generative-file-upload";
 import { useCanvasDropNodeSelection } from "./use-canvas-drop-node-selection";
 import { WorkflowProvider } from "./workflow-context";
-import { VideoTrimSessionProvider, useVideoTrimSession } from "./video-trim-session-context";
+import {
+  VideoTrimSessionProvider,
+  useVideoTrimSession,
+} from "./video-trim-session-context";
 import { SubtitleEraseSessionProvider } from "./video-subtitle-erase-session-context";
 import { RetakePlaybackUrlProvider } from "./retake-playback-url-context";
 import { WorkflowEditorCanvasChrome } from "./workflow-editor-canvas-chrome";
@@ -215,9 +230,7 @@ export interface WorkflowBuilderProps {
   onEditorViewportGestureEnd?: (viewport: WorkflowEditorViewport) => void;
   onCommitEditorViewport?: (viewport: WorkflowEditorViewport) => void;
   generativeDefaults?: WorkflowGenerativeDefaults;
-  onGenerativeDefaultsChange?: (
-    defaults: WorkflowGenerativeDefaults
-  ) => void;
+  onGenerativeDefaultsChange?: (defaults: WorkflowGenerativeDefaults) => void;
   /** True after HTTP has loaded the workflow graph (Persist-First). */
   graphReady?: boolean;
   workflowSettingsOpen?: boolean;
@@ -493,7 +506,8 @@ export function WorkflowBuilder({
           instance,
           mountDefaultViewport,
           () => {
-            appliedViewportKeyRef.current = JSON.stringify(mountDefaultViewport);
+            appliedViewportKeyRef.current =
+              JSON.stringify(mountDefaultViewport);
             cancelViewportRestoreRef.current = null;
             setCanvasRevealed(true);
             requestAnimationFrame(() => {
@@ -740,9 +754,7 @@ export function WorkflowBuilder({
           workflowId={workflowId}
           onReturnToCanvas={handleReturnToCanvas}
           onReturnToCanvasFromDetail={handleReturnToCanvas}
-          onAddGenerativeNode={
-            readOnly ? undefined : handleAddGenerativeNode
-          }
+          onAddGenerativeNode={readOnly ? undefined : handleAddGenerativeNode}
           onRequestDeleteStudioNode={
             readOnly ? undefined : requestDeleteStudioNode
           }
@@ -764,129 +776,143 @@ export function WorkflowBuilder({
           />
           <CreativeStudioCanvasSync selectNode={selectNode} />
           <div className="relative flex min-h-0 flex-1 flex-col">
-          <CloudStorageCanvasProvider orgId={orgId} enabled={!readOnly && !isCanvasFrozen}>
-          <RetakePlaybackUrlProvider>
-          <SubtitleEraseSessionProvider>
-          <VideoTrimSessionProvider>
-            <InlineAiTextMigrationHost
-              organizationId={orgId}
-              workflowId={workflowId}
-              graphReady={graphReady}
-              nodes={nodes}
-              setNodes={setNodes}
-            />
-            <div className="relative flex min-h-0 flex-1">
-              {workflowsListUrl ? (
-                <WorkflowEditorCanvasChrome
-                  workflowName={workflowName ?? ""}
-                  workflowsListUrl={workflowsListUrl}
-                  readOnly={readOnly}
-                  onOpenWorkflowSettings={onOpenWorkflowSettings}
-                  soleSelectedNodeId={soleSelectedNodeId}
-                />
-              ) : null}
-              <div
-                className={cn(
-                  "h-full w-full overflow-hidden relative",
-                  !canvasRevealed && "invisible"
-                )}
-              >
-                <WorkflowEditorMainArea
-                  nodes={nodes}
-                  edges={edges}
-                  workflowName={workflowName}
-                  reactFlowInstance={reactFlowInstance}
-                  canvasFileDropEnabled={!readOnly && interactive && !isCanvasFrozen}
-                  onAddCanvasDropNodes={readOnly ? undefined : addGenerativeNodesBatch}
-                  onSelectDroppedNodes={readOnly ? undefined : selectNodes}
-                  onNodesChange={onNodesChange}
-                  onEdgesChange={onEdgesChange}
-                  onConnect={onConnect}
-                  onConnectStart={onConnectStart}
-                  onConnectEnd={onConnectEnd}
-                  onNodeDragStart={onNodeDragStart}
-                  onNodeDragStop={onNodeDragStop}
-                  isDraggingRef={isDraggingRef}
-                  onMoveStart={handleViewportMoveStart}
-                  onMoveEnd={handleViewportMoveEnd}
-                  onInit={handleReactFlowInit}
-                  onQuickAddAiNode={readOnly ? undefined : handleQuickAddAiNode}
-                  onCreateGenerativeNode={
-                    readOnly ? undefined : handleAddGenerativeNode
-                  }
-                  onConnectWorkflow={readOnly ? undefined : onConnect}
-                  onRemoveNodes={
-                    readOnly ? undefined : removeNodesWithoutConfirm
-                  }
-                  onUndo={readOnly ? undefined : undo}
-                  onRedo={readOnly ? undefined : redo}
-                  canUndo={canUndo}
-                  canRedo={canRedo}
-                  reserveTopChromeSpace={Boolean(workflowsListUrl)}
-                  isValidConnection={isValidConnection}
-                  disabled={readOnly}
-                  onFitToScreen={handleFitToScreen}
-                  onZoomOneToOne={handleZoomOneToOne}
-                  selectedNodes={selectedNodes}
-                  selectedEdges={selectedEdges}
-                  onApplyLayout={readOnly ? undefined : applyLayout}
-                  showControls={interactive}
-                  showBackground={showBackground}
-                  fitViewPadding={fitViewPadding}
-                  skipInitialFitView={skipInitialFitView}
-                  defaultViewport={mountDefaultViewport}
-                  onEditorViewportChange={
-                    readOnly || !canPersistViewport
-                      ? undefined
-                      : onEditorViewportChange
-                  }
-                  onEditorViewportGestureEnd={
-                    readOnly || !canPersistViewport
-                      ? undefined
-                      : onEditorViewportGestureEnd
-                  }
-                  suppressViewportPersistEndRef={suppressViewportPersistEndRef}
-                  onRestoreEditorViewportAfterStudio={
-                    restoreEditorViewportAfterStudio
-                  }
-                  soleSelectedNodeId={soleSelectedNodeId}
-                  addNodeMenu={addNodeMenu}
-                  onAddNodeMenuSelect={
-                    readOnly ? undefined : handleAddNodeMenuSelect
-                  }
-                  onCloseAddNodeMenu={readOnly ? undefined : closeAddNodeMenu}
-                  onPaneClick={readOnly ? undefined : handlePaneClick}
-                  onPaneContextMenu={
-                    readOnly ? undefined : handlePaneContextMenu
-                  }
-                />
-              </div>
-            </div>
+            <CloudStorageCanvasProvider
+              orgId={orgId}
+              enabled={!readOnly && !isCanvasFrozen}
+            >
+              <RetakePlaybackUrlProvider>
+                <SubtitleEraseSessionProvider>
+                  <VideoTrimSessionProvider>
+                    <InlineAiTextMigrationHost
+                      organizationId={orgId}
+                      workflowId={workflowId}
+                      graphReady={graphReady}
+                      nodes={nodes}
+                      setNodes={setNodes}
+                    />
+                    <div className="relative flex min-h-0 flex-1">
+                      {workflowsListUrl ? (
+                        <WorkflowEditorCanvasChrome
+                          workflowName={workflowName ?? ""}
+                          workflowsListUrl={workflowsListUrl}
+                          readOnly={readOnly}
+                          onOpenWorkflowSettings={onOpenWorkflowSettings}
+                          soleSelectedNodeId={soleSelectedNodeId}
+                        />
+                      ) : null}
+                      <div
+                        className={cn(
+                          "h-full w-full overflow-hidden relative",
+                          !canvasRevealed && "invisible"
+                        )}
+                      >
+                        <WorkflowEditorMainArea
+                          nodes={nodes}
+                          edges={edges}
+                          workflowName={workflowName}
+                          reactFlowInstance={reactFlowInstance}
+                          canvasFileDropEnabled={
+                            !readOnly && interactive && !isCanvasFrozen
+                          }
+                          onAddCanvasDropNodes={
+                            readOnly ? undefined : addGenerativeNodesBatch
+                          }
+                          onSelectDroppedNodes={
+                            readOnly ? undefined : selectNodes
+                          }
+                          onNodesChange={onNodesChange}
+                          onEdgesChange={onEdgesChange}
+                          onConnect={onConnect}
+                          onConnectStart={onConnectStart}
+                          onConnectEnd={onConnectEnd}
+                          onNodeDragStart={onNodeDragStart}
+                          onNodeDragStop={onNodeDragStop}
+                          isDraggingRef={isDraggingRef}
+                          onMoveStart={handleViewportMoveStart}
+                          onMoveEnd={handleViewportMoveEnd}
+                          onInit={handleReactFlowInit}
+                          onQuickAddAiNode={
+                            readOnly ? undefined : handleQuickAddAiNode
+                          }
+                          onCreateGenerativeNode={
+                            readOnly ? undefined : handleAddGenerativeNode
+                          }
+                          onConnectWorkflow={readOnly ? undefined : onConnect}
+                          onRemoveNodes={
+                            readOnly ? undefined : removeNodesWithoutConfirm
+                          }
+                          onUndo={readOnly ? undefined : undo}
+                          onRedo={readOnly ? undefined : redo}
+                          canUndo={canUndo}
+                          canRedo={canRedo}
+                          reserveTopChromeSpace={Boolean(workflowsListUrl)}
+                          isValidConnection={isValidConnection}
+                          disabled={readOnly}
+                          onFitToScreen={handleFitToScreen}
+                          onZoomOneToOne={handleZoomOneToOne}
+                          selectedNodes={selectedNodes}
+                          selectedEdges={selectedEdges}
+                          onApplyLayout={readOnly ? undefined : applyLayout}
+                          showControls={interactive}
+                          showBackground={showBackground}
+                          fitViewPadding={fitViewPadding}
+                          skipInitialFitView={skipInitialFitView}
+                          defaultViewport={mountDefaultViewport}
+                          onEditorViewportChange={
+                            readOnly || !canPersistViewport
+                              ? undefined
+                              : onEditorViewportChange
+                          }
+                          onEditorViewportGestureEnd={
+                            readOnly || !canPersistViewport
+                              ? undefined
+                              : onEditorViewportGestureEnd
+                          }
+                          suppressViewportPersistEndRef={
+                            suppressViewportPersistEndRef
+                          }
+                          onRestoreEditorViewportAfterStudio={
+                            restoreEditorViewportAfterStudio
+                          }
+                          soleSelectedNodeId={soleSelectedNodeId}
+                          addNodeMenu={addNodeMenu}
+                          onAddNodeMenuSelect={
+                            readOnly ? undefined : handleAddNodeMenuSelect
+                          }
+                          onCloseAddNodeMenu={
+                            readOnly ? undefined : closeAddNodeMenu
+                          }
+                          onPaneClick={readOnly ? undefined : handlePaneClick}
+                          onPaneContextMenu={
+                            readOnly ? undefined : handlePaneContextMenu
+                          }
+                        />
+                      </div>
+                    </div>
 
-          <WorkflowSettingsDialog
-            open={workflowSettingsOpen}
-            onOpenChange={onWorkflowSettingsOpenChange ?? (() => {})}
-            workflowName={workflowName}
-            workflowDescription={workflowDescription}
-            onWorkflowUpdate={readOnly ? undefined : onWorkflowUpdate}
-            disabledWorkflow={readOnly}
+                    <WorkflowSettingsDialog
+                      open={workflowSettingsOpen}
+                      onOpenChange={onWorkflowSettingsOpenChange ?? (() => {})}
+                      workflowName={workflowName}
+                      workflowDescription={workflowDescription}
+                      onWorkflowUpdate={readOnly ? undefined : onWorkflowUpdate}
+                      disabledWorkflow={readOnly}
+                    />
+                  </VideoTrimSessionProvider>
+                </SubtitleEraseSessionProvider>
+              </RetakePlaybackUrlProvider>
+            </CloudStorageCanvasProvider>
+          </div>
+
+          <DetachNodesConfirmDialog
+            open={detachConfirmOpen}
+            source={detachConfirmSource}
+            nodeCount={detachConfirmNodeCount}
+            dontAskAgain={detachConfirmDontAsk}
+            onDontAskAgainChange={setDetachConfirmDontAsk}
+            onOpenChange={handleDetachConfirmOpenChange}
+            onConfirm={handleDetachConfirm}
           />
-          </VideoTrimSessionProvider>
-          </SubtitleEraseSessionProvider>
-          </RetakePlaybackUrlProvider>
-          </CloudStorageCanvasProvider>
-        </div>
-
-        <DetachNodesConfirmDialog
-          open={detachConfirmOpen}
-          source={detachConfirmSource}
-          nodeCount={detachConfirmNodeCount}
-          dontAskAgain={detachConfirmDontAsk}
-          onDontAskAgainChange={setDetachConfirmDontAsk}
-          onOpenChange={handleDetachConfirmOpenChange}
-          onConfirm={handleDetachConfirm}
-        />
-
         </CreativeStudioProvider>
       </WorkflowProvider>
     </ReactFlowProvider>
@@ -930,15 +956,9 @@ function WorkflowStudioKeyboardShortcuts({
       return;
     }
     requestDeleteSelected();
-  }, [
-    requestDeleteSelected,
-    requestDeleteStudioNode,
-    studioNodeId,
-    viewMode,
-  ]);
+  }, [requestDeleteSelected, requestDeleteStudioNode, studioNodeId, viewMode]);
 
-  const hasStudioNodeSelected =
-    viewMode === "studio" && studioNodeId != null;
+  const hasStudioNodeSelected = viewMode === "studio" && studioNodeId != null;
 
   useKeyboardShortcuts({
     disabled: readOnly,
@@ -1016,11 +1036,11 @@ function WorkflowEditorMainArea({
     handleCanvasDrop,
     handleCanvasFilePick,
   } = useCanvasGenerativeFileDrop({
-      reactFlowInstance,
-      enabled: canvasFileDropEnabled && viewMode === "canvas",
-      onAddCanvasDropNodes,
-      onSelectDroppedNodes: onSelectDroppedNodes ? selectDroppedNodes : undefined,
-    });
+    reactFlowInstance,
+    enabled: canvasFileDropEnabled && viewMode === "canvas",
+    onAddCanvasDropNodes,
+    onSelectDroppedNodes: onSelectDroppedNodes ? selectDroppedNodes : undefined,
+  });
 
   const isStudio = viewMode === "studio";
   const wasStudioRef = useRef(isStudio);
@@ -1063,9 +1083,7 @@ function WorkflowEditorMainArea({
         <div
           className={cn(
             "absolute z-50",
-            reserveTopChromeSpace
-              ? "inset-x-0 bottom-0 top-14"
-              : "inset-0"
+            reserveTopChromeSpace ? "inset-x-0 bottom-0 top-14" : "inset-0"
           )}
         >
           <Suspense fallback={<CreativeStudioLoadingFallback />}>

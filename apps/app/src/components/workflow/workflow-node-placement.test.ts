@@ -1,7 +1,13 @@
 import { describe, expect, it } from "vitest";
 
-import { AI_IMAGE_CARD_HEIGHT_PX, AI_IMAGE_CARD_WIDTH_PX } from "./ai-image-node-utils";
-import { AI_TEXT_CARD_HEIGHT_PX, AI_TEXT_CARD_WIDTH_PX } from "./ai-text-node-utils";
+import {
+  AI_IMAGE_CARD_HEIGHT_PX,
+  AI_IMAGE_CARD_WIDTH_PX,
+} from "./ai-image-node-utils";
+import {
+  AI_TEXT_CARD_HEIGHT_PX,
+  AI_TEXT_CARD_WIDTH_PX,
+} from "./ai-text-node-utils";
 import {
   collectOccupiedRects,
   findFallbackNodePosition,

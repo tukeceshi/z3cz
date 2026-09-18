@@ -25,7 +25,11 @@ import {
 } from "@/services/persist-generative-media-from-url";
 import { patchWorkflowNodeCloudAccelerationPending } from "@/services/patch-node-cloud-acceleration-pending";
 import type { WorkflowNodeType } from "@/components/workflow/workflow-types";
-import type { ImageGenerationRequestSnapshot, ResourceIdReference, WorkflowMediaValue } from "@dafthunk/types";
+import type {
+  ImageGenerationRequestSnapshot,
+  ResourceIdReference,
+  WorkflowMediaValue,
+} from "@dafthunk/types";
 import { VIDEO_JOB_CLIENT_POLL_INTERVAL_MS } from "@dafthunk/types";
 
 const JOB_POLL_INTERVAL_MS = VIDEO_JOB_CLIENT_POLL_INTERVAL_MS;
@@ -51,12 +55,8 @@ async function waitForJobFinalMedia(
         modelCanonicalId: response.job.modelCanonicalId,
       };
     }
-    if (
-      response.job.status === "failed"
-    ) {
-      throw new Error(
-        response.job.failureReason ?? "Generation failed"
-      );
+    if (response.job.status === "failed") {
+      throw new Error(response.job.failureReason ?? "Generation failed");
     }
     if (response.job.status === "cancelled") {
       throw new GenerativeGenerationCancelledError();
@@ -196,11 +196,7 @@ export function useGenerativeCloudJobProgress(
       downloadPercent: null,
     });
     options.setPersistPhase(null);
-  }, [
-    activeJobId,
-    options.setPersistPhase,
-    syncProgress,
-  ]);
+  }, [activeJobId, options.setPersistPhase, syncProgress]);
 
   const cloudAcceleration = useGenerativeCloudAcceleration({
     organizationId: options.orgId,

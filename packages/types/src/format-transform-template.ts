@@ -118,9 +118,7 @@ export function parsePollValuesFromInput(input: string): readonly string[] {
     .filter((entry) => entry.length > 0);
 }
 
-export function formatPollValuesForInput(
-  values: readonly string[]
-): string {
+export function formatPollValuesForInput(values: readonly string[]): string {
   return values.join(",");
 }
 
@@ -185,7 +183,11 @@ export interface SingleModelFormatTransform {
 export function singleModelFormatTransformFromTemplate(
   template: Pick<
     FormatTransformTemplate,
-    "id" | "upstreamParams" | "paramMappings" | "pollMapping" | "lockedResolution"
+    | "id"
+    | "upstreamParams"
+    | "paramMappings"
+    | "pollMapping"
+    | "lockedResolution"
   >
 ): SingleModelFormatTransform {
   return {
@@ -791,9 +793,7 @@ export function resolveTransformMappingLabel(
     return null;
   }
   if (mapping.transform) {
-    return (
-      TRANSFORM_MAPPING_LABELS[mapping.transform] ?? mapping.transform
-    );
+    return TRANSFORM_MAPPING_LABELS[mapping.transform] ?? mapping.transform;
   }
   const sourcePath = mapping.sourcePath?.trim();
   if (!sourcePath) {
@@ -803,10 +803,7 @@ export function resolveTransformMappingLabel(
 }
 
 export function describeFormatTransformTemplateRules(
-  template: Pick<
-    FormatTransformTemplate,
-    "upstreamParams" | "paramMappings"
-  >
+  template: Pick<FormatTransformTemplate, "upstreamParams" | "paramMappings">
 ): FormatTransformTemplateRulesDescription {
   const mappingByParamId = new Map(
     template.paramMappings.map((mapping) => [mapping.upstreamParamId, mapping])
@@ -821,7 +818,8 @@ export function describeFormatTransformTemplateRules(
 
     let sourceLabel: string | null = null;
     if (mapping.transform) {
-      sourceLabel = TRANSFORM_MAPPING_LABELS[mapping.transform] ?? mapping.transform;
+      sourceLabel =
+        TRANSFORM_MAPPING_LABELS[mapping.transform] ?? mapping.transform;
     } else {
       const sourcePath = mapping.sourcePath?.trim();
       if (sourcePath) {

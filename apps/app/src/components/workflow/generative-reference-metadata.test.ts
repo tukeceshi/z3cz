@@ -9,9 +9,7 @@ import {
 } from "@dafthunk/types";
 import { describe, expect, it } from "vitest";
 
-import {
-  evaluateAiVideoReferenceStructural,
-} from "./ai-video-reference-policy";
+import { evaluateAiVideoReferenceStructural } from "./ai-video-reference-policy";
 import {
   applyModelBindingToNodeData,
   generativeModelBindingHandlersForModality,
@@ -22,7 +20,10 @@ import {
 } from "./generative-reference-metadata";
 import { resolveAiImageReferenceRules } from "./ai-image-reference-policy";
 import type { WorkflowNodeType } from "./workflow-types";
-import { testWorkflowNodeData, testWorkflowParam } from "./workflow-test-fixtures";
+import {
+  testWorkflowNodeData,
+  testWorkflowParam,
+} from "./workflow-test-fixtures";
 
 describe("parseNonNegativeInt", () => {
   it("preserves zero", () => {
@@ -95,13 +96,13 @@ describe("generativeReferenceMetadataForModel", () => {
       brandIcon: null,
     };
 
-    expect(generativeReferenceMetadataForModel("video", videoModel)).toMatchObject(
-      {
-        refMaxVideos: "0",
-        refReferenceMode: "first_last_frame",
-        refSupportsTaskCancel: "1",
-      }
-    );
+    expect(
+      generativeReferenceMetadataForModel("video", videoModel)
+    ).toMatchObject({
+      refMaxVideos: "0",
+      refReferenceMode: "first_last_frame",
+      refSupportsTaskCancel: "1",
+    });
   });
 });
 
@@ -115,11 +116,13 @@ describe("resolveAiImageReferenceRules", () => {
       metadata: { refMaxImages: "1" },
     });
 
-    expect(resolveAiImageReferenceRules({ targetNodeData: nodeData }).maxReferenceImages).toBe(
-      1
-    );
     expect(
-      resolveAiImageReferenceRules({ targetNodeData: nodeData }).maxReferenceImages
+      resolveAiImageReferenceRules({ targetNodeData: nodeData })
+        .maxReferenceImages
+    ).toBe(1);
+    expect(
+      resolveAiImageReferenceRules({ targetNodeData: nodeData })
+        .maxReferenceImages
     ).not.toBe(DEFAULT_IMAGE_MODEL_PARAMETER_RULES.maxReferenceImages);
   });
 });

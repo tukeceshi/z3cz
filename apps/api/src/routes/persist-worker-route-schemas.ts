@@ -5,7 +5,10 @@ export const persistWorkerIdSchema = z
   .trim()
   .min(2)
   .max(64)
-  .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, "Use lowercase letters, numbers, and hyphens");
+  .regex(
+    /^[a-z0-9]+(?:-[a-z0-9]+)*$/,
+    "Use lowercase letters, numbers, and hyphens"
+  );
 
 export const persistWorkerPoolSettingsSchema = z.object({
   enabled: z.boolean(),

@@ -60,8 +60,8 @@ describe("applyGenerativeNodeStudioReference", () => {
       precedingText: "## Sheet\n",
     });
 
-    expect(result.data.inputs.find((input) => input.id === "prompt")?.value).toBe(
-      prompt
-    );
+    expect(
+      result.data.inputs.find((input) => input.id === "prompt")?.value
+    ).toBe(prompt);
   });
 });

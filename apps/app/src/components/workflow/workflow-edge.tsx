@@ -11,13 +11,9 @@ import { memo, useMemo } from "react";
 
 import { cn } from "@/utils/utils";
 
-import {
-  snapAiImageOutputBorderPoint,
-} from "./ai-image-connection-utils";
+import { snapAiImageOutputBorderPoint } from "./ai-image-connection-utils";
 import { AI_IMAGE_OUTPUT_ID } from "./ai-image-node-utils";
-import {
-  buildGenerativeDragPreviewState,
-} from "./generative-connection-preview";
+import { buildGenerativeDragPreviewState } from "./generative-connection-preview";
 import {
   getAiTextEdgePathOffset,
   resolveAiTextEdgeAnchors,
@@ -51,7 +47,9 @@ interface SmoothStepPathParams {
   offset?: number;
 }
 
-export function buildWorkflowSmoothStepPath(params: SmoothStepPathParams): string {
+export function buildWorkflowSmoothStepPath(
+  params: SmoothStepPathParams
+): string {
   const { offset = 20 } = params;
   const [edgePath] = getSmoothStepPath({
     sourceX: params.sourceX,
@@ -142,7 +140,15 @@ export const WorkflowEdge = memo(
         resolved.sourceHandle ?? null,
         resolved.targetHandle ?? null
       );
-    }, [data?.sourceType, data?.targetType, nodeLookup, source, target, sourceHandle, targetHandle]);
+    }, [
+      data?.sourceType,
+      data?.targetType,
+      nodeLookup,
+      source,
+      target,
+      sourceHandle,
+      targetHandle,
+    ]);
 
     const anchors = useMemo(
       () =>
@@ -347,11 +353,12 @@ export const WorkflowConnectionLine = memo(
       outboundFromImageOutput?.y ??
       outboundFromKeywords?.y ??
       fromY;
-    const sourcePosition = outboundFromOutput || outboundFromImageOutput
-      ? Position.Right
-      : outboundFromKeywords
-        ? Position.Left
-        : fromPosition;
+    const sourcePosition =
+      outboundFromOutput || outboundFromImageOutput
+        ? Position.Right
+        : outboundFromKeywords
+          ? Position.Left
+          : fromPosition;
 
     const previewTargetId =
       snapped?.nodeId ??

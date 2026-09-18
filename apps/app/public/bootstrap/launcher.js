@@ -170,17 +170,20 @@
     });
 
     var attempts = sources.map(function (source, index) {
-      return fetchShellBuffer(source.url, controllers[index].signal)
-        .then(function (buffer) {
-          return verifyShellHash(buffer, expectedHash).then(function (verified) {
-            controllers.forEach(function (controller, controllerIndex) {
-              if (controllerIndex !== index) {
-                controller.abort();
-              }
-            });
-            return verified;
-          });
-        });
+      return fetchShellBuffer(source.url, controllers[index].signal).then(
+        function (buffer) {
+          return verifyShellHash(buffer, expectedHash).then(
+            function (verified) {
+              controllers.forEach(function (controller, controllerIndex) {
+                if (controllerIndex !== index) {
+                  controller.abort();
+                }
+              });
+              return verified;
+            }
+          );
+        }
+      );
     });
 
     return Promise.any(attempts);
@@ -285,11 +288,17 @@
         finish(Boolean(navigator.serviceWorker.controller));
       }, SW_CONTROL_TIMEOUT_MS);
 
-      navigator.serviceWorker.addEventListener("controllerchange", function onChange() {
-        clearTimeout(timer);
-        navigator.serviceWorker.removeEventListener("controllerchange", onChange);
-        finish(true);
-      });
+      navigator.serviceWorker.addEventListener(
+        "controllerchange",
+        function onChange() {
+          clearTimeout(timer);
+          navigator.serviceWorker.removeEventListener(
+            "controllerchange",
+            onChange
+          );
+          finish(true);
+        }
+      );
     });
   }
 
@@ -313,7 +322,9 @@
       return Promise.reject(new Error("Gzip decompression unavailable"));
     }
     return new Response(
-      new Blob([compressed]).stream().pipeThrough(new DecompressionStream("gzip"))
+      new Blob([compressed])
+        .stream()
+        .pipeThrough(new DecompressionStream("gzip"))
     ).arrayBuffer();
   }
 
@@ -407,22 +418,26 @@
     }
 
     var serviceWorkerReady = registerAssetServiceWorker();
-    var shellArchive = loadShellBytes(config).then(gunzipBytes).then(parseShellArchive);
+    var shellArchive = loadShellBytes(config)
+      .then(gunzipBytes)
+      .then(parseShellArchive);
 
-    return Promise.all([serviceWorkerReady, shellArchive]).then(function (results) {
-      var swReady = results[0];
-      var archive = results[1];
-      var entry = archive.entry || config.entry;
-      var css = archive.css.length > 0 ? archive.css : config.css || [];
+    return Promise.all([serviceWorkerReady, shellArchive]).then(
+      function (results) {
+        var swReady = results[0];
+        var archive = results[1];
+        var entry = archive.entry || config.entry;
+        var css = archive.css.length > 0 ? archive.css : config.css || [];
 
-      if (!swReady) {
-        return loadViaHttp(entry, css);
+        if (!swReady) {
+          return loadViaHttp(entry, css);
+        }
+
+        return seedAssetCache(archive.fileBytes).then(function () {
+          return loadViaHttp(entry, css);
+        });
       }
-
-      return seedAssetCache(archive.fileBytes).then(function () {
-        return loadViaHttp(entry, css);
-      });
-    });
+    );
   }
 
   function loadApp(config) {
@@ -453,7 +468,10 @@
       entry: remote.entry || inline.entry || "",
       css: remote.css && remote.css.length > 0 ? remote.css : inline.css || [],
       manifestVersion:
-        remote.manifestVersion || inline.manifestVersion || inline.shellHash || "",
+        remote.manifestVersion ||
+        inline.manifestVersion ||
+        inline.shellHash ||
+        "",
       shellSources:
         remote.shellSources && remote.shellSources.length > 0
           ? remote.shellSources

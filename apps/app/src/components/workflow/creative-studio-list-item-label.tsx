@@ -63,7 +63,11 @@ export function CreativeStudioListItemLabel({
   }, [commit, editing, registerListNodeRenameCommit]);
 
   return (
-    <div className={editing ? STUDIO_NODE_LABEL_ROW_EDITING : STUDIO_NODE_LABEL_ROW}>
+    <div
+      className={
+        editing ? STUDIO_NODE_LABEL_ROW_EDITING : STUDIO_NODE_LABEL_ROW
+      }
+    >
       {editing ? (
         <div
           className="min-w-0 flex-1"
@@ -95,9 +99,7 @@ export function CreativeStudioListItemLabel({
           {label}
         </button>
       )}
-      {!editing ? (
-        <CreativeStudioListItemMenu nodeId={node.id} />
-      ) : null}
+      {!editing ? <CreativeStudioListItemMenu nodeId={node.id} /> : null}
     </div>
   );
 }

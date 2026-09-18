@@ -12,7 +12,9 @@ describe("splitMarkdownTables", () => {
     const markdown = "## Title\n\nHello **world**";
     const segments = splitMarkdownTables(markdown);
 
-    expect(segments).toEqual([{ type: "text", start: 0, end: markdown.length }]);
+    expect(segments).toEqual([
+      { type: "text", start: 0, end: markdown.length },
+    ]);
   });
 
   it("splits text around a complete table", () => {
@@ -49,7 +51,9 @@ describe("splitMarkdownTables", () => {
 
     const segments = splitMarkdownTables(markdown);
 
-    expect(segments).toEqual([{ type: "text", start: 0, end: markdown.length }]);
+    expect(segments).toEqual([
+      { type: "text", start: 0, end: markdown.length },
+    ]);
   });
 
   it("recognizes a minimal complete table", () => {
@@ -97,16 +101,9 @@ describe("mergeMarkdownTableEdits", () => {
     const updated = mergeMarkdownTableEdits(
       markdown,
       segments,
-      new Map([
-        [
-          tableSegment.index,
-          "| A | B |\n| --- | --- |\n| 9 | 8 |",
-        ],
-      ])
+      new Map([[tableSegment.index, "| A | B |\n| --- | --- |\n| 9 | 8 |"]])
     );
 
-    expect(updated).toBe(
-      "Head\n\n| A | B |\n| --- | --- |\n| 9 | 8 |\n\nTail"
-    );
+    expect(updated).toBe("Head\n\n| A | B |\n| --- | --- |\n| 9 | 8 |\n\nTail");
   });
 });

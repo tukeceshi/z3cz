@@ -21,7 +21,8 @@ export const REF_MAX_IMAGES_META_KEY = "refMaxImages" as const;
 export const REF_MAX_VIDEOS_META_KEY = "refMaxVideos" as const;
 export const REF_MAX_AUDIOS_META_KEY = "refMaxAudios" as const;
 export const REF_REFERENCE_MODE_META_KEY = "refReferenceMode" as const;
-export const REF_SUPPORTS_TASK_CANCEL_META_KEY = "refSupportsTaskCancel" as const;
+export const REF_SUPPORTS_TASK_CANCEL_META_KEY =
+  "refSupportsTaskCancel" as const;
 
 export function parseNonNegativeInt(
   raw: string | undefined,

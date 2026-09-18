@@ -33,7 +33,9 @@ export function derivePersistWorkerApiBaseUrlFromWebHost(
 export function isLoopbackPersistWorkerApiBaseUrl(apiBaseUrl: string): boolean {
   try {
     const { hostname } = new URL(apiBaseUrl);
-    return hostname === "localhost" || hostname === "127.0.0.1" || hostname === "::1";
+    return (
+      hostname === "localhost" || hostname === "127.0.0.1" || hostname === "::1"
+    );
   } catch {
     return false;
   }
@@ -71,12 +73,12 @@ __DAFTHUNK_WORKER__
 
 echo ${shellQuote(`API_BASE_URL=${params.apiBaseUrl}`)}
 ${
-    isLoopbackPersistWorkerApiBaseUrl(params.apiBaseUrl)
-      ? `echo ${shellQuote(
-          "WARNING: API_BASE_URL points at localhost; a remote worker cannot reach this API. Set a public API URL (frontend /api or host:3102) when initializing."
-        )}`
-      : ""
-  }
+  isLoopbackPersistWorkerApiBaseUrl(params.apiBaseUrl)
+    ? `echo ${shellQuote(
+        "WARNING: API_BASE_URL points at localhost; a remote worker cannot reach this API. Set a public API URL (frontend /api or host:3102) when initializing."
+      )}`
+    : ""
+}
 
 cat > "$STAGE_DIR/env" <<'__DAFTHUNK_ENV__'
 API_BASE_URL=${params.apiBaseUrl}

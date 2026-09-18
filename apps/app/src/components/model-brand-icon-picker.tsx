@@ -56,7 +56,9 @@ export function ModelBrandIconPicker({
 
   return (
     <div className="space-y-1.5">
-      {label ? <Label className="text-[11px] text-muted-foreground">{label}</Label> : null}
+      {label ? (
+        <Label className="text-[11px] text-muted-foreground">{label}</Label>
+      ) : null}
       <Popover>
         <PopoverTrigger asChild>
           <Button

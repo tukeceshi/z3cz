@@ -95,12 +95,11 @@ export async function resolveJobCloudAccelerationFlags(
     };
   }
 
-  const shouldUseCloudAcceleration =
-    await isAiInterfaceCloudAccelerationActive(
-      db,
-      job.organizationId,
-      job.interfaceId
-    );
+  const shouldUseCloudAcceleration = await isAiInterfaceCloudAccelerationActive(
+    db,
+    job.organizationId,
+    job.interfaceId
+  );
 
   return {
     cloudAccelerationEnabled: true,

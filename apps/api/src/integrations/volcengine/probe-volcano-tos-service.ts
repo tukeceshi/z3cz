@@ -1,6 +1,4 @@
-import type {
-  VolcanoProbeTosBucketsResponse,
-} from "@dafthunk/types";
+import type { VolcanoProbeTosBucketsResponse } from "@dafthunk/types";
 
 import {
   TOS_ACCOUNT_DISABLE_CODE,
@@ -132,8 +130,7 @@ export function classifyTosRequestError(
     });
   }
 
-  const message =
-    error instanceof Error ? error.message : "TOS request failed";
+  const message = error instanceof Error ? error.message : "TOS request failed";
   return {
     status: "transient_error",
     message,

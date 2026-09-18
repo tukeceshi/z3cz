@@ -119,7 +119,8 @@ export function AiVideoTrimBottomPanel({
   const [isStartingTrim, setIsStartingTrim] = useState(false);
   const trimTaskRef = useRef(0);
   const [highQualityHintOpen, setHighQualityHintOpen] = useState(false);
-  const [shortDurationConfirmOpen, setShortDurationConfirmOpen] = useState(false);
+  const [shortDurationConfirmOpen, setShortDurationConfirmOpen] =
+    useState(false);
   const [shortDurationDontAsk, setShortDurationDontAsk] = useState(false);
 
   const mediaKitTrimAvailable = Boolean(
@@ -266,7 +267,8 @@ export function AiVideoTrimBottomPanel({
               }
               if (jobResponse.job.status === "failed") {
                 throw new Error(
-                  jobResponse.job.failureReason ?? t("workflow.videoTrim.generateFailed")
+                  jobResponse.job.failureReason ??
+                    t("workflow.videoTrim.generateFailed")
                 );
               }
               if (jobResponse.job.status === "cancelled") {
@@ -402,7 +404,13 @@ export function AiVideoTrimBottomPanel({
         return;
       }
       const sourceResourceId = getResourceIdFromValue(session.sourceMedia);
-      if (!sourceResourceId || !("kind" in session.sourceMedia && isCloudStoredResource(session.sourceMedia))) {
+      if (
+        !sourceResourceId ||
+        !(
+          "kind" in session.sourceMedia &&
+          isCloudStoredResource(session.sourceMedia)
+        )
+      ) {
         toast.error("workflow.videoTrim.sourceNotCloud");
         return;
       }
@@ -535,130 +543,132 @@ export function AiVideoTrimBottomPanel({
   return (
     <>
       <GenerativeBottomPanelShell nodeId={nodeId} zoom={zoom}>
-      <div className={VIDEO_TRIM_PANEL_RULER_ROW_CLASS}>
-        {ready ? (
-          <VideoTrimRuler
-            videoDurationSec={session.videoDurationSec ?? 0}
-            range={session.draftRange}
-            onRangeChange={handleDraftRangeChange}
-            onRangeCommit={handleRangeCommit}
-          />
-        ) : (
-          <div className="h-9 min-w-0 flex-1 animate-pulse rounded-md bg-neutral-200/80 dark:bg-neutral-700/60" />
-        )}
-        <button
-          type="button"
-          aria-label={t("common.close")}
-          className="inline-flex size-7 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-neutral-100 dark:hover:bg-neutral-700/60"
-          onPointerDown={(event) => event.stopPropagation()}
-          onMouseDown={(event) => event.stopPropagation()}
-          onClick={(event) => {
-            event.stopPropagation();
-            closeTrimSession();
-          }}
-        >
-          <XIcon className="size-4" strokeWidth={2} />
-        </button>
-      </div>
-
-      <div className={VIDEO_TRIM_PANEL_FOOTER_CLASS}>
-        <div className={VIDEO_TRIM_PANEL_FOOTER_LEFT_CLASS}>
-          <div className="flex items-center gap-0.5">
-            <Popover
-              modal={false}
-              open={highQualityHintOpen}
-              onOpenChange={setHighQualityHintOpen}
-            >
-              <PopoverAnchor asChild>
-                <label className="flex cursor-pointer items-center gap-2 text-xs">
-                  <Switch
-                    checked={session.highQuality}
-                    disabled={!ready || isStartingTrim}
-                    onCheckedChange={handleHighQualityToggle}
-                  />
-                  <span>{t("workflow.videoTrim.highQuality")}</span>
-                </label>
-              </PopoverAnchor>
-              <PopoverContent
-                className="w-64 p-3 text-sm"
-                align="start"
-                side="top"
-                onPointerDown={(event) => event.stopPropagation()}
-                onMouseDown={(event) => event.stopPropagation()}
-              >
-                <div className="space-y-2">
-                  <p>{t("workflow.videoTrim.notConfiguredHint")}</p>
-                  <Link
-                    to={interfacesUrl}
-                    className="inline-block text-xs underline underline-offset-2"
-                  >
-                    {t("workflow.videoTrim.openAiInterfaces")}
-                  </Link>
-                </div>
-              </PopoverContent>
-            </Popover>
-            <VideoTrimLocalTrimHintIcon />
-          </div>
-        </div>
-
-        <div className={VIDEO_TRIM_PANEL_FOOTER_CENTER_CLASS}>
+        <div className={VIDEO_TRIM_PANEL_RULER_ROW_CLASS}>
           {ready ? (
-            <VideoTrimTimeFields
+            <VideoTrimRuler
               videoDurationSec={session.videoDurationSec ?? 0}
               range={session.draftRange}
-              disabled={isStartingTrim}
               onRangeChange={handleDraftRangeChange}
               onRangeCommit={handleRangeCommit}
             />
-          ) : session.loadPhase === "error" ? (
-            <p className="text-xs text-destructive">{t("workflow.videoTrim.loadFailed")}</p>
           ) : (
-            <div className="h-7 w-40 animate-pulse rounded bg-neutral-200/80 dark:bg-neutral-700/60" />
+            <div className="h-9 min-w-0 flex-1 animate-pulse rounded-md bg-neutral-200/80 dark:bg-neutral-700/60" />
           )}
-        </div>
-
-        <div className={VIDEO_TRIM_PANEL_FOOTER_ACTIONS_CLASS}>
           <button
             type="button"
-            disabled={!ready || isStartingTrim}
-            aria-label={
-              session.playbackPaused
-                ? t("workflow.videoTrim.play")
-                : t("workflow.videoTrim.pause")
-            }
-            className={VIDEO_TRIM_PANEL_ACTION_BUTTON_CLASS}
+            aria-label={t("common.close")}
+            className="inline-flex size-7 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-neutral-100 dark:hover:bg-neutral-700/60"
             onPointerDown={(event) => event.stopPropagation()}
             onMouseDown={(event) => event.stopPropagation()}
             onClick={(event) => {
               event.stopPropagation();
-              setPlaybackPaused(!session.playbackPaused);
+              closeTrimSession();
             }}
           >
-            {session.playbackPaused ? (
-              <PlayIcon className="size-4" strokeWidth={2} />
+            <XIcon className="size-4" strokeWidth={2} />
+          </button>
+        </div>
+
+        <div className={VIDEO_TRIM_PANEL_FOOTER_CLASS}>
+          <div className={VIDEO_TRIM_PANEL_FOOTER_LEFT_CLASS}>
+            <div className="flex items-center gap-0.5">
+              <Popover
+                modal={false}
+                open={highQualityHintOpen}
+                onOpenChange={setHighQualityHintOpen}
+              >
+                <PopoverAnchor asChild>
+                  <label className="flex cursor-pointer items-center gap-2 text-xs">
+                    <Switch
+                      checked={session.highQuality}
+                      disabled={!ready || isStartingTrim}
+                      onCheckedChange={handleHighQualityToggle}
+                    />
+                    <span>{t("workflow.videoTrim.highQuality")}</span>
+                  </label>
+                </PopoverAnchor>
+                <PopoverContent
+                  className="w-64 p-3 text-sm"
+                  align="start"
+                  side="top"
+                  onPointerDown={(event) => event.stopPropagation()}
+                  onMouseDown={(event) => event.stopPropagation()}
+                >
+                  <div className="space-y-2">
+                    <p>{t("workflow.videoTrim.notConfiguredHint")}</p>
+                    <Link
+                      to={interfacesUrl}
+                      className="inline-block text-xs underline underline-offset-2"
+                    >
+                      {t("workflow.videoTrim.openAiInterfaces")}
+                    </Link>
+                  </div>
+                </PopoverContent>
+              </Popover>
+              <VideoTrimLocalTrimHintIcon />
+            </div>
+          </div>
+
+          <div className={VIDEO_TRIM_PANEL_FOOTER_CENTER_CLASS}>
+            {ready ? (
+              <VideoTrimTimeFields
+                videoDurationSec={session.videoDurationSec ?? 0}
+                range={session.draftRange}
+                disabled={isStartingTrim}
+                onRangeChange={handleDraftRangeChange}
+                onRangeCommit={handleRangeCommit}
+              />
+            ) : session.loadPhase === "error" ? (
+              <p className="text-xs text-destructive">
+                {t("workflow.videoTrim.loadFailed")}
+              </p>
             ) : (
-              <PauseIcon className="size-4" strokeWidth={2} />
+              <div className="h-7 w-40 animate-pulse rounded bg-neutral-200/80 dark:bg-neutral-700/60" />
             )}
-          </button>
+          </div>
 
-          <button
-            type="button"
-            disabled={!ready || isStartingTrim}
-            className={VIDEO_TRIM_PANEL_PRIMARY_BUTTON_CLASS}
-            onPointerDown={(event) => event.stopPropagation()}
-            onMouseDown={(event) => event.stopPropagation()}
-            onClick={(event) => {
-              event.stopPropagation();
-              void handleGenerate();
-            }}
-          >
-            {isStartingTrim ? (
-              <LoaderIcon className="size-4 animate-spin" strokeWidth={2} />
-            ) : null}
-            <span>{t("workflow.videoTrim.action")}</span>
-          </button>
+          <div className={VIDEO_TRIM_PANEL_FOOTER_ACTIONS_CLASS}>
+            <button
+              type="button"
+              disabled={!ready || isStartingTrim}
+              aria-label={
+                session.playbackPaused
+                  ? t("workflow.videoTrim.play")
+                  : t("workflow.videoTrim.pause")
+              }
+              className={VIDEO_TRIM_PANEL_ACTION_BUTTON_CLASS}
+              onPointerDown={(event) => event.stopPropagation()}
+              onMouseDown={(event) => event.stopPropagation()}
+              onClick={(event) => {
+                event.stopPropagation();
+                setPlaybackPaused(!session.playbackPaused);
+              }}
+            >
+              {session.playbackPaused ? (
+                <PlayIcon className="size-4" strokeWidth={2} />
+              ) : (
+                <PauseIcon className="size-4" strokeWidth={2} />
+              )}
+            </button>
+
+            <button
+              type="button"
+              disabled={!ready || isStartingTrim}
+              className={VIDEO_TRIM_PANEL_PRIMARY_BUTTON_CLASS}
+              onPointerDown={(event) => event.stopPropagation()}
+              onMouseDown={(event) => event.stopPropagation()}
+              onClick={(event) => {
+                event.stopPropagation();
+                void handleGenerate();
+              }}
+            >
+              {isStartingTrim ? (
+                <LoaderIcon className="size-4 animate-spin" strokeWidth={2} />
+              ) : null}
+              <span>{t("workflow.videoTrim.action")}</span>
+            </button>
+          </div>
         </div>
-      </div>
       </GenerativeBottomPanelShell>
 
       <VideoTrimShortDurationConfirmDialog

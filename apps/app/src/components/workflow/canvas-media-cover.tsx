@@ -8,7 +8,14 @@ import {
 } from "@dafthunk/types";
 import MusicIcon from "lucide-react/icons/music";
 import PlayIcon from "lucide-react/icons/play";
-import { useCallback, useEffect, useMemo, useRef, useState, type SyntheticEvent } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type SyntheticEvent,
+} from "react";
 import { useNodes } from "@xyflow/react";
 import { useParams } from "react-router";
 
@@ -344,7 +351,9 @@ function CanvasMediaLoadingPlaceholder({
   readonly className?: string;
 }) {
   return (
-    <MediaDisplayLoadingPlaceholder className={cn("absolute inset-0", className)} />
+    <MediaDisplayLoadingPlaceholder
+      className={cn("absolute inset-0", className)}
+    />
   );
 }
 
@@ -358,13 +367,14 @@ function CanvasImageCover({
   sharedUrlSet,
 }: CanvasMediaCoverBaseProps) {
   const { t } = useTranslation();
-  const { displayUrl, phase, isCanvasOnScreen, urlSet, retry } = useCanvasMediaCoverUrl({
-    media,
-    nodeType: "ai-image",
-    cardWidthPx,
-    cardHeightPx,
-    sharedUrlSet,
-  });
+  const { displayUrl, phase, isCanvasOnScreen, urlSet, retry } =
+    useCanvasMediaCoverUrl({
+      media,
+      nodeType: "ai-image",
+      cardWidthPx,
+      cardHeightPx,
+      sharedUrlSet,
+    });
 
   useEffect(() => {
     prefetchDecodedDisplayUrls([urlSet.s, urlSet.m, urlSet.l]);
@@ -385,11 +395,14 @@ function CanvasImageCover({
   const showUnavailable = useDebouncedUnavailable(
     phase === "missing" && isCanvasOnScreen
   );
-  const fitClassName = fitMode === "contain" ? "object-contain" : "object-cover";
+  const fitClassName =
+    fitMode === "contain" ? "object-contain" : "object-cover";
 
   return (
     <div className={cn("relative h-full w-full overflow-hidden", className)}>
-      {phase === "loading" && !hasImage ? <CanvasMediaLoadingPlaceholder /> : null}
+      {phase === "loading" && !hasImage ? (
+        <CanvasMediaLoadingPlaceholder />
+      ) : null}
 
       {hasImage ? (
         <CanvasTierCoverImage
@@ -429,7 +442,9 @@ function CanvasVideoCover({
   const nodes = useNodes();
   const { updateNodeData } = useWorkflow();
   const trimSessionApi = useOptionalVideoTrimSession();
-  const trimActive = Boolean(nodeId && trimSessionApi?.isTrimActiveForNode(nodeId));
+  const trimActive = Boolean(
+    nodeId && trimSessionApi?.isTrimActiveForNode(nodeId)
+  );
   const trimSession =
     trimSessionApi &&
     trimActive &&
@@ -441,7 +456,9 @@ function CanvasVideoCover({
     Boolean(nodeId && subtitleEraseApi?.isSubtitleEraseActiveForNode(nodeId)) &&
     subtitleEraseApi?.session?.draftConfig.mode === "refined" &&
     subtitleEraseApi?.session?.regionMode === true;
-  const flowNode = nodeId ? nodes.find((node) => node.id === nodeId) : undefined;
+  const flowNode = nodeId
+    ? nodes.find((node) => node.id === nodeId)
+    : undefined;
   const nodeSelected = flowNode?.selected === true;
   const nodeData = flowNode?.data as WorkflowNodeType | undefined;
   const isRetakePanel = isAiVideoRetakePanel(nodeData?.metadata);
@@ -454,7 +471,9 @@ function CanvasVideoCover({
       if (!nodeId || !updateNodeData || !retakeActive) {
         return;
       }
-      updateNodeData(nodeId, (current) => withAiVideoRetakeDraft(current, patch));
+      updateNodeData(nodeId, (current) =>
+        withAiVideoRetakeDraft(current, patch)
+      );
     },
     [nodeId, retakeActive, updateNodeData]
   );
@@ -474,22 +493,19 @@ function CanvasVideoCover({
       : null;
   const [isHovered, setIsHovered] = useState(false);
   const ensureFullOnHover =
-    trimActive || retakeActive || eraseRegionModeActive || (!staticCover && isHovered);
-  const {
-    displayUrl,
-    phase,
-    isCanvasOnScreen,
-    urlSet,
-    stale,
-    retry,
-  } = useCanvasMediaCoverUrl({
-    media,
-    nodeType: "ai-video",
-    cardWidthPx,
-    cardHeightPx,
-    sharedUrlSet,
-    ensureSize: ensureFullOnHover ? "full" : undefined,
-  });
+    trimActive ||
+    retakeActive ||
+    eraseRegionModeActive ||
+    (!staticCover && isHovered);
+  const { displayUrl, phase, isCanvasOnScreen, urlSet, stale, retry } =
+    useCanvasMediaCoverUrl({
+      media,
+      nodeType: "ai-video",
+      cardWidthPx,
+      cardHeightPx,
+      sharedUrlSet,
+      ensureSize: ensureFullOnHover ? "full" : undefined,
+    });
   const hoverPreviewEnabled = ensureFullOnHover && isCanvasOnScreen;
   const fullVideoDisplay = useMemo(
     () =>
@@ -542,20 +558,19 @@ function CanvasVideoCover({
   const showUnavailable = useDebouncedUnavailable(
     phase === "missing" && isCanvasOnScreen
   );
-  const fitClassName = fitMode === "contain" ? "object-contain" : "object-cover";
+  const fitClassName =
+    fitMode === "contain" ? "object-contain" : "object-cover";
   const objectFit = fitMode === "contain" ? "contain" : "cover";
 
   return (
     <div
       className={cn("relative h-full w-full overflow-hidden", className)}
-      onMouseEnter={
-        staticCover ? undefined : () => setIsHovered(true)
-      }
-      onMouseLeave={
-        staticCover ? undefined : () => setIsHovered(false)
-      }
+      onMouseEnter={staticCover ? undefined : () => setIsHovered(true)}
+      onMouseLeave={staticCover ? undefined : () => setIsHovered(false)}
     >
-      {phase === "loading" && !hasImage ? <CanvasMediaLoadingPlaceholder /> : null}
+      {phase === "loading" && !hasImage ? (
+        <CanvasMediaLoadingPlaceholder />
+      ) : null}
 
       {hasImage ? (
         <div
@@ -586,14 +601,14 @@ function CanvasVideoCover({
           externalPlaybackControl={playbackActive || eraseRegionModeActive}
           playbackRange={
             playbackActive && !eraseRegionModeActive
-              ? playbackSession?.committedRange ?? null
+              ? (playbackSession?.committedRange ?? null)
               : null
           }
           playbackPaused={
             eraseRegionModeActive
               ? true
               : playbackActive
-                ? playbackSession?.playbackPaused ?? false
+                ? (playbackSession?.playbackPaused ?? false)
                 : false
           }
           onPlaybackPausedChange={
@@ -662,10 +677,7 @@ function CanvasVideoCover({
       {showPlayIcon ? (
         <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-black/15">
           <PlayIcon
-            className={cn(
-              "text-white/85",
-              staticCover ? "h-5 w-5" : "h-8 w-8"
-            )}
+            className={cn("text-white/85", staticCover ? "h-5 w-5" : "h-8 w-8")}
             strokeWidth={1.75}
           />
         </div>
@@ -746,7 +758,10 @@ export function CanvasAudioCover({
 
 const HISTORY_LIST_THUMB_PX = 72;
 
-function isElementVisible(element: HTMLElement, root: HTMLElement | null): boolean {
+function isElementVisible(
+  element: HTMLElement,
+  root: HTMLElement | null
+): boolean {
   const targetRect = element.getBoundingClientRect();
   if (targetRect.width <= 0 || targetRect.height <= 0) return false;
 

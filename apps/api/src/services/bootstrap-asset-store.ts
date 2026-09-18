@@ -51,7 +51,10 @@ function readManifestFromDisk(root: string): BootstrapManifest {
 }
 
 export function getBootstrapAssetsRoot(): string | null {
-  if (cachedRoot && fs.existsSync(diskUrl(path.join(cachedRoot, MANIFEST_FILE)))) {
+  if (
+    cachedRoot &&
+    fs.existsSync(diskUrl(path.join(cachedRoot, MANIFEST_FILE)))
+  ) {
     const mtimeMs = manifestMtimeMs(cachedRoot);
     if (cachedManifest && mtimeMs === cachedMtimeMs) {
       return cachedRoot;

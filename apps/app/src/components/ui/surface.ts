@@ -12,8 +12,7 @@ export const SURFACE_CARD_SOFT =
   "border border-border/50 bg-card dark:border-neutral-700 dark:bg-neutral-800";
 
 /** Muted inset block */
-export const SURFACE_MUTED_INSET =
-  "bg-muted/30 dark:bg-neutral-700/30";
+export const SURFACE_MUTED_INSET = "bg-muted/30 dark:bg-neutral-700/30";
 
 /** Standard border */
 export const SURFACE_BORDER = "border-border dark:border-neutral-700";

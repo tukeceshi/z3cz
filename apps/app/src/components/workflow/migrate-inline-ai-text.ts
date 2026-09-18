@@ -35,9 +35,7 @@ export function nodeHasInlineAiText(data: WorkflowNodeType): boolean {
   const history = readAiTextResultHistory(data.inputs);
   return history.items.some(
     (item) =>
-      typeof item.text === "string" &&
-      item.text.length > 0 &&
-      !item.resourceId
+      typeof item.text === "string" && item.text.length > 0 && !item.resourceId
   );
 }
 

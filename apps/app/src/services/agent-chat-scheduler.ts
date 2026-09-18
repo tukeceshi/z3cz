@@ -106,7 +106,9 @@ export const AGENT_MAIN_INSTRUCTION = AGENT_IDENTITY;
 
 export const EXECUTE_TALK_REQUIRED = "先说明要做什么，再调用" as const;
 
-export function buildModeSystemReminder(_mode: AgentSessionMode = "ask"): string {
+export function buildModeSystemReminder(
+  _mode: AgentSessionMode = "ask"
+): string {
   return AGENT_BASE_IDENTITY;
 }
 
@@ -308,7 +310,8 @@ function parseAskQuestionFromJson(
       readonly prompt?: unknown;
       readonly options?: unknown;
     };
-    const prompt = typeof record.prompt === "string" ? record.prompt.trim() : "";
+    const prompt =
+      typeof record.prompt === "string" ? record.prompt.trim() : "";
     if (!prompt || !Array.isArray(record.options)) {
       return undefined;
     }
@@ -676,9 +679,13 @@ export function answerToHistoryContent(content: string): string {
 
 const CITE_HEADER = /^(\d+):(\d+):(\S+)$/;
 
-export function parseCiteHeader(
-  header: string
-): { readonly startLine: number; readonly endLine: number; readonly filepath: string } | undefined {
+export function parseCiteHeader(header: string):
+  | {
+      readonly startLine: number;
+      readonly endLine: number;
+      readonly filepath: string;
+    }
+  | undefined {
   const match = CITE_HEADER.exec(header.trim());
   if (!match) {
     return undefined;
@@ -921,8 +928,7 @@ export async function runAgentScheduler(
       }
     }
     const lastBlock = lastTalkIndex >= 0 ? blocks[lastTalkIndex] : undefined;
-    const lastTalk =
-      lastBlock?.kind === "talk" ? lastBlock.text : answer.talk;
+    const lastTalk = lastBlock?.kind === "talk" ? lastBlock.text : answer.talk;
     const judgment = parseEventJudgment(lastTalk);
     if (lastTalkIndex >= 0 && judgment.talk !== lastTalk.trim()) {
       if (judgment.talk) {
@@ -979,7 +985,9 @@ export async function runAgentScheduler(
           }),
       (fullText, fullThinking) => {
         params.onAssistantContent(
-          composeSavedAnswer(withAnswerStep(answer, fullThinking ?? "", fullText))
+          composeSavedAnswer(
+            withAnswerStep(answer, fullThinking ?? "", fullText)
+          )
         );
       }
     );
@@ -1179,7 +1187,9 @@ function nextAnswerMarker(
   text: string,
   from: number,
   tags: readonly (typeof ANSWER_MARKERS)[number][] = ANSWER_MARKERS
-): { readonly tag: (typeof ANSWER_MARKERS)[number]; readonly at: number } | undefined {
+):
+  | { readonly tag: (typeof ANSWER_MARKERS)[number]; readonly at: number }
+  | undefined {
   let best:
     | { readonly tag: (typeof ANSWER_MARKERS)[number]; readonly at: number }
     | undefined;

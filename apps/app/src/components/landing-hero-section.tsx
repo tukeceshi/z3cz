@@ -52,7 +52,7 @@ export function LandingHeroSection() {
       className={cn(
         "relative isolate flex min-h-[calc(100vh-4rem)] flex-col overflow-hidden text-foreground dark:bg-neutral-900",
         LANDING_BORDER,
-        "border-b bg-[#f7f5f1]",
+        "border-b bg-[#f7f5f1]"
       )}
     >
       <div
@@ -66,7 +66,8 @@ export function LandingHeroSection() {
               className="mx-auto max-w-5xl font-serif text-balance font-bold leading-[1.4] tracking-[-0.035em] text-foreground"
               style={{ fontSize: "clamp(1.75rem, 3.4vw, 2.875rem)" }}
             >
-              <span className={HERO_BRAND_CLASS}>z3cz</span>:{t("landing.heroHeadlineSuffix")}
+              <span className={HERO_BRAND_CLASS}>z3cz</span>:
+              {t("landing.heroHeadlineSuffix")}
             </h1>
 
             <p className="mx-auto mt-6 max-w-3xl font-mono text-[17px] leading-relaxed tracking-[-0.02em] text-pretty text-muted-foreground">
@@ -84,7 +85,10 @@ export function LandingHeroSection() {
                     ?.scrollIntoView({ behavior: "smooth", block: "start" });
                 }}
               >
-                <span aria-hidden className="size-1.5 bg-white/80 dark:bg-neutral-950" />
+                <span
+                  aria-hidden
+                  className="size-1.5 bg-white/80 dark:bg-neutral-950"
+                />
                 {t("landing.heroDemoCta")}
                 <ArrowRight className="size-3.5" />
               </button>

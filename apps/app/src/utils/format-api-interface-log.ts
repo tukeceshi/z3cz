@@ -3,8 +3,7 @@ import type { ApiInterfaceRequestLog } from "@dafthunk/types";
 export function formatApiLogLine(log: ApiInterfaceRequestLog): string {
   const time = new Date(log.createdAt).toLocaleString();
   const status = log.httpStatus ?? "—";
-  const duration =
-    log.durationMs !== null ? `${log.durationMs}ms` : "—";
+  const duration = log.durationMs !== null ? `${log.durationMs}ms` : "—";
   const operation = log.operation ?? "—";
   return `${time} · ${operation} · ${log.method} · ${status} · ${duration}`;
 }

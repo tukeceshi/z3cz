@@ -178,11 +178,15 @@ describe("volcano-mediakit-pricing-catalog", () => {
   });
 
   it("includes subtitle erase pricing", () => {
-    expect(formatMediaKitYuanPerSecond(VOLCANO_MEDIKIT_SUBTITLE_ERASE_PRICING.standard)).toBe(
-      "0.0067"
-    );
-    expect(formatMediaKitYuanPerSecond(VOLCANO_MEDIKIT_SUBTITLE_ERASE_PRICING.refined)).toBe(
-      "0.0167"
-    );
+    expect(
+      formatMediaKitYuanPerSecond(
+        VOLCANO_MEDIKIT_SUBTITLE_ERASE_PRICING.standard
+      )
+    ).toBe("0.0067");
+    expect(
+      formatMediaKitYuanPerSecond(
+        VOLCANO_MEDIKIT_SUBTITLE_ERASE_PRICING.refined
+      )
+    ).toBe("0.0167");
   });
 });

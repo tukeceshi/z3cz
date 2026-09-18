@@ -1,4 +1,7 @@
-import type { LegalDocumentType, PublicLegalDocumentResponse } from "@dafthunk/types";
+import type {
+  LegalDocumentType,
+  PublicLegalDocumentResponse,
+} from "@dafthunk/types";
 import Markdown from "react-markdown";
 
 import { useTranslation } from "@/components/locale-provider";
@@ -67,7 +70,10 @@ export function LegalDocumentDialog({
           ) : null}
         </DialogHeader>
         <div className="min-h-0 flex-1 overflow-y-auto pr-1">
-          <LegalDocumentBody document={document} isLoading={isDocumentLoading} />
+          <LegalDocumentBody
+            document={document}
+            isLoading={isDocumentLoading}
+          />
         </div>
       </DialogContent>
     </Dialog>

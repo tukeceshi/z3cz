@@ -29,7 +29,8 @@ export interface PlatformVideoCapabilityBaseline {
   readonly maxReferenceAudios: number;
 }
 
-interface LegacySingleModelCapabilityLimits extends SingleModelCapabilityLimits {
+interface LegacySingleModelCapabilityLimits
+  extends SingleModelCapabilityLimits {
   readonly resolutions?: readonly string[];
 }
 
@@ -210,8 +211,7 @@ function normalizeStoredCapabilityLimits(
   const filtered = legacy.resolutions.filter((entry) =>
     platformEnum.includes(entry)
   );
-  const enumValues =
-    filtered.length > 0 ? filtered : [...platformEnum];
+  const enumValues = filtered.length > 0 ? filtered : [...platformEnum];
   const defaultValue = enumValues.includes(
     String(platformBaseline.resolution.default)
   )
@@ -281,7 +281,8 @@ export function applyVideoCapabilityLimits(
   const orgPriceDiscountFold = readVideoPricePromoFold(
     migrated.priceEstimateDiscountFold
   );
-  const applyOfficialPriceDiscount = migrated.applyOfficialPriceDiscount !== false;
+  const applyOfficialPriceDiscount =
+    migrated.applyOfficialPriceDiscount !== false;
 
   let generationFields = normalized.generationFields;
   if (migrated.resolution) {
@@ -376,9 +377,13 @@ export function normalizeCapabilityLimitsForSave(params: {
 
   if (
     params.limits.supportsTaskCancel !== undefined &&
-    params.limits.supportsTaskCancel !== params.platformBaseline.supportsTaskCancel
+    params.limits.supportsTaskCancel !==
+      params.platformBaseline.supportsTaskCancel
   ) {
-    result = { ...result, supportsTaskCancel: params.limits.supportsTaskCancel };
+    result = {
+      ...result,
+      supportsTaskCancel: params.limits.supportsTaskCancel,
+    };
   }
 
   if (
@@ -408,27 +413,41 @@ export function normalizeCapabilityLimitsForSave(params: {
     params.limits.maxReferenceImages !==
       params.platformBaseline.maxReferenceImages
   ) {
-    result = { ...result, maxReferenceImages: params.limits.maxReferenceImages };
+    result = {
+      ...result,
+      maxReferenceImages: params.limits.maxReferenceImages,
+    };
   }
 
   if (
     params.limits.maxReferenceVideos !== undefined &&
-    params.limits.maxReferenceVideos !== params.platformBaseline.maxReferenceVideos
+    params.limits.maxReferenceVideos !==
+      params.platformBaseline.maxReferenceVideos
   ) {
-    result = { ...result, maxReferenceVideos: params.limits.maxReferenceVideos };
+    result = {
+      ...result,
+      maxReferenceVideos: params.limits.maxReferenceVideos,
+    };
   }
 
   if (
     params.limits.maxReferenceAudios !== undefined &&
-    params.limits.maxReferenceAudios !== params.platformBaseline.maxReferenceAudios
+    params.limits.maxReferenceAudios !==
+      params.platformBaseline.maxReferenceAudios
   ) {
-    result = { ...result, maxReferenceAudios: params.limits.maxReferenceAudios };
+    result = {
+      ...result,
+      maxReferenceAudios: params.limits.maxReferenceAudios,
+    };
   }
 
   const priceEstimateDiscountFold = readVideoPricePromoFold(
     params.limits.priceEstimateDiscountFold
   );
-  if (params.priceEstimateEnabled !== false && priceEstimateDiscountFold !== undefined) {
+  if (
+    params.priceEstimateEnabled !== false &&
+    priceEstimateDiscountFold !== undefined
+  ) {
     result = { ...result, priceEstimateDiscountFold };
   }
 
@@ -500,10 +519,7 @@ export function isCapabilityLimitsSubsetOfPlatform(params: {
   });
   const platformAllows = platformBaseline.supportsTaskCancel;
 
-  if (
-    params.capabilityLimits.supportsTaskCancel === true &&
-    !platformAllows
-  ) {
+  if (params.capabilityLimits.supportsTaskCancel === true && !platformAllows) {
     return false;
   }
 
@@ -567,7 +583,9 @@ export function isCapabilityLimitsSubsetOfPlatform(params: {
   }
 
   if (migrated.priceEstimateDiscountFold !== undefined) {
-    if (readVideoPricePromoFold(migrated.priceEstimateDiscountFold) === undefined) {
+    if (
+      readVideoPricePromoFold(migrated.priceEstimateDiscountFold) === undefined
+    ) {
       return false;
     }
   }

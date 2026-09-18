@@ -159,7 +159,10 @@ export function useGenerativeParamsEditor(
     [scheduleGenerativeDefaultCommit]
   );
 
-  const cancelPendingCommit = useCallback((): Record<string, unknown> | null => {
+  const cancelPendingCommit = useCallback((): Record<
+    string,
+    unknown
+  > | null => {
     if (nodeTimeoutRef.current !== null) {
       clearTimeout(nodeTimeoutRef.current);
       nodeTimeoutRef.current = null;

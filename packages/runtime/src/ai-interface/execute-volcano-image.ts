@@ -82,10 +82,7 @@ export async function executeVolcanoImageGeneration(params: {
     return { status: "failed", error: "Prompt is required" };
   }
 
-  if (
-    trimmedPrompt.length > 0 &&
-    trimmedPrompt.length > rules.promptMaxChars
-  ) {
+  if (trimmedPrompt.length > 0 && trimmedPrompt.length > rules.promptMaxChars) {
     return {
       status: "failed",
       error: `Prompt exceeds maximum length of ${rules.promptMaxChars} characters`,

@@ -32,7 +32,10 @@ function binding(
 describe("readModelSelectionRecord", () => {
   it("requires both model and interface id", () => {
     expect(
-      readModelSelectionRecord({ modelId: "gpt-image-1", interfaceId: "iface-a" })
+      readModelSelectionRecord({
+        modelId: "gpt-image-1",
+        interfaceId: "iface-a",
+      })
     ).toEqual({
       canonicalId: "gpt-image-1",
       interfaceId: "iface-a",
@@ -53,7 +56,10 @@ describe("resolveEffectiveGenerativeModel", () => {
     expect(
       resolveEffectiveGenerativeModel({
         nodeBinding: { canonicalId: "gpt-image-1", interfaceId: "iface-b" },
-        workflowDefault: { canonicalId: "doubao-seedream-5", interfaceId: "iface-a" },
+        workflowDefault: {
+          canonicalId: "doubao-seedream-5",
+          interfaceId: "iface-a",
+        },
         models,
       })
     ).toEqual({ model: models[1], source: "node" });
@@ -156,7 +162,9 @@ describe("resolveModelCardState", () => {
   });
 
   it("returns loading while models are loading", () => {
-    expect(resolveModelCardState(undefined, true)).toEqual({ status: "loading" });
+    expect(resolveModelCardState(undefined, true)).toEqual({
+      status: "loading",
+    });
   });
 });
 
@@ -214,10 +222,14 @@ describe("persistModelBindingToInputs", () => {
 describe("persistGenerativeBindingWithParams", () => {
   it("writes model binding and params together", () => {
     expect(
-      persistGenerativeBindingWithParams([], {
-        canonicalId: "gpt-image-1",
-        interfaceId: "iface-a",
-      }, { ratio: "16:9" })
+      persistGenerativeBindingWithParams(
+        [],
+        {
+          canonicalId: "gpt-image-1",
+          interfaceId: "iface-a",
+        },
+        { ratio: "16:9" }
+      )
     ).toEqual([
       {
         id: "model",

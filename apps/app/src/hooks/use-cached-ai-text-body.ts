@@ -1,7 +1,4 @@
-import {
-  getResourceIdFromValue,
-  isResourceIdReference,
-} from "@dafthunk/types";
+import { getResourceIdFromValue, isResourceIdReference } from "@dafthunk/types";
 import { useEffect, useRef, useState } from "react";
 import { useParams } from "react-router";
 

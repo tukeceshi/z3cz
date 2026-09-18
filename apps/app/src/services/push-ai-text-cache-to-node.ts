@@ -5,7 +5,10 @@ import {
   type WorkflowMediaValue,
 } from "@dafthunk/types";
 
-import { isAiTextGenerating, readAiTextResultHistory } from "@/components/workflow/ai-text-node-utils";
+import {
+  isAiTextGenerating,
+  readAiTextResultHistory,
+} from "@/components/workflow/ai-text-node-utils";
 import { readAiTextResultReference } from "@/components/workflow/ai-text-persist-utils";
 import {
   withAiTextStagingDisplayState,
@@ -126,8 +129,7 @@ export function pushWorkflowAiTextCacheInBackground(params: {
       workflowId: params.workflowId,
       reference: item.reference,
       workflowSha,
-      onDisplayState: (state) =>
-        params.applyDisplayState?.(item.nodeId, state),
+      onDisplayState: (state) => params.applyDisplayState?.(item.nodeId, state),
     }).catch(() => {
       params.applyDisplayState?.(item.nodeId, "failed");
     });

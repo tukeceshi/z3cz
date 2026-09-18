@@ -148,9 +148,7 @@ export async function resolveResourceDisplayUrl(params: {
   }
 
   const set = await resolveMediaDisplayUrlSet(params);
-  const local = params.size
-    ? pickMediaDisplayUrl(set, params.size)
-    : set.full;
+  const local = params.size ? pickMediaDisplayUrl(set, params.size) : set.full;
   if (local) return local;
 
   const nodeType = params.nodeType ?? inferMediaNodeType(params.media);

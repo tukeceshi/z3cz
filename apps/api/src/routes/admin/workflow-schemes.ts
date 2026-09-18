@@ -7,10 +7,7 @@ import type {
   WorkflowTrigger,
 } from "@dafthunk/types";
 import { WORKFLOW_SCHEME_OMNIPOTENT_ID } from "@dafthunk/types";
-import {
-  ALL_WORKFLOW_RUNTIMES,
-  ALL_WORKFLOW_TRIGGERS,
-} from "@dafthunk/types";
+import { ALL_WORKFLOW_RUNTIMES, ALL_WORKFLOW_TRIGGERS } from "@dafthunk/types";
 import { zValidator } from "@hono/zod-validator";
 import { Hono } from "hono";
 import { z } from "zod";
@@ -47,7 +44,10 @@ const createSchemeSchema = z.object({
     .trim()
     .min(2)
     .max(64)
-    .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, "Use lowercase letters, numbers, and hyphens"),
+    .regex(
+      /^[a-z0-9]+(?:-[a-z0-9]+)*$/,
+      "Use lowercase letters, numbers, and hyphens"
+    ),
   name: z.string().trim().min(1).max(120),
   description: z.string().trim().max(500).nullable().optional(),
   icon: z.string().trim().max(64).nullable().optional(),
@@ -121,7 +121,9 @@ adminWorkflowSchemeRoutes.post(
       return c.json({ scheme }, 201);
     } catch (error) {
       const message =
-        error instanceof Error ? error.message : "Failed to create workflow scheme";
+        error instanceof Error
+          ? error.message
+          : "Failed to create workflow scheme";
       console.error("Error creating workflow scheme:", error);
       return c.json({ error: message }, 400);
     }
@@ -151,7 +153,9 @@ adminWorkflowSchemeRoutes.patch(
       return c.json({ scheme });
     } catch (error) {
       const message =
-        error instanceof Error ? error.message : "Failed to update workflow scheme";
+        error instanceof Error
+          ? error.message
+          : "Failed to update workflow scheme";
       console.error("Error updating workflow scheme:", error);
       const status = message === "Scheme not found" ? 404 : 400;
       return c.json({ error: message }, status);
@@ -168,7 +172,9 @@ adminWorkflowSchemeRoutes.delete("/:id", async (c) => {
     return c.json({ success: true });
   } catch (error) {
     const message =
-      error instanceof Error ? error.message : "Failed to delete workflow scheme";
+      error instanceof Error
+        ? error.message
+        : "Failed to delete workflow scheme";
     console.error("Error deleting workflow scheme:", error);
     const status = message === "Scheme not found" ? 404 : 400;
     return c.json({ error: message }, status);

@@ -16,7 +16,10 @@ import { submitVideoEnhance } from "@/services/platform-ai-model-service";
 import { persistMediaForNodeInBackground } from "@/services/ensure-resource-cached";
 import { tryClaimGenerativeJobFinalize } from "@/services/generative-cloud-job-resume-registry";
 import { useCloudStorageCanvasContext } from "@/components/workflow/cloud-storage-canvas-provider";
-import { useGenerativeCloudJobProgress, generativeVideoProgressButtonKey } from "@/hooks/use-generative-cloud-job";
+import {
+  useGenerativeCloudJobProgress,
+  generativeVideoProgressButtonKey,
+} from "@/hooks/use-generative-cloud-job";
 import type { PersistGenerativeMediaPhase } from "@/services/persist-generative-media-from-url";
 
 import { GenerativeConfigPanelShell } from "./generative-config-panel-shell";
@@ -72,10 +75,8 @@ export function AiVideoEnhanceConfigPanel({
   const { configured: cloudConfigured } = useCloudStorageCanvasContext();
 
   const aiInterfaceId = getInputString(data, "ai_interface_id");
-  const {
-    interfaceId: mediaKitInterfaceId,
-    config: mediaKitConfig,
-  } = useOrgVolcanoMediaKitConfig(orgId);
+  const { interfaceId: mediaKitInterfaceId, config: mediaKitConfig } =
+    useOrgVolcanoMediaKitConfig(orgId);
 
   const parsedConfig = useMemo(
     () => parseVideoEnhanceNodeConfig(data.metadata),
@@ -86,9 +87,8 @@ export function AiVideoEnhanceConfigPanel({
     parsedConfig
   );
   const [isGenerating, setIsGenerating] = useState(false);
-  const [persistPhase, setPersistPhase] = useState<PersistGenerativeMediaPhase | null>(
-    null
-  );
+  const [persistPhase, setPersistPhase] =
+    useState<PersistGenerativeMediaPhase | null>(null);
   const [progressNowMs, setProgressNowMs] = useState(() => Date.now());
   const generateInFlightRef = useRef(false);
   const autoSubmitAttemptedRef = useRef(false);
@@ -224,7 +224,10 @@ export function AiVideoEnhanceConfigPanel({
 
       if (response.workflowNodeContent && updateNodeData) {
         updateNodeData(nodeId, (current) => ({
-          ...applyWorkflowNodeContentPatch(current, response.workflowNodeContent!),
+          ...applyWorkflowNodeContentPatch(
+            current,
+            response.workflowNodeContent!
+          ),
           metadata: withGenerativeProgress(
             withAiVideoGeneratingFlag(current.metadata, true),
             { jobId: response.jobId, phase: "generating" }
@@ -236,16 +239,16 @@ export function AiVideoEnhanceConfigPanel({
         const resolvedJob = await resolveJobMedia(response.jobId);
         if (!resolvedJob.owned) {
           if (resolvedJob.media.length === 0) {
-            throw new Error(
-              t("workflow.videoEnhance.submitFailed")
-            );
+            throw new Error(t("workflow.videoEnhance.submitFailed"));
           }
           setPersistPhase(null);
           clearProgress();
           return;
         }
         if (resolvedJob.media.length === 0) {
-          throw new Error("Video enhance succeeded without a playable reference");
+          throw new Error(
+            "Video enhance succeeded without a playable reference"
+          );
         }
 
         const canWriteHistory = tryClaimGenerativeJobFinalize(response.jobId);
@@ -306,7 +309,9 @@ export function AiVideoEnhanceConfigPanel({
       }
     } catch (error) {
       toast.errorRaw(
-        error instanceof Error ? error.message : t("workflow.videoEnhance.submitFailed")
+        error instanceof Error
+          ? error.message
+          : t("workflow.videoEnhance.submitFailed")
       );
       if (updateNodeData) {
         updateNodeData(nodeId, (current) => ({

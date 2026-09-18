@@ -52,13 +52,17 @@ export function DeleteAiInterfaceDialog({
     }
   };
 
-  const isVolcano = iface ? isVolcanoAiInterfaceProvider(iface.provider) : false;
+  const isVolcano = iface
+    ? isVolcanoAiInterfaceProvider(iface.provider)
+    : false;
 
   return (
     <AlertDialog open={open} onOpenChange={onOpenChange}>
       <AlertDialogContent>
         <AlertDialogHeader>
-          <AlertDialogTitle>{t("pages.aiInterfaces.deleteTitle")}</AlertDialogTitle>
+          <AlertDialogTitle>
+            {t("pages.aiInterfaces.deleteTitle")}
+          </AlertDialogTitle>
           <AlertDialogDescription asChild>
             <div className="space-y-2 text-sm text-muted-foreground">
               <p>

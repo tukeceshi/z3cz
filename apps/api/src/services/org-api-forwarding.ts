@@ -62,7 +62,10 @@ async function fetchViaForwardWorker(
     ...(init?.body ? { duplex: "half" } : {}),
   } as RequestInit;
 
-  return fetch(`http://${host}:${PERSIST_WORKER_FORWARD_PORT}/forward`, requestInit);
+  return fetch(
+    `http://${host}:${PERSIST_WORKER_FORWARD_PORT}/forward`,
+    requestInit
+  );
 }
 
 export async function createOrgApiForwardFetch(params: {

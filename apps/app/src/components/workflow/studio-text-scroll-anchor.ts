@@ -9,14 +9,19 @@ export function captureStudioTextScrollRestore(
 ): StudioTextScrollRestore {
   const containerTop = container.getBoundingClientRect().top;
   const fallbackScrollTop = container.scrollTop;
-  const anchors = [...container.querySelectorAll("[data-studio-scroll-anchor]")];
+  const anchors = [
+    ...container.querySelectorAll("[data-studio-scroll-anchor]"),
+  ];
 
   const visibleAnchor = anchors.find((element) => {
     if (!(element instanceof HTMLElement)) {
       return false;
     }
     const rect = element.getBoundingClientRect();
-    return rect.bottom > containerTop + 1 && rect.top < containerTop + container.clientHeight;
+    return (
+      rect.bottom > containerTop + 1 &&
+      rect.top < containerTop + container.clientHeight
+    );
   });
 
   if (visibleAnchor instanceof HTMLElement) {

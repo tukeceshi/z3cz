@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 
-import { generationModeToNodeType, parseGenerationMode } from "./agent-canvas-connect";
+import {
+  generationModeToNodeType,
+  parseGenerationMode,
+} from "./agent-canvas-connect";
 
 describe("generationModeToNodeType", () => {
   it("maps the four generation modes", () => {

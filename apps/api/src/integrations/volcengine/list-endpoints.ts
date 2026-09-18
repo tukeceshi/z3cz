@@ -64,9 +64,7 @@ export async function listVolcanoEndpointIds(
     }
 
     collected.push(
-      ...items
-        .map(readEndpointId)
-        .filter((id): id is string => id !== null)
+      ...items.map(readEndpointId).filter((id): id is string => id !== null)
     );
 
     const total = result.TotalCount ?? result.totalCount;

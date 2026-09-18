@@ -90,7 +90,9 @@ export function AdminApiForwardingCreateDialog(
       await props.onCreated();
     } catch (error) {
       toast.error(
-        error instanceof Error ? error.message : t("adminApiForwarding.createError")
+        error instanceof Error
+          ? error.message
+          : t("adminApiForwarding.createError")
       );
     } finally {
       setIsCreating(false);
@@ -122,7 +124,9 @@ export function AdminApiForwardingCreateDialog(
               </h3>
               <div className="grid gap-4 md:grid-cols-2">
                 <div className="space-y-1">
-                  <Label htmlFor="template_create_name">{t("common.name")}</Label>
+                  <Label htmlFor="template_create_name">
+                    {t("common.name")}
+                  </Label>
                   <Input
                     id="template_create_name"
                     value={form.name}

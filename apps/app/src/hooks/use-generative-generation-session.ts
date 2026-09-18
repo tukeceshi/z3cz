@@ -135,41 +135,41 @@ export function useGenerativeGenerationSession(
     [finalizeLocalCancel, options]
   );
 
-  const flushDeferredCancelIfPending = useCallback(async (): Promise<
-    GenerativeGenerationCancelResult | null
-  > => {
-    if (!cancelPendingRef.current) {
-      return null;
-    }
+  const flushDeferredCancelIfPending =
+    useCallback(async (): Promise<GenerativeGenerationCancelResult | null> => {
+      if (!cancelPendingRef.current) {
+        return null;
+      }
 
-    const jobId =
-      jobIdRef.current ?? readGenerativeProgressJobId(options.metadata);
-    if (!jobId) {
-      return null;
-    }
+      const jobId =
+        jobIdRef.current ?? readGenerativeProgressJobId(options.metadata);
+      if (!jobId) {
+        return null;
+      }
 
-    return executeCancel(jobId);
-  }, [executeCancel, options.metadata]);
+      return executeCancel(jobId);
+    }, [executeCancel, options.metadata]);
 
-  const cancel = useCallback(async (): Promise<GenerativeGenerationCancelResult> => {
-    const jobId =
-      jobIdRef.current ?? readGenerativeProgressJobId(options.metadata);
-    const clientRequestId = clientRequestIdRef.current;
+  const cancel =
+    useCallback(async (): Promise<GenerativeGenerationCancelResult> => {
+      const jobId =
+        jobIdRef.current ?? readGenerativeProgressJobId(options.metadata);
+      const clientRequestId = clientRequestIdRef.current;
 
-    if (!options.orgId || (!jobId && !clientRequestId)) {
-      throw new GenerativeGenerationCancelRejectedError(
-        "No active generation job to cancel"
-      );
-    }
+      if (!options.orgId || (!jobId && !clientRequestId)) {
+        throw new GenerativeGenerationCancelRejectedError(
+          "No active generation job to cancel"
+        );
+      }
 
-    if (!jobId) {
-      cancelPendingRef.current = true;
-      setCancelPending(true);
-      return { kind: "pending" };
-    }
+      if (!jobId) {
+        cancelPendingRef.current = true;
+        setCancelPending(true);
+        return { kind: "pending" };
+      }
 
-    return executeCancel(jobId);
-  }, [executeCancel, options.metadata, options.orgId]);
+      return executeCancel(jobId);
+    }, [executeCancel, options.metadata, options.orgId]);
 
   useEffect(() => {
     registerGenerativeGenerationCancel(options.nodeId, () => {
@@ -184,8 +184,7 @@ export function useGenerativeGenerationSession(
 
   const readCancelled = useCallback(() => {
     return (
-      cancelConfirmedRef.current ||
-      (abortRef.current?.signal.aborted ?? false)
+      cancelConfirmedRef.current || (abortRef.current?.signal.aborted ?? false)
     );
   }, []);
 

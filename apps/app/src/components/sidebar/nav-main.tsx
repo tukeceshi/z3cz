@@ -92,9 +92,7 @@ export function NavMain({ groups, footerItems }: NavMainProps) {
           <SidebarGroup
             key={group.label || index}
             className="bg-transparent p-0"
-            data-tour={
-              group.tourId ? `${group.tourId}-nav-group` : undefined
-            }
+            data-tour={group.tourId ? `${group.tourId}-nav-group` : undefined}
           >
             {group.label && (
               <SidebarGroupLabel className="text-xs text-neutral-500 dark:text-neutral-400 px-2">

@@ -3,18 +3,16 @@ import { AsyncLocalStorage } from "node:async_hooks";
 const RESPONSE_EXCERPT_MAX = 2048;
 const BASE64_REDACT_MIN_CHARS = 256;
 
-export interface UpstreamRequestLogSink {
-  (record: {
-    readonly method: string;
-    readonly url: string;
-    readonly httpStatus: number | null;
-    readonly durationMs: number | null;
-    readonly upstreamRequestId: string | null;
-    readonly requestBody: Record<string, unknown> | null;
-    readonly responseExcerpt: string | null;
-    readonly error: string | null;
-  }): void | Promise<void>;
-}
+export type UpstreamRequestLogSink = (record: {
+  readonly method: string;
+  readonly url: string;
+  readonly httpStatus: number | null;
+  readonly durationMs: number | null;
+  readonly upstreamRequestId: string | null;
+  readonly requestBody: Record<string, unknown> | null;
+  readonly responseExcerpt: string | null;
+  readonly error: string | null;
+}) => void | Promise<void>;
 
 /** Strip query/hash so signed URLs are not persisted. */
 export function redactMediaUrl(raw: string): string {
@@ -52,7 +50,9 @@ export function redactJsonValue(value: unknown): unknown {
   }
   if (value && typeof value === "object") {
     const out: Record<string, unknown> = {};
-    for (const [key, entry] of Object.entries(value as Record<string, unknown>)) {
+    for (const [key, entry] of Object.entries(
+      value as Record<string, unknown>
+    )) {
       const lower = key.toLowerCase();
       if (
         lower === "authorization" ||
@@ -139,10 +139,7 @@ export function runWithUpstreamFetch<T>(
   return upstreamFetchStore.run(fetchImpl, fn);
 }
 
-function callUpstreamFetch(
-  url: string,
-  init?: RequestInit
-): Promise<Response> {
+function callUpstreamFetch(url: string, init?: RequestInit): Promise<Response> {
   const impl = upstreamFetchStore.getStore();
   return (impl ?? fetch)(url, init);
 }

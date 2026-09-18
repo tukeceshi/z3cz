@@ -50,7 +50,11 @@ describe("studio-reference-drag", () => {
     const dataTransfer = {
       types: [] as string[],
       store: "",
-      setData(this: { types: string[]; store: string }, type: string, value: string) {
+      setData(
+        this: { types: string[]; store: string },
+        type: string,
+        value: string
+      ) {
         this.types = [type];
         this.store = value;
       },
@@ -78,9 +82,11 @@ describe("studio-reference-drag", () => {
 
     setStudioReferenceDragSession({ nodeId: "b", outputId: "images" });
 
-    expect(resolveStudioReferenceDragPayloadFromTransfer(dataTransfer)).toEqual({
-      nodeId: "b",
-      outputId: "images",
-    });
+    expect(resolveStudioReferenceDragPayloadFromTransfer(dataTransfer)).toEqual(
+      {
+        nodeId: "b",
+        outputId: "images",
+      }
+    );
   });
 });

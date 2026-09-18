@@ -1,6 +1,9 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { clearAiTextDisplaysForTests, getAiTextDisplay } from "./ai-text-display-registry";
+import {
+  clearAiTextDisplaysForTests,
+  getAiTextDisplay,
+} from "./ai-text-display-registry";
 
 const ensureAiTextCached = vi.fn();
 const readAiTextContent = vi.fn();
@@ -62,7 +65,9 @@ describe("ai-text-cache-layer", () => {
     ensureAiTextCached.mockResolvedValue(true);
     readAiTextContent.mockResolvedValue("| 镜头｜时间线 |\n| --- | --- |");
 
-    const { readAiTextFullBodyFromStaging } = await import("./ai-text-cache-layer");
+    const { readAiTextFullBodyFromStaging } = await import(
+      "./ai-text-cache-layer"
+    );
     await expect(
       readAiTextFullBodyFromStaging({
         organizationId: "org",

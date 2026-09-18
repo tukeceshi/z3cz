@@ -1,4 +1,7 @@
-import type { AiGenerativeNodeType, PatchNodeLayoutMetadata } from "@dafthunk/types";
+import type {
+  AiGenerativeNodeType,
+  PatchNodeLayoutMetadata,
+} from "@dafthunk/types";
 import { useCallback, useRef, useState, type DragEvent } from "react";
 
 import { useAuth } from "@/components/auth-context";
@@ -7,9 +10,18 @@ import { useAppToast } from "@/hooks/use-app-toast";
 import { stageGenerativeCardUpload } from "@/services/stage-generative-media";
 import { warmCardUploadPersist } from "@/services/generative-card-upload-persist";
 
-import { withAiAudioGenerateError, withAiAudioManualUpload } from "./ai-audio-node-utils";
-import { withAiImageGenerateError, withAiImageManualUpload } from "./ai-image-node-utils";
-import { withAiVideoGenerateError, withAiVideoManualUpload } from "./ai-video-node-utils";
+import {
+  withAiAudioGenerateError,
+  withAiAudioManualUpload,
+} from "./ai-audio-node-utils";
+import {
+  withAiImageGenerateError,
+  withAiImageManualUpload,
+} from "./ai-image-node-utils";
+import {
+  withAiVideoGenerateError,
+  withAiVideoManualUpload,
+} from "./ai-video-node-utils";
 import { useCloudStorageCanvasContext } from "./cloud-storage-canvas-provider";
 import { useCreativeStudio } from "./creative-studio-context";
 import {
@@ -42,7 +54,9 @@ interface GenerativeDropUploadParams {
   readonly workflowId: string | undefined;
   readonly cloudConfigured: boolean;
   readonly patchNodeLayout?: PatchNodeLayoutMetadata;
-  readonly updateNodeData: NonNullable<ReturnType<typeof useWorkflow>["updateNodeData"]>;
+  readonly updateNodeData: NonNullable<
+    ReturnType<typeof useWorkflow>["updateNodeData"]
+  >;
   readonly t: ReturnType<typeof useTranslation>["t"];
   readonly toast: ReturnType<typeof useAppToast>;
 }
@@ -157,8 +171,13 @@ function startCanvasDropUploads(params: {
   readonly nodeIds: readonly string[];
   readonly drops: readonly GenerativeStudioDropFile[];
   readonly cardSizes: readonly MediaCardSize[];
-  readonly upload: Omit<GenerativeDropUploadParams, "nodeId" | "drop" | "patchNodeLayout">;
-  readonly updateNodeData: NonNullable<ReturnType<typeof useWorkflow>["updateNodeData"]>;
+  readonly upload: Omit<
+    GenerativeDropUploadParams,
+    "nodeId" | "drop" | "patchNodeLayout"
+  >;
+  readonly updateNodeData: NonNullable<
+    ReturnType<typeof useWorkflow>["updateNodeData"]
+  >;
 }): void {
   params.nodeIds.forEach((nodeId, index) => {
     const drop = params.drops[index];
@@ -170,7 +189,10 @@ function startCanvasDropUploads(params: {
     startGenerativeDropUpload({
       nodeId,
       drop,
-      patchNodeLayout: createPatchNodeLayoutMetadata(nodeId, params.updateNodeData),
+      patchNodeLayout: createPatchNodeLayoutMetadata(
+        nodeId,
+        params.updateNodeData
+      ),
       ...params.upload,
     });
   });
@@ -178,7 +200,8 @@ function startCanvasDropUploads(params: {
 
 function isCanvasFileDrag(dataTransfer: DataTransfer): boolean {
   return (
-    dataTransfer.types.includes("Files") && !hasStudioReferenceDrag(dataTransfer)
+    dataTransfer.types.includes("Files") &&
+    !hasStudioReferenceDrag(dataTransfer)
   );
 }
 
@@ -206,9 +229,8 @@ export function useCanvasGenerativeFileDrop(params: {
     useCloudStorageCanvasContext();
   const { workflowId } = useCreativeStudio();
   const orgId = organization?.id;
-  const [fileDropPreview, setFileDropPreview] = useState<CanvasFileDropPreviewState>(
-    CANVAS_FILE_DROP_PREVIEW_IDLE
-  );
+  const [fileDropPreview, setFileDropPreview] =
+    useState<CanvasFileDropPreviewState>(CANVAS_FILE_DROP_PREVIEW_IDLE);
   const [isDropping, setIsDropping] = useState(false);
   const dropSelectGenerationRef = useRef(0);
 
@@ -322,7 +344,10 @@ export function useCanvasGenerativeFileDrop(params: {
           }
           batchItems.push({
             nodeType: drop.nodeType as AiGenerativeNodeType,
-            positionFlowPoint: resolveCanvasFileDropNodePosition(center, cardSize),
+            positionFlowPoint: resolveCanvasFileDropNodePosition(
+              center,
+              cardSize
+            ),
             layout: cardSize,
             manualContent: true,
           });
@@ -466,7 +491,12 @@ export function useStudioGenerativeFileDrop() {
 
   const handleFileDrop = useCallback(
     async (fileList: FileList | null) => {
-      if (uploading || blocksGenerativeMedia || !addGenerativeNode || !fileList?.length) {
+      if (
+        uploading ||
+        blocksGenerativeMedia ||
+        !addGenerativeNode ||
+        !fileList?.length
+      ) {
         return;
       }
 

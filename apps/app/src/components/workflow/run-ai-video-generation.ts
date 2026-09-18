@@ -81,7 +81,9 @@ export async function pollUntilVideoReady(params: {
           patchNodeLayout: params.patchNodeLayout,
         });
       }
-      throw new Error("Video generation succeeded without a playable reference");
+      throw new Error(
+        "Video generation succeeded without a playable reference"
+      );
     }
     if (result.status === "cancelled") {
       throw new GenerativeGenerationCancelledError();
@@ -105,7 +107,10 @@ export async function waitForAiVideoJobFinalMedia(params: {
   readonly shouldAbort?: () => boolean;
 }): Promise<ResolveAiVideoJobMediaResult> {
   while (true) {
-    const response = await getGenerationJob(params.organizationId, params.jobId);
+    const response = await getGenerationJob(
+      params.organizationId,
+      params.jobId
+    );
     if (response.job.status === "succeeded") {
       return {
         media: response.finalMedia ?? [],
@@ -206,10 +211,14 @@ export async function runAiVideoGeneration(
     throw new GenerativeGenerationCancelledError();
   }
   if (afterSubmit?.completedJobId) {
-    const resolvedJob = await params.resolveJobMedia(afterSubmit.completedJobId);
+    const resolvedJob = await params.resolveJobMedia(
+      afterSubmit.completedJobId
+    );
     const video = (resolvedJob.media[0] as MediaReference | undefined) ?? null;
     if (!video) {
-      throw new Error("Video generation succeeded without a playable reference");
+      throw new Error(
+        "Video generation succeeded without a playable reference"
+      );
     }
     return {
       video,
@@ -224,7 +233,9 @@ export async function runAiVideoGeneration(
     const resolvedJob = await params.resolveJobMedia(submitResponse.jobId);
     const video = (resolvedJob.media[0] as MediaReference | undefined) ?? null;
     if (!video) {
-      throw new Error("Video generation succeeded without a playable reference");
+      throw new Error(
+        "Video generation succeeded without a playable reference"
+      );
     }
     return {
       video,

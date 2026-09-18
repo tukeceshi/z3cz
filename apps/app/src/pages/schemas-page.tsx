@@ -182,8 +182,10 @@ function SchemasPageContent() {
 
   const { deleteDialog, openDeleteDialog } = useSchemaActions();
 
-  const columns = createColumns(openDeleteDialog, (schema) =>
-    setEditSchema(schema), t
+  const columns = createColumns(
+    openDeleteDialog,
+    (schema) => setEditSchema(schema),
+    t
   );
 
   useEffect(() => {

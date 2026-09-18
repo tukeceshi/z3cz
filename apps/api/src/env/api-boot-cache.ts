@@ -117,7 +117,9 @@ export function shouldSkipDatabaseMigrations(): boolean {
   }
   const stamp = readBootStamp();
   if (stamp?.migrationJournalHash === getMigrationJournalHash()) {
-    console.log("[api] Skipping database migrations (boot stamp matches journal).");
+    console.log(
+      "[api] Skipping database migrations (boot stamp matches journal)."
+    );
     return true;
   }
   console.log(

@@ -8,8 +8,6 @@ import {
   type WorkflowMediaValue,
 } from "@dafthunk/types";
 
-
-
 import { executeVolcanoImageGeneration } from "../../ai-interface/execute-volcano-image";
 
 import type { NodeContext } from "../../node-types";
@@ -21,13 +19,9 @@ import {
   resolveModelInterfaceIdFromInputs,
 } from "./resolve-model-interface-id";
 
-
-
 export const AI_IMAGE_NODE_TYPE = "ai-image" as const;
 
 export const AI_IMAGE_REFERENCE_INPUT = "reference_images" as const;
-
-
 
 /**
 
@@ -36,9 +30,7 @@ export const AI_IMAGE_REFERENCE_INPUT = "reference_images" as const;
  */
 
 export class AiImageNode extends ExecutableNode {
-
   public static readonly nodeType: NodeType = {
-
     id: "ai-image",
 
     name: "Image",
@@ -46,7 +38,6 @@ export class AiImageNode extends ExecutableNode {
     type: "ai-image",
 
     description:
-
       "Generate images using an AI model configured via your organization's AI interfaces.",
 
     documentation: `Generates images using the organization's configured Volcano AI interface.
@@ -80,9 +71,7 @@ export class AiImageNode extends ExecutableNode {
     usage: 10,
 
     inputs: [
-
       {
-
         name: "ai_interface_id",
 
         type: "string",
@@ -92,11 +81,9 @@ export class AiImageNode extends ExecutableNode {
         required: false,
 
         hidden: true,
-
       },
 
       {
-
         name: "model",
 
         type: "string",
@@ -106,11 +93,9 @@ export class AiImageNode extends ExecutableNode {
         required: false,
 
         hidden: true,
-
       },
 
       {
-
         name: "prompt",
 
         type: "string",
@@ -120,11 +105,9 @@ export class AiImageNode extends ExecutableNode {
         required: false,
 
         hidden: true,
-
       },
 
       {
-
         name: "params",
 
         type: "json",
@@ -134,11 +117,9 @@ export class AiImageNode extends ExecutableNode {
         required: false,
 
         hidden: true,
-
       },
 
       {
-
         name: AI_IMAGE_REFERENCE_INPUT,
 
         type: "image",
@@ -150,31 +131,24 @@ export class AiImageNode extends ExecutableNode {
         hidden: true,
 
         repeated: true,
-
       },
 
       {
-
         name: "manual_images",
 
         type: "json",
 
         description:
-
           "JSON array of ObjectReferences to return directly, bypassing generation.",
 
         required: false,
 
         hidden: true,
-
       },
-
     ],
 
     outputs: [
-
       {
-
         name: "images",
 
         type: "image",
@@ -184,102 +158,66 @@ export class AiImageNode extends ExecutableNode {
         description: "Generated images.",
 
         hidden: true,
-
       },
-
     ],
-
   };
 
-
-
-  public async execute(context: NodeContext): Promise<import("@dafthunk/types").NodeExecution> {
-
+  public async execute(
+    context: NodeContext
+  ): Promise<import("@dafthunk/types").NodeExecution> {
     const manualImages = context.inputs.manual_images;
 
     if (Array.isArray(manualImages) && manualImages.length > 0) {
-
       const refs = manualImages.filter(
-
-        (value): value is ObjectReference | MediaReference | ResourceIdReference =>
-
+        (
+          value
+        ): value is ObjectReference | MediaReference | ResourceIdReference =>
           isObjectReference(value) ||
           isEphemeralMediaReference(value) ||
           isResourceIdReference(value)
-
       );
 
       if (refs.length > 0) {
-
         return this.createSuccessResult({ images: refs });
-
       }
-
     }
 
-
-
     const prompt =
-
       typeof context.inputs.prompt === "string" ? context.inputs.prompt : "";
 
     const referenceValues = context.inputs[AI_IMAGE_REFERENCE_INPUT];
 
-    const referenceRefs: Array<MediaReference | ResourceIdReference> = Array.isArray(referenceValues)
-
-      ? referenceValues.filter(
-
-          (value): value is MediaReference | ResourceIdReference =>
-
-            isObjectReference(value) ||
-            isEphemeralMediaReference(value) ||
-            isResourceIdReference(value)
-
-        )
-
-      : isObjectReference(referenceValues) ||
-
-          isEphemeralMediaReference(referenceValues) ||
-
-          isResourceIdReference(referenceValues)
-
-        ? [referenceValues]
-
-        : [];
+    const referenceRefs: Array<MediaReference | ResourceIdReference> =
+      Array.isArray(referenceValues)
+        ? referenceValues.filter(
+            (value): value is MediaReference | ResourceIdReference =>
+              isObjectReference(value) ||
+              isEphemeralMediaReference(value) ||
+              isResourceIdReference(value)
+          )
+        : isObjectReference(referenceValues) ||
+            isEphemeralMediaReference(referenceValues) ||
+            isResourceIdReference(referenceValues)
+          ? [referenceValues]
+          : [];
 
     const hasPrompt = prompt.trim().length > 0;
 
     if (!hasPrompt && referenceRefs.length === 0) {
-
       return this.createErrorResult("A prompt or reference image is required.");
-
     }
-
-
 
     if (!context.resolveAiInterface) {
-
       return this.createErrorResult(
-
         "No AI interface configured. Please set up an AI interface in your organization settings."
-
       );
-
     }
 
-
-
     const modelCanonicalId =
-
       typeof context.inputs.model === "string" &&
-
       context.inputs.model.trim().length > 0
-
         ? context.inputs.model.trim()
-
         : undefined;
-
-
 
     if (!modelCanonicalId) {
       return this.createErrorResult("A model selection is required.");
@@ -296,16 +234,10 @@ export class AiImageNode extends ExecutableNode {
     }
 
     if (!context.resolveImageModel) {
-
       return this.createErrorResult(
-
         "Image model resolution is unavailable in this runtime."
-
       );
-
     }
-
-
 
     const resolvedModel = await context.resolveImageModel(
       modelCanonicalId,
@@ -313,38 +245,23 @@ export class AiImageNode extends ExecutableNode {
     );
 
     if (!resolvedModel) {
-
       return this.createErrorResult(
-
         `Model "${modelCanonicalId}" is not available for this organization.`
-
       );
-
     }
 
     const resolvedInterface = await context.resolveAiInterface({ interfaceId });
 
     if (!resolvedInterface) {
-
       return this.createErrorResult(
-
         "Could not resolve an AI interface. Please configure an AI interface in your organization settings."
-
       );
-
     }
 
-
-
     const generationParams =
-
       context.inputs.params && typeof context.inputs.params === "object"
-
         ? (context.inputs.params as Record<string, unknown>)
-
         : undefined;
-
-
 
     const referenceImageUrls: string[] = [];
 
@@ -353,12 +270,12 @@ export class AiImageNode extends ExecutableNode {
         referenceImageUrls.push(await resolveMediaInputUrl(context, ref));
       } catch (error) {
         return this.createErrorResult(
-          error instanceof Error ? error.message : "Failed to resolve reference image"
+          error instanceof Error
+            ? error.message
+            : "Failed to resolve reference image"
         );
       }
     }
-
-
 
     let storageResolution: Awaited<
       ReturnType<NonNullable<typeof context.resolveAiImageStorage>>
@@ -392,7 +309,6 @@ export class AiImageNode extends ExecutableNode {
     }
 
     const result = await executeVolcanoImageGeneration({
-
       apiKey: resolvedInterface.apiKey,
 
       baseUrl: resolvedInterface.baseUrl,
@@ -418,13 +334,9 @@ export class AiImageNode extends ExecutableNode {
       cloudUpload: storageResolution.cloudUpload,
 
       useFullSubmitUrl: resolvedInterface.useFullSubmitUrl,
-
     });
 
-
-
     if (result.status === "failed") {
-
       if (generationJobId && context.trackWorkflowGenerationJob) {
         await context.trackWorkflowGenerationJob.complete({
           organizationId: context.organizationId,
@@ -435,7 +347,6 @@ export class AiImageNode extends ExecutableNode {
       }
 
       return this.createErrorResult(result.error ?? "Image generation failed");
-
     }
 
     if (generationJobId && context.trackWorkflowGenerationJob) {
@@ -447,15 +358,9 @@ export class AiImageNode extends ExecutableNode {
     }
 
     return this.createSuccessResult(
-
       { images: result.images ?? [] },
 
       result.images?.length ?? 1
-
     );
-
   }
-
 }
-
-

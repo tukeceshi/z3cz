@@ -30,7 +30,9 @@ export function buildDefaultVolcanoModels(
   catalogEntries: readonly AiModelCatalogEntry[] = VOLCANO_AGGREGATE_MODEL_CATALOG
 ): Record<string, OrgModelInstanceConfig> {
   const catalog =
-    catalogEntries.length > 0 ? catalogEntries : VOLCANO_AGGREGATE_MODEL_CATALOG;
+    catalogEntries.length > 0
+      ? catalogEntries
+      : VOLCANO_AGGREGATE_MODEL_CATALOG;
   const enabledSet = new Set(
     enabledCanonicalIds ?? catalog.map((entry) => entry.canonicalId)
   );

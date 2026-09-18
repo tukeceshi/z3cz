@@ -1,9 +1,4 @@
-import {
-  useCallback,
-  useLayoutEffect,
-  useRef,
-  type RefObject,
-} from "react";
+import { useCallback, useLayoutEffect, useRef, type RefObject } from "react";
 
 import {
   isNearScrollBottom,
@@ -68,7 +63,10 @@ function resolveScrollPhase(params: {
   readonly holdTailAfterComplete: boolean;
   readonly variant: AiTextOutputScrollVariant;
 }): ScrollPhase {
-  if (params.streamStarted || (params.isGenerating && params.text.length === 0)) {
+  if (
+    params.streamStarted ||
+    (params.isGenerating && params.text.length === 0)
+  ) {
     return "stream-start";
   }
 

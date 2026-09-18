@@ -8,13 +8,17 @@ describe("parseVolcanoFoundationModelReference", () => {
       name: "glm-5-2",
       version: "260617",
     });
-    expect(parseVolcanoFoundationModelReference("deepseek-v4-flash-260425")).toEqual({
+    expect(
+      parseVolcanoFoundationModelReference("deepseek-v4-flash-260425")
+    ).toEqual({
       name: "deepseek-v4-flash",
       version: "260425",
     });
   });
 
   it("returns null for unsupported ids", () => {
-    expect(parseVolcanoFoundationModelReference("doubao-seed-evolving")).toBeNull();
+    expect(
+      parseVolcanoFoundationModelReference("doubao-seed-evolving")
+    ).toBeNull();
   });
 });

@@ -112,10 +112,7 @@ workflowFolderRoutes.patch(
     const data = c.req.valid("json");
     const db = createDatabase(c.env);
 
-    if (
-      data.coverObjectId !== undefined ||
-      data.coverMimeType !== undefined
-    ) {
+    if (data.coverObjectId !== undefined || data.coverMimeType !== undefined) {
       const hasCover =
         data.coverObjectId !== null && data.coverMimeType !== null;
       const clearingCover =

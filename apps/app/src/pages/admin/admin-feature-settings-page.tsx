@@ -141,10 +141,7 @@ export function AdminFeatureSettingsPage() {
         : entry.category === "docker_only");
 
     return (
-      <div
-        key={featureId}
-        className="rounded-lg border px-4 py-3 space-y-3"
-      >
+      <div key={featureId} className="rounded-lg border px-4 py-3 space-y-3">
         <div className="flex items-start justify-between gap-4">
           <div className="space-y-1">
             <div className="flex items-center gap-2">
@@ -196,23 +193,31 @@ export function AdminFeatureSettingsPage() {
     <InsetLayout title={t("featureSettings.title")}>
       <div className="mx-auto flex w-full max-w-3xl flex-col gap-6">
         <Alert>
-          <AlertDescription>{t("featureSettings.resourcesHint")}</AlertDescription>
+          <AlertDescription>
+            {t("featureSettings.resourcesHint")}
+          </AlertDescription>
         </Alert>
 
         <Card>
           <CardHeader>
             <CardTitle>{t("featureSettings.navTitle")}</CardTitle>
-            <CardDescription>{t("featureSettings.navDescription")}</CardDescription>
+            <CardDescription>
+              {t("featureSettings.navDescription")}
+            </CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
-            {RESOURCE_FEATURE_IDS.map((featureId) => renderFeatureRow(featureId))}
+            {RESOURCE_FEATURE_IDS.map((featureId) =>
+              renderFeatureRow(featureId)
+            )}
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader>
             <CardTitle>{t("featureSettings.schemeTitle")}</CardTitle>
-            <CardDescription>{t("featureSettings.schemeDescription")}</CardDescription>
+            <CardDescription>
+              {t("featureSettings.schemeDescription")}
+            </CardDescription>
           </CardHeader>
           <CardContent className="grid gap-2">
             <Label htmlFor="defaultScheme">
@@ -244,7 +249,9 @@ export function AdminFeatureSettingsPage() {
         <Card>
           <CardHeader>
             <CardTitle>{t("featureSettings.allNavTitle")}</CardTitle>
-            <CardDescription>{t("featureSettings.allNavDescription")}</CardDescription>
+            <CardDescription>
+              {t("featureSettings.allNavDescription")}
+            </CardDescription>
           </CardHeader>
           <CardContent className="space-y-2 text-sm text-muted-foreground">
             {RESOURCE_FEATURE_IDS.map((id) => (

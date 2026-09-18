@@ -54,19 +54,20 @@ export function GenerativeConfigPanelShell({
   children,
 }: GenerativeConfigPanelShellProps) {
   const { t } = useTranslation();
-  const [dropPreview, setDropPreview] = useState<StudioReferenceDropPreview | null>(
-    null
-  );
+  const [dropPreview, setDropPreview] =
+    useState<StudioReferenceDropPreview | null>(null);
 
   if (layout === "studio-dock") {
     const dropEnabled =
-      Boolean(onStudioReferenceDrop && previewStudioReferenceDrop) && !dropDisabled;
+      Boolean(onStudioReferenceDrop && previewStudioReferenceDrop) &&
+      !dropDisabled;
 
     const resolveDropPreview = (
       dataTransfer: DataTransfer
     ): StudioReferenceDropPreview | null => {
       if (!dropEnabled || !hasStudioReferenceDrag(dataTransfer)) return null;
-      const payload = resolveStudioReferenceDragPayloadFromTransfer(dataTransfer);
+      const payload =
+        resolveStudioReferenceDragPayloadFromTransfer(dataTransfer);
       if (!payload || !previewStudioReferenceDrop) return null;
       return previewStudioReferenceDrop(payload.nodeId, payload.outputId);
     };
@@ -224,7 +225,9 @@ export function GenerativeConfigPanelShell({
       }}
       onMouseDown={(event) => event.stopPropagation()}
     >
-      <div className="flex h-full min-h-0 flex-col overflow-y-auto px-3 pb-3 pt-2 thin-scrollbar">{children}</div>
+      <div className="flex h-full min-h-0 flex-col overflow-y-auto px-3 pb-3 pt-2 thin-scrollbar">
+        {children}
+      </div>
     </div>
   );
 }

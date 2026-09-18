@@ -1,7 +1,9 @@
 import { snapGenerativeContentBorderPoint } from "./generative-node-content-geometry";
 
 export function snapAiAudioPromptBorderPoint(node: {
-  readonly internals: { readonly positionAbsolute: { readonly x: number; readonly y: number } };
+  readonly internals: {
+    readonly positionAbsolute: { readonly x: number; readonly y: number };
+  };
   readonly measured?: { readonly width?: number; readonly height?: number };
   readonly width?: number;
   readonly height?: number;

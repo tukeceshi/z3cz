@@ -196,7 +196,9 @@ function StudioMediaMasonryList({
           focusId={node.id}
           isActive={isActive(node.id)}
           variant="media"
-          onNodeDoubleClick={() => listInteraction.onListNodeDoubleClick(node.id)}
+          onNodeDoubleClick={() =>
+            listInteraction.onListNodeDoubleClick(node.id)
+          }
         >
           <CreativeStudioNodeCard
             node={node}
@@ -324,8 +326,12 @@ export function CreativeStudioBoardTabs({
                 >
                   <CreativeStudioAudioTile
                     node={node}
-                    onOpenDetail={() => listInteraction.onListNodeClick(node.id)}
-                    onCancelPendingListClick={listInteraction.cancelPendingListClick}
+                    onOpenDetail={() =>
+                      listInteraction.onListNodeClick(node.id)
+                    }
+                    onCancelPendingListClick={
+                      listInteraction.cancelPendingListClick
+                    }
                     referenceDragEnabled={referenceDragEnabled}
                   />
                 </CreativeStudioListItem>

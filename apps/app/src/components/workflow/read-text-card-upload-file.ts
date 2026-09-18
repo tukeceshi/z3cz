@@ -41,7 +41,10 @@ async function readDocxMarkdown(file: File): Promise<string> {
 
 export async function readTextCardUploadFile(
   file: File
-): Promise<{ readonly ok: true; readonly text: string } | { readonly ok: false; readonly error: TextCardUploadReadError }> {
+): Promise<
+  | { readonly ok: true; readonly text: string }
+  | { readonly ok: false; readonly error: TextCardUploadReadError }
+> {
   const kind = classifyTextCardUploadFile(file);
 
   if (kind === "legacy-doc") {
@@ -54,7 +57,9 @@ export async function readTextCardUploadFile(
 
   try {
     const raw =
-      kind === "docx" ? await readDocxMarkdown(file) : await readPlainTextFile(file);
+      kind === "docx"
+        ? await readDocxMarkdown(file)
+        : await readPlainTextFile(file);
 
     if (!raw.trim()) {
       return { ok: false, error: "empty_file" };

@@ -58,10 +58,14 @@ async function fetchPublicSiteSettings(): Promise<PublicSiteSettings> {
 }
 
 export function LocaleProvider({ children }: { children: React.ReactNode }) {
-  const { data, error, mutate } = useSWR("/site-settings", fetchPublicSiteSettings, {
-    revalidateOnFocus: true,
-    shouldRetryOnError: true,
-  });
+  const { data, error, mutate } = useSWR(
+    "/site-settings",
+    fetchPublicSiteSettings,
+    {
+      revalidateOnFocus: true,
+      shouldRetryOnError: true,
+    }
+  );
 
   const siteSettings = data ?? DEFAULT_SITE_SETTINGS;
   const isSiteSettingsReady = data !== undefined || error !== undefined;
@@ -123,7 +127,14 @@ export function LocaleProvider({ children }: { children: React.ReactNode }) {
       isSiteSettingsReady,
       refreshSiteSettings,
     }),
-    [locale, setLocale, t, siteSettings, isSiteSettingsReady, refreshSiteSettings]
+    [
+      locale,
+      setLocale,
+      t,
+      siteSettings,
+      isSiteSettingsReady,
+      refreshSiteSettings,
+    ]
   );
 
   return (
@@ -140,7 +151,20 @@ export function useLocale() {
 }
 
 export function useTranslation() {
-  const { locale, setLocale, t, siteSettings, isSiteSettingsReady, refreshSiteSettings } =
-    useLocale();
-  return { locale, setLocale, t, siteSettings, isSiteSettingsReady, refreshSiteSettings };
+  const {
+    locale,
+    setLocale,
+    t,
+    siteSettings,
+    isSiteSettingsReady,
+    refreshSiteSettings,
+  } = useLocale();
+  return {
+    locale,
+    setLocale,
+    t,
+    siteSettings,
+    isSiteSettingsReady,
+    refreshSiteSettings,
+  };
 }

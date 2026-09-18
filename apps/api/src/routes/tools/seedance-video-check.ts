@@ -56,7 +56,10 @@ const seedanceVideoCheckRoutes = new Hono<ApiContext>();
 
 seedanceVideoCheckRoutes.use("*", jwtMiddleware);
 seedanceVideoCheckRoutes.use("*", requireWorkflowView());
-seedanceVideoCheckRoutes.use("*", createRequireFeatureMiddleware("ai-interfaces"));
+seedanceVideoCheckRoutes.use(
+  "*",
+  createRequireFeatureMiddleware("ai-interfaces")
+);
 
 async function resolveVolcanoCredentialsForOrg(
   env: Bindings,
@@ -68,7 +71,9 @@ async function resolveVolcanoCredentialsForOrg(
   return getVolcanoCredentials(env, organizationId, row.metadata);
 }
 
-function formatSeedanceCheckError(error: unknown): SeedanceVideoCheckErrorResponse {
+function formatSeedanceCheckError(
+  error: unknown
+): SeedanceVideoCheckErrorResponse {
   if (error instanceof SeedanceOfficialResultCallError) {
     return {
       error: error.message,
@@ -123,12 +128,18 @@ seedanceVideoCheckRoutes.post(
     const organizationId = c.get("organizationId")!;
 
     try {
-      const body = c.req.valid("json") satisfies SubmitSeedanceVideoCheckRequest;
-      const credentials = await resolveVolcanoCredentialsForOrg(c.env, organizationId);
+      const body = c.req.valid(
+        "json"
+      ) satisfies SubmitSeedanceVideoCheckRequest;
+      const credentials = await resolveVolcanoCredentialsForOrg(
+        c.env,
+        organizationId
+      );
       if (!credentials) {
         return c.json(
           {
-            error: "Configure a Volcano Engine AI interface before using this tool",
+            error:
+              "Configure a Volcano Engine AI interface before using this tool",
             code: SEEDANCE_VIDEO_CHECK_VOLCANO_REQUIRED_CODE,
           } satisfies SeedanceVideoCheckErrorResponse,
           400
@@ -175,15 +186,24 @@ seedanceVideoCheckRoutes.get("/result", async (c) => {
   const organizationId = c.get("organizationId")!;
   const queryId = c.req.query("queryId")?.trim();
   if (!queryId) {
-    return c.json({ error: "queryId is required" } satisfies SeedanceVideoCheckErrorResponse, 400);
+    return c.json(
+      {
+        error: "queryId is required",
+      } satisfies SeedanceVideoCheckErrorResponse,
+      400
+    );
   }
 
   try {
-    const credentials = await resolveVolcanoCredentialsForOrg(c.env, organizationId);
+    const credentials = await resolveVolcanoCredentialsForOrg(
+      c.env,
+      organizationId
+    );
     if (!credentials) {
       return c.json(
         {
-          error: "Configure a Volcano Engine AI interface before using this tool",
+          error:
+            "Configure a Volcano Engine AI interface before using this tool",
           code: SEEDANCE_VIDEO_CHECK_VOLCANO_REQUIRED_CODE,
         } satisfies SeedanceVideoCheckErrorResponse,
         400

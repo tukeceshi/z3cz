@@ -60,35 +60,71 @@ export function createApp(options: CreateAppOptions): Hono<ApiContext> {
   app.route("/legal-documents", legalDocumentsRoutes);
   app.route("/site-settings", siteSettingsRoutes);
   app.route("/video-price-estimates", videoPriceEstimatesRoutes);
-  app.route("/bootstrap", lazyRoute(() => import("./routes/bootstrap")));
+  app.route(
+    "/bootstrap",
+    lazyRoute(() => import("./routes/bootstrap"))
+  );
   app.route("/auth", auth);
-  app.route("/admin", lazyRoute(() => import("./routes/admin")));
+  app.route(
+    "/admin",
+    lazyRoute(() => import("./routes/admin"))
+  );
   app.route(
     "/internal/persist-workers",
     lazyRoute(() => import("./routes/internal/persist-workers"))
   );
-  app.route("/oauth", lazyRoute(() => import("./routes/oauth")));
-  app.route("/profile", lazyRoute(() => import("./routes/profile")));
+  app.route(
+    "/oauth",
+    lazyRoute(() => import("./routes/oauth"))
+  );
+  app.route(
+    "/profile",
+    lazyRoute(() => import("./routes/profile"))
+  );
   app.route(
     "/organizations",
     lazyRoute(() => import("./routes/organizations"))
   );
-  app.route("/invitations", lazyRoute(() => import("./routes/invitations")));
-  app.route("/robots.txt", lazyRoute(() => import("./routes/robots")));
-  app.route("/llms.txt", lazyRoute(() => import("./routes/llms")));
+  app.route(
+    "/invitations",
+    lazyRoute(() => import("./routes/invitations"))
+  );
+  app.route(
+    "/robots.txt",
+    lazyRoute(() => import("./routes/robots"))
+  );
+  app.route(
+    "/llms.txt",
+    lazyRoute(() => import("./routes/llms"))
+  );
   app.route(
     "/stripe/webhooks",
     lazyRoute(() => import("./routes/stripe-webhooks"))
   );
-  app.route("/queues", lazyRoute(() => import("./routes/queue-publish")));
-  app.route("/forms", lazyRoute(() => import("./routes/forms")));
+  app.route(
+    "/queues",
+    lazyRoute(() => import("./routes/queue-publish"))
+  );
+  app.route(
+    "/forms",
+    lazyRoute(() => import("./routes/forms"))
+  );
   app.route(
     "/feedback-forms",
     lazyRoute(() => import("./routes/feedback-forms"))
   );
-  app.route("/templates", lazyRoute(() => import("./routes/templates")));
-  app.route("/workflow-schemes", lazyRoute(() => import("./routes/workflow-schemes")));
-  app.route("/types", lazyRoute(() => import("./routes/types")));
+  app.route(
+    "/templates",
+    lazyRoute(() => import("./routes/templates"))
+  );
+  app.route(
+    "/workflow-schemes",
+    lazyRoute(() => import("./routes/workflow-schemes"))
+  );
+  app.route(
+    "/types",
+    lazyRoute(() => import("./routes/types"))
+  );
   app.route(
     "/:organizationId/api-keys",
     lazyRoute(() => import("./routes/api-keys"))

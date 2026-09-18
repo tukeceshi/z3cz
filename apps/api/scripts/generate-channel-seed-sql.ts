@@ -37,4 +37,6 @@ const target = resolve(
   "../db/migrations/0065_platform_ai_model_channels.sql"
 );
 writeFileSync(target, sql, "utf8");
-console.log(`Wrote ${PLATFORM_AI_MODEL_CHANNEL_SEED.length} channel rows to ${target}`);
+console.log(
+  `Wrote ${PLATFORM_AI_MODEL_CHANNEL_SEED.length} channel rows to ${target}`
+);

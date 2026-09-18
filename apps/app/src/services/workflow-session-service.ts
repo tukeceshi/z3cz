@@ -281,7 +281,9 @@ export class WorkflowWebSocket {
     next: { nodes: Node[]; edges: Edge[] }
   ): boolean {
     if (!this.currentState) {
-      console.warn("[WorkflowWS] No current state available, cannot send patch");
+      console.warn(
+        "[WorkflowWS] No current state available, cannot send patch"
+      );
       return false;
     }
 

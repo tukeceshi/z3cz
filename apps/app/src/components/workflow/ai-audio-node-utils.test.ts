@@ -34,7 +34,12 @@ function createAudioNode(history: unknown): WorkflowNodeType {
       }),
     ],
     outputs: [
-      testWorkflowParam({ id: "audios", name: "audios", type: "audio", value: [] }),
+      testWorkflowParam({
+        id: "audios",
+        name: "audios",
+        type: "audio",
+        value: [],
+      }),
     ],
     executionState: "idle",
   };

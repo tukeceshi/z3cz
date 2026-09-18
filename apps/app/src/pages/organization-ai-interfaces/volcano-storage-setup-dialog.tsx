@@ -106,7 +106,9 @@ export function VolcanoStorageSetupDialog({
             : null;
 
         if (!result) {
-          throw new Error("Storage setup requires interface or wizard credentials");
+          throw new Error(
+            "Storage setup requires interface or wizard credentials"
+          );
         }
 
         setServiceStatus(result.status);
@@ -171,7 +173,8 @@ export function VolcanoStorageSetupDialog({
 
   useEffect(() => {
     if (!open) return;
-    const nextRegion = initialRegion || defaultVolcanoTosRegionForLocale(locale);
+    const nextRegion =
+      initialRegion || defaultVolcanoTosRegionForLocale(locale);
     setRegion(nextRegion);
     setSelectedBucket(initialBucket || CREATE_NEW_TOS_BUCKET);
     setBucketLoadError(null);
@@ -284,7 +287,9 @@ export function VolcanoStorageSetupDialog({
               ) : (
                 <>
                   {bucketLoadError ? (
-                    <p className="text-destructive text-sm">{bucketLoadError}</p>
+                    <p className="text-destructive text-sm">
+                      {bucketLoadError}
+                    </p>
                   ) : null}
                   <div className="space-y-2">
                     {bucketOptions.map((option) => {
@@ -335,7 +340,10 @@ export function VolcanoStorageSetupDialog({
       </Dialog>
 
       {confirmExistingOpen ? (
-        <Dialog open={confirmExistingOpen} onOpenChange={setConfirmExistingOpen}>
+        <Dialog
+          open={confirmExistingOpen}
+          onOpenChange={setConfirmExistingOpen}
+        >
           <DialogContent className="sm:max-w-md">
             <DialogHeader>
               <DialogTitle>
@@ -358,7 +366,10 @@ export function VolcanoStorageSetupDialog({
               >
                 {t("pages.aiInterfaces.tosStorage.switchToCreate")}
               </Button>
-              <Button onClick={() => void handleConfirmExisting()} disabled={isSaving}>
+              <Button
+                onClick={() => void handleConfirmExisting()}
+                disabled={isSaving}
+              >
                 {t("pages.aiInterfaces.tosStorage.confirmEnable")}
               </Button>
             </DialogFooter>

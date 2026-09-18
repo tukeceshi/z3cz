@@ -54,9 +54,7 @@ export function StudioTextTablePreview({
             {parsed.rows.map((row, rowIndex) => (
               <tr key={`row-${rowIndex}`}>
                 {row.map((cell, columnIndex) => (
-                  <td key={`cell-${rowIndex}-${columnIndex}`}>
-                    {cell.trim()}
-                  </td>
+                  <td key={`cell-${rowIndex}-${columnIndex}`}>{cell.trim()}</td>
                 ))}
               </tr>
             ))}

@@ -4,10 +4,7 @@ import { Hono } from "hono";
 
 import { ApiContext } from "../context";
 import { createDatabase, getPublicLegalDocument } from "../db";
-import {
-  isAppLocale,
-  isLegalDocumentType,
-} from "../services/legal-documents";
+import { isAppLocale, isLegalDocumentType } from "../services/legal-documents";
 
 const legalDocumentsRoutes = new Hono<ApiContext>();
 

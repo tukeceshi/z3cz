@@ -1,4 +1,7 @@
-import type { GenerationJobPendingMedia, GenerationJobRecord } from "./generation-job";
+import type {
+  GenerationJobPendingMedia,
+  GenerationJobRecord,
+} from "./generation-job";
 import type { MediaReference } from "./media-reference";
 
 export const GENERATION_JOB_WORKER_CLAIM_TIMEOUT_MS = 900_000;

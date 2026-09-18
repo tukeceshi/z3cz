@@ -16,9 +16,7 @@ import type { WorkflowExecution } from "@dafthunk/types";
 import { AgentWorkflow } from "agents/workflows";
 import type { Bindings } from "../context";
 import { createDatabase, stampOnboardingStage } from "../db";
-import {
-  createWorkflowRuntime,
-} from "./cloudflare-workflow-runtime";
+import { createWorkflowRuntime } from "./cloudflare-workflow-runtime";
 
 // Internal params injected by Agent.runWorkflow() �?matches AgentWorkflowParams<T>
 // from the agents SDK (not directly importable due to bundled d.ts resolution issues).
@@ -48,9 +46,8 @@ export class WorkflowRuntimeEntrypoint extends AgentWorkflowBase {
       `[WorkflowRuntime] run instanceId=${event.instanceId} workflow=${params.workflow.id} trigger=${params.workflow.trigger} nodes=${params.workflow.nodes.length}`
     );
     try {
-      const runtime = await createWorkflowRuntime(
-        this.env,
-        (exec) => this.reportProgress(exec)
+      const runtime = await createWorkflowRuntime(this.env, (exec) =>
+        this.reportProgress(exec)
       );
       const result = await runtime.executeWithStep(
         params,

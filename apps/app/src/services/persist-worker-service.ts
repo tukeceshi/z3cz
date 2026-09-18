@@ -17,9 +17,12 @@ import { makeRequest } from "./utils";
 const ADMIN_ENDPOINT = "/admin/persist-workers";
 
 export function useAdminPersistWorkers() {
-  const { data, error, isLoading, mutate } = useSWR(ADMIN_ENDPOINT, async () => {
-    return makeRequest<ListPersistWorkersResponse>(ADMIN_ENDPOINT);
-  });
+  const { data, error, isLoading, mutate } = useSWR(
+    ADMIN_ENDPOINT,
+    async () => {
+      return makeRequest<ListPersistWorkersResponse>(ADMIN_ENDPOINT);
+    }
+  );
 
   return {
     workers: data?.workers ?? [],
@@ -129,13 +132,10 @@ export async function redeployOrgPersistWorker(
   id: string,
   input: RedeployPersistWorkerRequest
 ): Promise<RedeployPersistWorkerResponse> {
-  return makeRequest(
-    `${orgWorkersEndpoint(organizationId)}/${id}/redeploy`,
-    {
-      method: "POST",
-      body: JSON.stringify(input),
-    }
-  );
+  return makeRequest(`${orgWorkersEndpoint(organizationId)}/${id}/redeploy`, {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
 }
 
 export async function deleteOrgPersistWorker(
@@ -147,4 +147,8 @@ export async function deleteOrgPersistWorker(
   });
 }
 
-export type { PersistWorker, PersistWorkerPlatformSummary, PersistWorkerPoolSettings };
+export type {
+  PersistWorker,
+  PersistWorkerPlatformSummary,
+  PersistWorkerPoolSettings,
+};

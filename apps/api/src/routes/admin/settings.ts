@@ -5,11 +5,7 @@ import { Hono } from "hono";
 import { z } from "zod";
 
 import { ApiContext } from "../../context";
-import {
-  createDatabase,
-  getSiteSettings,
-  updateSiteSettings,
-} from "../../db";
+import { createDatabase, getSiteSettings, updateSiteSettings } from "../../db";
 import { broadcastWorkflowPublicState } from "../../services/workflow-public-broadcast";
 
 const adminSettingsRoutes = new Hono<ApiContext>();
@@ -56,11 +52,12 @@ adminSettingsRoutes.patch(
 
     const input: UpdateSiteSettingsRequest = {
       ...(body.siteName !== undefined ? { siteName: body.siteName } : {}),
-      ...(body.siteTagline !== undefined ? { siteTagline: body.siteTagline } : {}),
+      ...(body.siteTagline !== undefined
+        ? { siteTagline: body.siteTagline }
+        : {}),
       ...(body.supportEmail !== undefined
         ? {
-            supportEmail:
-              body.supportEmail === "" ? null : body.supportEmail,
+            supportEmail: body.supportEmail === "" ? null : body.supportEmail,
           }
         : {}),
       ...(body.icpFilingNumber !== undefined

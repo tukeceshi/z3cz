@@ -94,7 +94,9 @@ describe("mergeVolcanoActivationCache", () => {
         probedAt: new Date().toISOString(),
       },
     ]);
-    expect(prunedWithoutCatalog.models[platformOnly.canonicalId]).toBeUndefined();
+    expect(
+      prunedWithoutCatalog.models[platformOnly.canonicalId]
+    ).toBeUndefined();
 
     const prunedWithCatalog = mergeVolcanoActivationCache(
       metadata,
