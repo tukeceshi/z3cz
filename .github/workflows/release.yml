@@ -1,0 +1,69 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Verify VERSION and changelog
+        shell: bash
+        run: |
+          version="$(tr -d '\r\n' < VERSION)"
+          [[ "$version" == "$GITHUB_REF_NAME" ]] || {
+            echo "VERSION=$version does not match tag $GITHUB_REF_NAME" >&2
+            exit 1
+          }
+          grep -Fqx "## $version" CHANGELOG.md || {
+            echo "CHANGELOG.md is missing ## $version" >&2
+            exit 1
+          }
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v4
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build, push versioned images, pack host files
+        env:
+          DAFTHUNK_PUSH_IMAGES: "1"
+          DAFTHUNK_RELEASE: "1"
+        run: bash scripts/host/pack-deploy.sh
+
+      - name: Prepare release notes
+        shell: bash
+        run: |
+          version="$GITHUB_REF_NAME"
+          awk -v heading="## $version" '
+            $0 == heading { found=1; next }
+            found && /^## / { exit }
+            found { print }
+          ' CHANGELOG.md > RELEASE_NOTES.md
+          test -s RELEASE_NOTES.md || printf 'z3cz %s\n' "$version" > RELEASE_NOTES.md
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          prerelease_args=()
+          if [[ "$GITHUB_REF_NAME" == *-* ]]; then
+            prerelease_args+=(--prerelease)
+          fi
+          gh release create "$GITHUB_REF_NAME" \
+            z3cz-deploy.tar.gz \
+            --verify-tag \
+            --title "$GITHUB_REF_NAME" \
+            --notes-file RELEASE_NOTES.md \
+            "${prerelease_args[@]}"

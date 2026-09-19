@@ -21,6 +21,7 @@ import adminQueuesRoutes from "./queues";
 import adminSettingsRoutes from "./settings";
 import adminStatsRoutes from "./stats";
 import adminSupportRoutes from "./support";
+import adminSystemUpdateRoutes from "./system-update";
 import adminUsersRoutes from "./users";
 import adminWorkflowSchemesRoutes from "./workflow-schemes";
 import adminWorkflowsRoutes from "./workflows";
@@ -36,6 +37,7 @@ adminRoutes.use("*", adminMiddleware);
 // Mount admin sub-routes
 adminRoutes.route("/stats", adminStatsRoutes);
 adminRoutes.route("/settings", adminSettingsRoutes);
+adminRoutes.route("/system-update", adminSystemUpdateRoutes);
 adminRoutes.route(
   "/competitor-video-pricing",
   adminCompetitorVideoPricingRoutes

@@ -35,6 +35,7 @@ Commands:
   render      Generate compose / Caddyfile / env from containers/app.yml
   bootstrap   Alias of rebuild (first install)
   rebuild     Start packaged images, recreate stack (keeps shared/ data)
+  migrate     Apply database migrations with the current api image
   start       Start existing stack
   stop        Stop stack
   restart     Restart stack
@@ -57,6 +58,25 @@ function requireAppYml() {
     );
     process.exit(1);
   }
+}
+
+/**
+ * @param {string[]} args
+ * @param {{ inherit?: boolean }} [opts]
+ */
+function migrateApi() {
+  return compose([
+    "run",
+    "--rm",
+    "--no-deps",
+    "-e",
+    "RUN_DB_MIGRATE=true",
+    "--entrypoint",
+    "sh",
+    "api",
+    "-c",
+    "cd /app/apps/api && pnpm db:migrate",
+  ]);
 }
 
 /**
@@ -128,10 +148,21 @@ async function main() {
       if (compose(["up", "-d", "--wait", "--remove-orphans", "postgres"]) !== 0) {
         process.exit(1);
       }
+      if (migrateApi() !== 0) {
+        process.exit(1);
+      }
       if (compose(["up", "-d", "--force-recreate", "--no-deps", "api", "app"]) !== 0) {
         process.exit(1);
       }
       process.exit(compose(["up", "-d", "--remove-orphans"]) === 0 ? 0 : 1);
+      return;
+    }
+    case "migrate": {
+      render();
+      if (compose(["up", "-d", "--wait", "postgres"]) !== 0) {
+        process.exit(1);
+      }
+      process.exit(migrateApi() === 0 ? 0 : 1);
       return;
     }
     case "start": {

@@ -19,6 +19,9 @@ tls: auto
 http_port: 80
 https_port: 443
 
+# 运行中的 api/app 镜像版本。生产请固定为正式版（如 1.0.0），不要用 latest 做在线更新。
+image_tag: latest
+
 env:
   # setup / launcher 会写入真实密钥；勿提交 containers/
   JWT_SECRET: change-me

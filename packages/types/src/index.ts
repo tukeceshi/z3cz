@@ -101,6 +101,7 @@ export * from "./schema";
 export * from "./secret";
 export * from "./legal-documents";
 export * from "./site-settings";
+export * from "./system-update";
 export * from "./slack";
 export * from "./telegram";
 export * from "./types";

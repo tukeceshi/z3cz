@@ -7,6 +7,12 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 OUT="${1:-$ROOT/z3cz-deploy.tar.gz}"
 API_IMAGE="${DAFTHUNK_API_IMAGE:-tukeceshi/z3cz-api:latest}"
 APP_IMAGE="${DAFTHUNK_APP_IMAGE:-tukeceshi/z3cz-app:latest}"
+VERSION_TAG=""
+if [[ "${DAFTHUNK_RELEASE:-}" == "1" && -f "$ROOT/VERSION" ]]; then
+  VERSION_TAG="$(tr -d 'v \r\n' < "$ROOT/VERSION")"
+  API_IMAGE="tukeceshi/z3cz-api:${VERSION_TAG}"
+  APP_IMAGE="tukeceshi/z3cz-app:${VERSION_TAG}"
+fi
 
 log() { printf '==> %s\n' "$*"; }
 
@@ -53,17 +59,27 @@ push_images() {
     log "Pushing ${app_sha}"
     docker push "$app_sha"
   fi
+  if [[ -n "$VERSION_TAG" ]]; then
+    docker tag "$API_IMAGE" "tukeceshi/z3cz-api:latest"
+    docker tag "$APP_IMAGE" "tukeceshi/z3cz-app:latest"
+    log "Pushing tukeceshi/z3cz-api:latest"
+    docker push "tukeceshi/z3cz-api:latest"
+    log "Pushing tukeceshi/z3cz-app:latest"
+    docker push "tukeceshi/z3cz-app:latest"
+  fi
 }
 
 copy_host_files() {
   local stage="$1"
   mkdir -p \
-    "$stage/scripts/host" \
+    "$stage/scripts/host/updater" \
     "$stage/docker-host/lib" \
     "$stage/docker-host/samples" \
     "$stage/docker/nginx"
 
   cp "$ROOT/scripts/host/"*.sh "$stage/scripts/host/"
+  cp "$ROOT/scripts/host/updater/"*.mjs "$stage/scripts/host/updater/"
+  rm -f "$stage/scripts/host/updater/"*.test.mjs
   cp "$ROOT/docker-host/launcher" "$stage/docker-host/launcher"
   cp "$ROOT/docker-host/launcher.mjs" "$stage/docker-host/launcher.mjs"
   cp "$ROOT/docker-host/dafthunk-setup" "$stage/docker-host/dafthunk-setup"
@@ -73,6 +89,8 @@ copy_host_files() {
   rm -f "$stage/docker-host/lib/"*.test.mjs
   cp "$ROOT/docker/nginx/app.static.conf" "$stage/docker/nginx/app.static.conf"
   chmod +x "$stage/scripts/host/"*.sh "$stage/docker-host/launcher" "$stage/docker-host/dafthunk-setup"
+  cp "$ROOT/VERSION" "$stage/VERSION"
+  cp "$ROOT/CHANGELOG.md" "$stage/CHANGELOG.md"
   if git -C "$ROOT" rev-parse HEAD >/dev/null 2>&1; then
     git -C "$ROOT" rev-parse HEAD >"$stage/DEPLOY_REVISION"
   else

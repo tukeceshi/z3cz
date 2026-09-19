@@ -2,6 +2,7 @@ import { Hono } from "hono";
 
 import { ApiContext } from "../context";
 import { readBootPhase } from "../env/api-boot-cache";
+import { runtimeVersion } from "../runtime/version";
 
 const health = new Hono<ApiContext>();
 
@@ -23,7 +24,7 @@ health.get("/", async (c) => {
   return c.json({
     status: "ok",
     phase,
-    version: "1.0.0",
+    version: c.env.APP_VERSION ?? runtimeVersion,
     runtime: c.env.RUNTIME ?? "workers",
     storage: storageProvider,
     timestamp: new Date().toISOString(),

@@ -27,6 +27,15 @@ sudo bash /var/dafthunk/scripts/host/deploy.sh
 
 ## 更新
 
+管理后台 **系统设置 → 系统更新**（需先安装更新器）：
+
+```bash
+sudo bash /var/dafthunk/scripts/host/install-host-updater.sh
+sudo bash /var/dafthunk/scripts/host/deploy.sh
+```
+
+命令行：
+
 ```bash
 sudo bash /var/dafthunk/scripts/host/update.sh
 

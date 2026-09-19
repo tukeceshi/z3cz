@@ -35,6 +35,9 @@ export interface Bindings {
   JWT_SECRET: string;
   CLOUDFLARE_ENV: string;
   RUNTIME?: "node" | "workers";
+  APP_VERSION?: string;
+  UPDATER_SOCKET?: string;
+  UPDATER_TOKEN?: string;
   CLOUDFLARE_ACCOUNT_ID: string;
   CLOUDFLARE_API_TOKEN: string;
   CLOUDFLARE_AI_GATEWAY_ID?: string;

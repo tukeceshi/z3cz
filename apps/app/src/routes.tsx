@@ -23,6 +23,7 @@ import {
   AdminOrganizationRedirectPage,
   AdminPersistWorkersPage,
   AdminSettingsPage,
+  AdminSystemUpdatePage,
   AdminStuckUsersPage,
   AdminSupportPage,
   AdminUserDetailPage,
@@ -245,6 +246,17 @@ export const routes: AppRouteObject[] = [
       </AdminLayout>
     ),
     handle: { head: createRouteHead("seo.routes.adminSettings") },
+  },
+  {
+    path: "/admin/system-update",
+    element: (
+      <AdminLayout>
+        <AdminProtectedRoute>
+          <AdminSystemUpdatePage />
+        </AdminProtectedRoute>
+      </AdminLayout>
+    ),
+    handle: { head: createRouteHead("seo.routes.adminSystemUpdate") },
   },
   {
     path: "/admin/competitor-pricing",

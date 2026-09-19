@@ -12,6 +12,7 @@
  *   le_email: string,
  *   http_port: number,
  *   https_port: number,
+ *   image_tag: string,
  *   env: Record<string, string>
  * }}
  */
@@ -75,6 +76,8 @@ export function parseAppYml(raw) {
     tls = "manual";
   }
 
+  const imageTagRaw = String(root.image_tag ?? "").trim();
+
   return {
     hostname,
     https: root.https === undefined ? true : Boolean(root.https),
@@ -82,6 +85,7 @@ export function parseAppYml(raw) {
     le_email: String(root.le_email ?? "").trim(),
     http_port: Number(root.http_port ?? 80) || 80,
     https_port: Number(root.https_port ?? 443) || 443,
+    image_tag: imageTagRaw || "latest",
     env,
   };
 }
@@ -124,6 +128,7 @@ function coerce(value) {
  *   le_email?: string,
  *   http_port?: number,
  *   https_port?: number,
+ *   image_tag?: string,
  *   env: Record<string, string>
  * }} config
  */
@@ -139,6 +144,7 @@ export function stringifyAppYml(config) {
   }
   lines.push(`http_port: ${config.http_port ?? 80}`);
   lines.push(`https_port: ${config.https_port ?? 443}`);
+  lines.push(`image_tag: ${config.image_tag || "latest"}`);
   lines.push("env:");
   for (const [key, value] of Object.entries(config.env)) {
     lines.push(`  ${key}: ${escapeYmlScalar(value)}`);

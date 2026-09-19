@@ -61,8 +61,20 @@ sudo bash /var/dafthunk/scripts/host/deploy.sh
 
 #### 更新
 
+管理后台 **系统设置 → 系统更新**：检查正式版本、一键升级、失败回退。
+
+服务器需先安装更新器（只需一次），然后重建服务：
+
+```bash
+sudo bash /var/dafthunk/scripts/host/install-host-updater.sh
+sudo bash /var/dafthunk/scripts/host/deploy.sh
+```
+
+命令行备用：
+
 ```bash
 sudo bash /var/dafthunk/scripts/host/update.sh
+sudo bash /var/dafthunk/scripts/host/update.sh v1.0.0
 
 # 重置安装：清 DB 与上传，保留域名配置与证书
 sudo bash /var/dafthunk/scripts/host/update.sh --reset

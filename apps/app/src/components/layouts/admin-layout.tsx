@@ -5,6 +5,7 @@ import HardDriveUpload from "lucide-react/icons/hard-drive-upload";
 import Inbox from "lucide-react/icons/inbox";
 import KeyRound from "lucide-react/icons/key-round";
 import LayoutDashboard from "lucide-react/icons/layout-dashboard";
+import RefreshCw from "lucide-react/icons/refresh-cw";
 import Rocket from "lucide-react/icons/rocket";
 import Settings from "lucide-react/icons/settings";
 import Sparkles from "lucide-react/icons/sparkles";
@@ -87,6 +88,12 @@ export function AdminLayout({ children }: AdminLayoutProps) {
           title: t("sidebar.siteSettings"),
           url: "/admin/settings",
           icon: Settings,
+        },
+        {
+          id: "system-update",
+          title: t("sidebar.systemUpdate"),
+          url: "/admin/system-update",
+          icon: RefreshCw,
         },
         {
           id: "competitor-pricing",

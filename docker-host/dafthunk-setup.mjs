@@ -98,10 +98,13 @@ async function main() {
 
   /** @type {Record<string, string>} */
   let existingEnv = {};
+  let existingImageTag = "latest";
   if (fs.existsSync(appYmlPath)) {
     const { parseAppYml } = await import("./lib/parse-app-yml.mjs");
     try {
-      existingEnv = parseAppYml(fs.readFileSync(appYmlPath, "utf8")).env;
+      const existing = parseAppYml(fs.readFileSync(appYmlPath, "utf8"));
+      existingEnv = existing.env;
+      existingImageTag = existing.image_tag || "latest";
       console.log("Existing containers/app.yml found — preserving secrets.");
     } catch {
       existingEnv = {};
@@ -126,6 +129,7 @@ async function main() {
     le_email: leEmail,
     http_port: httpPort,
     https_port: httpsPort,
+    image_tag: existingImageTag,
     env: {
       JWT_SECRET: jwt,
       SECRET_MASTER_KEY: master,

@@ -218,4 +218,69 @@ test("renderCompose is host project without smtp", () => {
   assert.doesNotMatch(yaml, /dockerfile:/);
   assert.match(yaml, /WEB_HOST: "http:\/\/localhost:8080"/);
   assert.match(yaml, /app\.static\.conf/);
+  assert.match(yaml, /RUN_DB_MIGRATE: "false"/);
+  assert.match(yaml, /APP_VERSION: "latest"/);
+});
+
+test("parseAppYml reads image_tag", () => {
+  const config = parseAppYml(`
+hostname: example.com
+https: true
+image_tag: 1.2.3
+env:
+  JWT_SECRET: abc
+  SECRET_MASTER_KEY: def
+`);
+  assert.equal(config.image_tag, "1.2.3");
+});
+
+test("parseAppYml defaults image_tag to latest", () => {
+  const config = parseAppYml(`
+hostname: example.com
+https: true
+env:
+  JWT_SECRET: abc
+  SECRET_MASTER_KEY: def
+`);
+  assert.equal(config.image_tag, "latest");
+});
+
+test("renderCompose pins api/app to image_tag", () => {
+  const yaml = renderCompose({
+    hostname: "localhost",
+    https: false,
+    tls: "auto",
+    le_email: "",
+    http_port: 8080,
+    https_port: 443,
+    image_tag: "1.3.0",
+    env: {
+      JWT_SECRET: "a".repeat(64),
+      SECRET_MASTER_KEY: "b".repeat(64),
+    },
+    origin: "http://localhost:8080",
+  });
+  assert.match(yaml, /image: tukeceshi\/z3cz-api:1\.3\.0/);
+  assert.match(yaml, /image: tukeceshi\/z3cz-app:1\.3\.0/);
+  assert.match(yaml, /APP_VERSION: "v1\.3\.0"/);
+});
+
+test("renderCompose mounts updater socket when token is set", () => {
+  const yaml = renderCompose({
+    hostname: "localhost",
+    https: false,
+    tls: "auto",
+    le_email: "",
+    http_port: 8080,
+    https_port: 443,
+    image_tag: "1.0.0",
+    env: {
+      JWT_SECRET: "a".repeat(64),
+      SECRET_MASTER_KEY: "b".repeat(64),
+      UPDATER_TOKEN: "t".repeat(32),
+    },
+    origin: "http://localhost:8080",
+  });
+  assert.match(yaml, /\/run\/z3cz-updater:\/run\/z3cz-updater/);
+  assert.match(yaml, /UPDATER_SOCKET: \/run\/z3cz-updater\/updater\.sock/);
 });
