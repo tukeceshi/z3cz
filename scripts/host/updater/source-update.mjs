@@ -246,11 +246,22 @@ export async function runSourceUpdate(
     await manager.compose([
       "up",
       "-d",
+      "--wait",
+      "--wait-timeout",
+      "180",
       "--force-recreate",
       "--no-deps",
       "--pull",
       "never",
       "api",
+    ]);
+    await manager.compose([
+      "up",
+      "-d",
+      "--force-recreate",
+      "--no-deps",
+      "--pull",
+      "never",
       "app",
     ]);
     manager.setPhase("verifying", "检查 API 和前端服务");

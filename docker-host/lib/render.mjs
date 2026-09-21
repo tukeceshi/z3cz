@@ -267,10 +267,12 @@ services:
         condition: service_healthy
     environment:
       NODE_ENV: production
+      RUNTIME: docker
       HOST: 0.0.0.0
       PORT: "3102"
       DATABASE_URL: postgresql://postgres:postgres@postgres:5432/postgres
       LOCAL_STORAGE_PATH: /app/data/storage
+      API_BOOT_CACHE_DIR: /app/data/storage/cache
       RUN_DB_MIGRATE: "false"
       BOOTSTRAP_ASSETS_DIR: ${source ? "/app/apps/app/dist" : "/app/data/bootstrap"}
       Z3CZ_MAINTENANCE_FILE: /maintenance/enabled
@@ -292,7 +294,7 @@ services:
       interval: 10s
       timeout: 5s
       retries: 12
-      start_period: 60s
+      start_period: ${source ? "180s" : "60s"}
     restart: unless-stopped
 
   app:

@@ -82,7 +82,7 @@ install_binary() {
   local_sums="${INSTALL_DIR}/dist/SHA256SUMS"
   tmp="$(mktemp)"
   sums="$(mktemp)"
-  trap 'rm -f "$tmp" "$sums"' RETURN
+  trap 'rm -f "${tmp:-}" "${sums:-}"; trap - RETURN' RETURN
 
   if [[ -f "$local_bin" && -f "$local_sums" ]]; then
     verify_checksum "$local_bin" "$local_sums" "$asset"
