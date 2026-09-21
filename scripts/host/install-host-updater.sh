@@ -6,13 +6,41 @@ set -euo pipefail
 INSTALL_DIR="${DAFTHUNK_INSTALL_DIR:-/var/dafthunk}"
 SOCKET_DIR="${Z3CZ_UPDATER_SOCKET_DIR:-/run/z3cz-updater}"
 STATE_DIR="${Z3CZ_UPDATER_STATE_DIR:-/var/lib/z3cz-updater}"
-NODE_HOME="/usr/local/lib/z3cz-updater"
-NODE_BIN="${NODE_HOME}/bin/node"
+UPDATER_BIN="/usr/local/bin/z3cz-host-updater"
 UPDATER_ENV="/etc/z3cz-updater.env"
 UPDATER_SERVICE="/etc/systemd/system/z3cz-updater.service"
-NODE_VERSION="22.12.0"
+REPOSITORY="${Z3CZ_UPDATER_REPOSITORY:-tukeceshi/z3cz}"
+GITHUB_MIRROR="${DAFTHUNK_GITHUB_MIRROR:-https://ghfast.top/}"
+GITHUB_MIRROR="${GITHUB_MIRROR%/}/"
+RELEASE_TAG=""
 
 fail() { printf 'Host Updater 安装失败：%s\n' "$1" >&2; exit 1; }
+
+updater_arch() {
+  case "$(uname -m)" in
+    x86_64|amd64) printf 'amd64' ;;
+    aarch64|arm64) printf 'arm64' ;;
+    *) fail "不支持的 CPU 架构：$(uname -m)" ;;
+  esac
+}
+
+mirror_url() {
+  case "$1" in
+    "${GITHUB_MIRROR}"*) printf '%s' "$1" ;;
+    *) printf '%s%s' "$GITHUB_MIRROR" "$1" ;;
+  esac
+}
+
+download_file() {
+  local url="$1" dest="$2"
+  local alt
+  alt="$(mirror_url "$url")"
+  if curl -fsSL --connect-timeout 20 "$url" -o "$dest"; then
+    return 0
+  fi
+  [[ "$alt" != "$url" ]] || return 1
+  curl -fsSL --connect-timeout 20 "$alt" -o "$dest"
+}
 
 require_root() {
   [[ "${EUID}" -eq 0 ]] || fail "请使用 sudo 运行"
@@ -20,41 +48,58 @@ require_root() {
   command -v systemctl >/dev/null 2>&1 || fail "服务器必须使用 systemd"
   command -v docker >/dev/null 2>&1 || fail "缺少 docker"
   command -v curl >/dev/null 2>&1 || fail "缺少 curl"
+  command -v sha256sum >/dev/null 2>&1 || fail "缺少 sha256sum"
   [[ -f "${INSTALL_DIR}/docker-host/containers/app.yml" ]] || fail "未找到 ${INSTALL_DIR}/docker-host/containers/app.yml"
-  [[ -f "${INSTALL_DIR}/scripts/host/updater/main.mjs" ]] || fail "未找到更新器脚本，请先更新部署包"
 }
 
 read_image_tag() {
   local tag
   tag="$(awk 'BEGIN{FS=":[[:space:]]*"} /^image_tag:/ { print $2; exit }' "${INSTALL_DIR}/docker-host/containers/app.yml" | tr -d '[:space:]')"
-  if [[ -z "$tag" || "$tag" == "latest" ]]; then
-    printf '提示：当前 image_tag 不是正式版本。安装完成后可在后台升到 GitHub 正式版。\n'
+  if [[ "$tag" =~ ^v?[0-9]+\.[0-9]+\.[0-9]+ ]]; then
+    if [[ "$tag" == v* ]]; then
+      RELEASE_TAG="$tag"
+    else
+      RELEASE_TAG="v${tag}"
+    fi
+    return 0
   fi
+  printf '提示：当前 image_tag 不是正式版本。安装完成后可在后台升到 GitHub 正式版。\n'
 }
 
-ensure_node() {
-  if command -v node >/dev/null 2>&1; then
-    local major
-    major="$(node -p "process.versions.node.split('.')[0]" 2>/dev/null || true)"
-    if [[ "${major:-0}" -ge 22 ]]; then
-      NODE_BIN="$(command -v node)"
+verify_checksum() {
+  local file="$1" sums="$2" asset="$3"
+  local expected
+  expected="$(awk -v asset="$asset" '$2 == asset { print $1; exit }' "$sums")"
+  [[ "$expected" =~ ^[a-f0-9]{64}$ ]] || fail "校验清单缺少 ${asset}"
+  printf '%s  %s\n' "$expected" "$file" | sha256sum -c - >/dev/null || fail "Host Updater SHA-256 校验失败"
+}
+
+install_binary() {
+  local arch asset local_bin local_sums tmp sums
+  arch="$(updater_arch)"
+  asset="z3cz-host-updater-linux-${arch}"
+  local_bin="${INSTALL_DIR}/dist/${asset}"
+  local_sums="${INSTALL_DIR}/dist/SHA256SUMS"
+  tmp="$(mktemp)"
+  sums="$(mktemp)"
+  trap 'rm -f "$tmp" "$sums"' RETURN
+
+  if [[ -n "$RELEASE_TAG" ]]; then
+    if download_file "https://github.com/${REPOSITORY}/releases/download/${RELEASE_TAG}/SHA256SUMS" "$sums" \
+      && download_file "https://github.com/${REPOSITORY}/releases/download/${RELEASE_TAG}/${asset}" "$tmp"; then
+      verify_checksum "$tmp" "$sums" "$asset"
+      install -m 0755 "$tmp" "$UPDATER_BIN"
       return 0
     fi
+    printf '提示：未能从 GitHub Release 下载更新器，改用部署包内二进制。\n'
   fi
-  local arch asset url
-  case "$(uname -m)" in
-    x86_64|amd64) arch="x64" ;;
-    aarch64|arm64) arch="arm64" ;;
-    *) fail "不支持的 CPU 架构：$(uname -m)" ;;
-  esac
-  asset="node-v${NODE_VERSION}-linux-${arch}"
-  mkdir -p "$NODE_HOME"
-  url="https://nodejs.org/dist/v${NODE_VERSION}/${asset}.tar.xz"
-  if ! curl -fsSL "$url" | tar -xJ -C "$NODE_HOME" --strip-components=1; then
-    url="https://npmmirror.com/mirrors/node/v${NODE_VERSION}/${asset}.tar.xz"
-    curl -fsSL "$url" | tar -xJ -C "$NODE_HOME" --strip-components=1 || fail "无法下载 Node ${NODE_VERSION}"
+
+  [[ -f "$local_bin" ]] || fail "未找到更新器二进制 ${local_bin}，请使用包含 dist/ 的部署包"
+  cp "$local_bin" "$tmp"
+  if [[ -f "$local_sums" ]]; then
+    verify_checksum "$tmp" "$local_sums" "$asset"
   fi
-  [[ -x "$NODE_BIN" ]] || fail "Node 安装后未找到 ${NODE_BIN}"
+  install -m 0755 "$tmp" "$UPDATER_BIN"
 }
 
 ensure_token() {
@@ -78,8 +123,8 @@ ensure_token() {
     mv "$tmp" "$yaml"
   fi
   umask 077
-  printf 'Z3CZ_UPDATER_TOKEN=%s\nZ3CZ_INSTALL_DIR=%s\nZ3CZ_UPDATER_SOCKET=%s/updater.sock\nZ3CZ_UPDATER_STATE_DIR=%s\n' \
-    "$token" "$INSTALL_DIR" "$SOCKET_DIR" "$STATE_DIR" > "$UPDATER_ENV"
+  printf 'Z3CZ_UPDATER_TOKEN=%s\nZ3CZ_INSTALL_DIR=%s\nZ3CZ_UPDATER_SOCKET=%s/updater.sock\nZ3CZ_UPDATER_STATE_DIR=%s\nZ3CZ_UPDATER_BINARY_PATH=%s\n' \
+    "$token" "$INSTALL_DIR" "$SOCKET_DIR" "$STATE_DIR" "$UPDATER_BIN" > "$UPDATER_ENV"
 }
 
 install_service() {
@@ -95,14 +140,14 @@ Wants=network-online.target
 [Service]
 Type=simple
 EnvironmentFile=${UPDATER_ENV}
-ExecStart=${NODE_BIN} ${INSTALL_DIR}/scripts/host/updater/main.mjs serve
+ExecStart=${UPDATER_BIN} serve
 Restart=on-failure
 RestartSec=5s
 NoNewPrivileges=true
 PrivateTmp=true
 ProtectHome=true
 ProtectSystem=full
-ReadWritePaths=${INSTALL_DIR} ${STATE_DIR} ${SOCKET_DIR} /run /var/run
+ReadWritePaths=${INSTALL_DIR} ${STATE_DIR} ${SOCKET_DIR} /usr/local/bin /run /var/run
 
 [Install]
 WantedBy=multi-user.target
@@ -115,11 +160,10 @@ EOF
 main() {
   require_root
   read_image_tag
-  ensure_node
+  install_binary
   ensure_token
   install_service
   printf 'Host Updater 已安装，Socket：%s/updater.sock\n' "$SOCKET_DIR"
-  printf '请重建服务使 Token 生效：sudo bash %s/scripts/host/deploy.sh\n' "$INSTALL_DIR"
 }
 
 main "$@"

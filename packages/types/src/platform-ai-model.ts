@@ -835,6 +835,10 @@ export const VIDEO_RATIO_OPTIONS = [
   "21:9",
 ] as const;
 
+export const VIDEO_OMNI_REFERENCE_TASK_TYPE_FIELD_NAME =
+  "omni_reference_task_type" as const;
+export const VIDEO_OMNI_REFERENCE_TASK_TYPE_OPTIONS = ["reference"] as const;
+
 /** Full video-generation field catalog for Admin and runtime. */
 export const VIDEO_GENERATION_FIELD_CATALOG: readonly UpstreamParamProfileField[] =
   [
@@ -906,6 +910,14 @@ export const VIDEO_GENERATION_FIELD_CATALOG: readonly UpstreamParamProfileField[
       type: "boolean",
       description: "返回尾帧",
       default: false,
+    },
+    {
+      name: VIDEO_OMNI_REFERENCE_TASK_TYPE_FIELD_NAME,
+      apiName: VIDEO_OMNI_REFERENCE_TASK_TYPE_FIELD_NAME,
+      type: "string",
+      description: "任务模式",
+      default: "reference",
+      enumValues: [...VIDEO_OMNI_REFERENCE_TASK_TYPE_OPTIONS],
     },
     {
       name: "output_format",

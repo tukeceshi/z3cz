@@ -63,12 +63,7 @@ sudo bash /var/dafthunk/scripts/host/deploy.sh
 
 管理后台 **系统设置 → 系统更新**：检查正式版本、一键升级、失败回退。
 
-服务器需先安装更新器（只需一次），然后重建服务：
-
-```bash
-sudo bash /var/dafthunk/scripts/host/install-host-updater.sh
-sudo bash /var/dafthunk/scripts/host/deploy.sh
-```
+`deploy.sh` 会自动安装宿主机更新器（二进制，不在系统上装 Node）。旧机器再跑一次部署即可启用在线更新。
 
 命令行备用：
 

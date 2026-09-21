@@ -75,7 +75,8 @@ copy_host_files() {
     "$stage/scripts/host/updater" \
     "$stage/docker-host/lib" \
     "$stage/docker-host/samples" \
-    "$stage/docker/nginx"
+    "$stage/docker/nginx" \
+    "$stage/dist"
 
   cp "$ROOT/scripts/host/"*.sh "$stage/scripts/host/"
   cp "$ROOT/scripts/host/updater/"*.mjs "$stage/scripts/host/updater/"
@@ -88,7 +89,11 @@ copy_host_files() {
   cp "$ROOT/docker-host/lib/"*.mjs "$stage/docker-host/lib/"
   rm -f "$stage/docker-host/lib/"*.test.mjs
   cp "$ROOT/docker/nginx/app.static.conf" "$stage/docker/nginx/app.static.conf"
-  chmod +x "$stage/scripts/host/"*.sh "$stage/docker-host/launcher" "$stage/docker-host/dafthunk-setup"
+  cp "$ROOT/dist/z3cz-host-updater-linux-amd64" "$stage/dist/"
+  cp "$ROOT/dist/z3cz-host-updater-linux-arm64" "$stage/dist/"
+  cp "$ROOT/dist/SHA256SUMS" "$stage/dist/"
+  chmod +x "$stage/scripts/host/"*.sh "$stage/docker-host/launcher" "$stage/docker-host/dafthunk-setup" \
+    "$stage/dist/z3cz-host-updater-linux-amd64" "$stage/dist/z3cz-host-updater-linux-arm64"
   cp "$ROOT/VERSION" "$stage/VERSION"
   cp "$ROOT/CHANGELOG.md" "$stage/CHANGELOG.md"
   if git -C "$ROOT" rev-parse HEAD >/dev/null 2>&1; then
@@ -102,6 +107,7 @@ copy_host_files() {
 
 build_images
 push_images
+bash "${ROOT}/scripts/host/compile-updater.sh"
 STAGE="$(mktemp -d)"
 trap 'rm -rf "$STAGE"' EXIT
 copy_host_files "$STAGE"

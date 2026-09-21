@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import type { UpstreamParamProfileField } from "@dafthunk/types";
 
 import {
+  isGenerationFieldVisibleOnCard,
   persistNodeGenerationParams,
   readNodeGenerationParams,
   resolveCardGenerationParams,
@@ -85,5 +86,17 @@ describe("persistNodeGenerationParams", () => {
         value: { ratio: "16:9" },
       },
     ]);
+  });
+});
+
+describe("isGenerationFieldVisibleOnCard", () => {
+  it("hides omni_reference_task_type from the node card", () => {
+    expect(
+      isGenerationFieldVisibleOnCard({ name: "omni_reference_task_type" })
+    ).toBe(false);
+    expect(isGenerationFieldVisibleOnCard({ name: "ratio" })).toBe(true);
+    expect(
+      isGenerationFieldVisibleOnCard({ name: "watermark", hidden: true })
+    ).toBe(false);
   });
 });

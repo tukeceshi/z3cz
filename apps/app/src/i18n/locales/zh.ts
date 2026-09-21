@@ -918,7 +918,7 @@ export const zh: TranslationDictionary = {
       loadFailed: "读取系统更新状态失败",
       unsupportedTitle: "当前部署不支持后台在线更新",
       unsupportedDetail:
-        "请在服务器安装更新器并重建服务。此状态下不会执行任何更新。命令：sudo bash /var/dafthunk/scripts/host/install-host-updater.sh",
+        "请先完成自托管部署（sudo bash /var/dafthunk/scripts/host/deploy.sh）。部署会自动安装更新器；此状态下不会执行任何更新。若仍看到本提示，请检查 z3cz-updater.service 后重建 API 容器。",
       manualTitle: "需要人工介入",
       manualDetail: "请检查更新器与容器日志。",
       releaseTitle: "可用版本",
@@ -2436,6 +2436,7 @@ export const zh: TranslationDictionary = {
         web_search: "联网搜索",
         virtual_avatar_library: "虚拟人像库",
         return_last_frame: "返回末帧",
+        omni_reference_task_type: "任务模式",
         output_format: "输出格式",
         execution_expires_after: "任务超时（秒）",
       },

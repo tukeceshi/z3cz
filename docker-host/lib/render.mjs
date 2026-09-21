@@ -233,7 +233,8 @@ services:
       test: ["CMD-SHELL", "pg_isready -U postgres -d postgres"]
       interval: 5s
       timeout: 5s
-      retries: 5
+      retries: 12
+      start_period: 90s
     restart: unless-stopped
 
   api:

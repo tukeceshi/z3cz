@@ -220,6 +220,8 @@ test("renderCompose is host project without smtp", () => {
   assert.match(yaml, /app\.static\.conf/);
   assert.match(yaml, /RUN_DB_MIGRATE: "false"/);
   assert.match(yaml, /APP_VERSION: "latest"/);
+  assert.match(yaml, /start_period: 90s/);
+  assert.match(yaml, /retries: 12/);
 });
 
 test("parseAppYml reads image_tag", () => {

@@ -30,6 +30,11 @@ done
 [[ -f "$APP_YML" ]] || die "Missing $APP_YML — run configure.sh first"
 [[ -x "${HOST_DIR}/launcher" ]] || die "Missing ${HOST_DIR}/launcher"
 
+if [[ -f "${INSTALL_DIR}/scripts/host/install-host-updater.sh" ]]; then
+  log "Ensure host updater"
+  bash "${INSTALL_DIR}/scripts/host/install-host-updater.sh"
+fi
+
 hostname="$(grep -E '^hostname:' "$APP_YML" | head -1 | sed 's/^hostname:[[:space:]]*//')"
 
 log "Deploy (log: $REBUILD_LOG)"

@@ -27,10 +27,9 @@ sudo bash /var/dafthunk/scripts/host/deploy.sh
 
 ## 更新
 
-管理后台 **系统设置 → 系统更新**（需先安装更新器）：
+管理后台 **系统设置 → 系统更新**。`deploy.sh` 会自动安装宿主机更新器。
 
 ```bash
-sudo bash /var/dafthunk/scripts/host/install-host-updater.sh
 sudo bash /var/dafthunk/scripts/host/deploy.sh
 ```
 

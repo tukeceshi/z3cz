@@ -9,7 +9,7 @@ INSTALL_DIR="${DAFTHUNK_INSTALL_DIR:-/var/dafthunk}"
 HOST_DIR="${INSTALL_DIR}/docker-host"
 # shellcheck source=postgres-data-dir.sh
 source "${INSTALL_DIR}/scripts/host/postgres-data-dir.sh"
-UPDATER="${INSTALL_DIR}/scripts/host/updater/main.mjs"
+UPDATER_BIN="${Z3CZ_UPDATER_BINARY_PATH:-/usr/local/bin/z3cz-host-updater}"
 SOCKET="${Z3CZ_UPDATER_SOCKET:-/run/z3cz-updater/updater.sock}"
 TARGET=""
 RESET=0
@@ -20,13 +20,19 @@ log() { printf '==> %s\n' "$*" >&2; }
 info() { printf ' -> %s\n' "$*" >&2; }
 die() { printf 'ERROR: %s\n' "$*" >&2; exit 1; }
 
-find_node() {
-  if [[ -x /usr/local/lib/z3cz-updater/bin/node ]]; then
-    printf '%s' /usr/local/lib/z3cz-updater/bin/node
+find_updater() {
+  if [[ -x "$UPDATER_BIN" ]]; then
+    printf '%s' "$UPDATER_BIN"
     return 0
   fi
-  if command -v node >/dev/null 2>&1; then
-    command -v node
+  local arch
+  case "$(uname -m)" in
+    x86_64|amd64) arch="amd64" ;;
+    aarch64|arm64) arch="arm64" ;;
+    *) return 1 ;;
+  esac
+  if [[ -x "${INSTALL_DIR}/dist/z3cz-host-updater-linux-${arch}" ]]; then
+    printf '%s' "${INSTALL_DIR}/dist/z3cz-host-updater-linux-${arch}"
     return 0
   fi
   return 1
@@ -77,15 +83,14 @@ run_via_service() {
 }
 
 run_via_cli() {
-  local node_bin
-  node_bin="$(find_node)" || die "未找到 Node。请先安装更新器：sudo bash ${INSTALL_DIR}/scripts/host/install-host-updater.sh"
-  [[ -f "$UPDATER" ]] || die "未找到更新器脚本"
+  local updater_bin
+  updater_bin="$(find_updater)" || die "未找到更新器。请运行：sudo bash ${INSTALL_DIR}/scripts/host/deploy.sh"
   export Z3CZ_INSTALL_DIR="$INSTALL_DIR"
   load_updater_env
   if [[ -n "$TARGET" ]]; then
-    exec "$node_bin" "$UPDATER" update "$TARGET"
+    exec "$updater_bin" update "$TARGET"
   fi
-  exec "$node_bin" "$UPDATER" update
+  exec "$updater_bin" update
 }
 
 while [[ $# -gt 0 ]]; do

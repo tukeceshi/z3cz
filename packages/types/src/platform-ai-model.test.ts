@@ -433,12 +433,18 @@ describe("VIDEO_GENERATION_FIELD_CATALOG", () => {
     expect(catalogNames.has("reference_mode")).toBe(true);
     expect(catalogNames.has("web_search")).toBe(true);
     expect(catalogNames.has("virtual_avatar_library")).toBe(true);
+    expect(catalogNames.has("omni_reference_task_type")).toBe(true);
     expect(catalogNames.has("camera_fixed")).toBe(false);
     expect(catalogNames.has("generate_count")).toBe(false);
     const duration = VIDEO_GENERATION_FIELD_CATALOG.find(
       (field) => field.name === "duration"
     );
     expect(duration?.apiName).toBe("duration");
+    const omniReferenceTaskType = VIDEO_GENERATION_FIELD_CATALOG.find(
+      (field) => field.name === "omni_reference_task_type"
+    );
+    expect(omniReferenceTaskType?.default).toBe("reference");
+    expect(omniReferenceTaskType?.enumValues).toEqual(["reference"]);
   });
 
   it("includes full Seedance default field set", () => {
@@ -449,6 +455,7 @@ describe("VIDEO_GENERATION_FIELD_CATALOG", () => {
     expect(defaultNames.has("web_search")).toBe(true);
     expect(defaultNames.has("virtual_avatar_library")).toBe(true);
     expect(defaultNames.has("return_last_frame")).toBe(true);
+    expect(defaultNames.has("omni_reference_task_type")).toBe(false);
     expect(defaultNames.has("seed")).toBe(true);
     expect(defaultNames.has("ratio")).toBe(true);
     expect(defaultNames.has("duration")).toBe(true);

@@ -10,6 +10,7 @@ import {
   isVolcanoMediaKitVideoTrimEnabled,
   mergeImageGenerationParams,
   normalizeVideoModelParameterRules,
+  VIDEO_OMNI_REFERENCE_TASK_TYPE_FIELD_NAME,
   readVideoPriceEstimateBaseline480pWithoutVideo,
   readVideoPriceEstimateDisplayFolds,
   readVideoPriceEstimateTier,
@@ -151,6 +152,7 @@ const RETAKE_HIDDEN_PARAM_FIELD_NAMES = new Set([
   "aspect_ratio",
   "duration",
   "reference_mode",
+  VIDEO_OMNI_REFERENCE_TASK_TYPE_FIELD_NAME,
 ]);
 const RETAKE_TRIGGER_SUMMARY_FIELD_NAMES = new Set([
   "resolution",

@@ -951,7 +951,7 @@ export const en = {
       loadFailed: "Could not load system update status",
       unsupportedTitle: "In-app updates are not available here",
       unsupportedDetail:
-        "Install the host updater on the server and recreate the API container. Nothing will be upgraded in this state. Command: sudo bash /var/dafthunk/scripts/host/install-host-updater.sh",
+        "Finish self-host deploy (sudo bash /var/dafthunk/scripts/host/deploy.sh). Deploy installs the host updater automatically; nothing will be upgraded in this state. If this message remains, check z3cz-updater.service and recreate the API container.",
       manualTitle: "Manual intervention required",
       manualDetail: "Check updater and container logs.",
       releaseTitle: "Available version",
@@ -2550,6 +2550,7 @@ export const en = {
         web_search: "Web search",
         virtual_avatar_library: "Virtual avatar library",
         return_last_frame: "Return last frame",
+        omni_reference_task_type: "Task mode",
         output_format: "Output format",
         execution_expires_after: "Task timeout (seconds)",
       },

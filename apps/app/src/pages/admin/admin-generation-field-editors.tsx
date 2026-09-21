@@ -912,6 +912,10 @@ function useGenerationFieldTitleResolver(modality: AdminGenerationModality) {
           );
         case "return_last_frame":
           return t("pages.adminAiModels.videoFieldLabels.return_last_frame");
+        case "omni_reference_task_type":
+          return t(
+            "pages.adminAiModels.videoFieldLabels.omni_reference_task_type"
+          );
         case "output_format":
           return t("pages.adminAiModels.videoFieldLabels.output_format");
         case "execution_expires_after":

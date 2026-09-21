@@ -23,7 +23,10 @@ import { cn } from "@/utils/utils";
 
 import { AI_BOTTOM_CHIP_CLASS } from "./ai-bottom-chip";
 import { DurationDragSlider } from "./duration-drag-slider";
-import { readNodeGenerationParams } from "./generative-card-params";
+import {
+  isGenerationFieldVisibleOnCard,
+  readNodeGenerationParams,
+} from "./generative-card-params";
 import type { GenerativeParamsPopoverUiProps } from "./use-generative-params-editor";
 import {
   formatGenerationDurationLabel,
@@ -88,7 +91,7 @@ function partitionVisibleFields(fields: readonly UpstreamParamProfileField[]): {
   readonly mainFields: readonly UpstreamParamProfileField[];
   readonly tailFields: readonly UpstreamParamProfileField[];
 } {
-  const visible = fields.filter((field) => !field.hidden);
+  const visible = fields.filter(isGenerationFieldVisibleOnCard);
   const tailByName = new Map(
     visible
       .filter((field) => TAIL_FIELD_NAMES.has(field.name))
@@ -214,7 +217,7 @@ function formatParamSummary(
 
   let referenceModeLabel: string | undefined;
 
-  for (const field of fields.filter((entry) => !entry.hidden)) {
+  for (const field of fields.filter(isGenerationFieldVisibleOnCard)) {
     const raw = readFieldValue(field, values);
     if (raw === undefined || raw === null || raw === "") continue;
 

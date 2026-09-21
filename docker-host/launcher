@@ -156,6 +156,12 @@ run_render() {
     "$HOST_DIR/shared/caddy" \
     "$HOST_DIR/shared/caddy-config" \
     "$HOST_DIR/shared/backups"
+  # postgres:16-alpine is uid 999; a root-owned empty bind-mount crash-loops.
+  if [[ -f "$REPO_ROOT/scripts/host/postgres-data-dir.sh" ]]; then
+    # shellcheck source=../scripts/host/postgres-data-dir.sh
+    source "$REPO_ROOT/scripts/host/postgres-data-dir.sh"
+    prepare_postgres_data_dir "$HOST_DIR/shared/postgres"
+  fi
 
   if command -v node >/dev/null 2>&1; then
     (cd "$REPO_ROOT" && node docker-host/launcher.mjs render)

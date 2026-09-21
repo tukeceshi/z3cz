@@ -1,7 +1,15 @@
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-const here = path.dirname(fileURLToPath(import.meta.url));
+function resolveHere() {
+  try {
+    return path.dirname(fileURLToPath(import.meta.url));
+  } catch {
+    return path.dirname(process.execPath);
+  }
+}
+
+const here = resolveHere();
 
 export const updaterRoot = here;
 export const installDir = path.resolve(

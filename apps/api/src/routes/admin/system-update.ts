@@ -103,7 +103,7 @@ adminSystemUpdateRoutes.post(
     } catch (error) {
       if (error instanceof Error && error.message === "unsupported") {
         return c.json(
-          { error: "当前部署不支持后台在线更新，请先在服务器安装更新器" },
+          { error: "当前部署不支持后台在线更新，请先完成自托管部署以安装更新器" },
           409
         );
       }
@@ -132,7 +132,7 @@ adminSystemUpdateRoutes.post(
     } catch (error) {
       if (error instanceof Error && error.message === "unsupported") {
         return c.json(
-          { error: "当前部署不支持后台回退，请先在服务器安装更新器" },
+          { error: "当前部署不支持后台回退，请先完成自托管部署以安装更新器" },
           409
         );
       }

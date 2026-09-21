@@ -31,11 +31,15 @@ function makeInstall(imageTag = "latest") {
   return {
     root,
     hostDir,
+    installDir: root,
     appYmlPath: path.join(hostDir, "containers", "app.yml"),
     composePath: path.join(hostDir, "docker-compose.generated.yml"),
     envPath: path.join(hostDir, ".env.generated"),
     stateDir: path.join(root, "state"),
     backupDir: path.join(root, "backups"),
+    binaryPath: path.join(root, "z3cz-host-updater"),
+    selfUpdate: false,
+    restartService: () => undefined,
   };
 }
 
@@ -88,5 +92,54 @@ test("writeImageTag updates app.yml", () => {
   manager.writeImageTag("v1.2.0");
   const config = parseAppYml(fs.readFileSync(paths.appYmlPath, "utf8"));
   assert.equal(config.image_tag, "1.2.0");
+  fs.rmSync(paths.root, { recursive: true, force: true });
+});
+
+test("verifyImages rejects images without a repo digest", async () => {
+  const paths = makeInstall("1.0.0");
+  const manager = new UpdateManager({
+    ...paths,
+    compose: async () => ({ stdout: "", stderr: "" }),
+    runCommand: async () => ({ stdout: "[]", stderr: "" }),
+  });
+  await assert.rejects(
+    () => manager.verifyImages("v1.1.0"),
+    /未包含仓库摘要/
+  );
+  fs.rmSync(paths.root, { recursive: true, force: true });
+});
+
+test("verifyImages records repo digests", async () => {
+  const paths = makeInstall("1.0.0");
+  const manager = new UpdateManager({
+    ...paths,
+    compose: async () => ({ stdout: "", stderr: "" }),
+    runCommand: async (_cwd, _cmd, args) => {
+      const image = String(args[2] || "");
+      return {
+        stdout: `["${image.replace(/:.*/, "")}@sha256:abc123"]`,
+        stderr: "",
+      };
+    },
+  });
+  await manager.verifyImages("v1.1.0");
+  assert.match(manager.state.imageDigests.api, /@sha256:abc123/);
+  assert.match(manager.state.imageDigests.app, /@sha256:abc123/);
+  fs.rmSync(paths.root, { recursive: true, force: true });
+});
+
+test("self-update failure after success becomes manual intervention", async () => {
+  const paths = makeInstall("1.0.0");
+  const manager = new UpdateManager({
+    ...paths,
+    selfUpdate: true,
+    compose: async () => ({ stdout: "", stderr: "" }),
+    replaceBinary: () => {
+      throw new Error("disk full");
+    },
+  });
+  await manager.finalizeSuccessfulUpdate("v1.1.0", path.join(paths.root, "next.bin"));
+  assert.equal(manager.snapshot().operation.phase, "manual_intervention");
+  assert.match(manager.snapshot().operation.error || "", /自更新失败/);
   fs.rmSync(paths.root, { recursive: true, force: true });
 });
