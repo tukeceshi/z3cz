@@ -88,14 +88,14 @@ ensure_swap() {
 }
 
 ensure_packages() {
-  if need_cmd docker && need_cmd curl && need_cmd tar && need_cmd gzip; then
+  if need_cmd docker && need_cmd curl && need_cmd tar && need_cmd gzip && need_cmd git; then
     info "Docker already installed"
   else
     need_cmd apt-get || die "Need apt-get to install Docker"
     log "Installing Docker"
     export DEBIAN_FRONTEND=noninteractive
     apt-get update -qq
-    apt-get install -y -qq docker.io ca-certificates curl tar gzip
+    apt-get install -y -qq docker.io ca-certificates curl tar gzip git
     systemctl enable --now docker 2>/dev/null || true
     need_cmd docker || die "Docker install failed"
     need_cmd curl || die "curl install failed"
@@ -141,6 +141,7 @@ looks_like_install() {
 }
 
 pull_packaged_images() {
+  [[ -f "${INSTALL_DIR}/SOURCE_REVISION" ]] && return 0
   [[ -x "${INSTALL_DIR}/docker-host/launcher" ]] || die "Missing docker-host/launcher"
   log "Pulling api/app images"
   (cd "${INSTALL_DIR}/docker-host" && ./launcher pull-app-images)

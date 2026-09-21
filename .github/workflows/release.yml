@@ -40,7 +40,10 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Build, push versioned images, pack host files
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Publish base environment and pack source updater
         env:
           DAFTHUNK_PUSH_IMAGES: "1"
           DAFTHUNK_RELEASE: "1"

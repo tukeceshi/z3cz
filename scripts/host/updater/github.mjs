@@ -47,6 +47,7 @@ export async function fetchLatestRelease(repository, options = {}) {
     (item) =>
       item &&
       !item.draft &&
+      !item.prerelease &&
       typeof item.tag_name === "string" &&
       item.tag_name.startsWith("v")
   );

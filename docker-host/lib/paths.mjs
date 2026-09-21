@@ -34,6 +34,7 @@ export function ensureHostDirs() {
     path.join(sharedDir, "caddy"),
     path.join(sharedDir, "caddy", "certs"),
     path.join(sharedDir, "backups"),
+    path.join(sharedDir, "maintenance"),
   ]) {
     fs.mkdirSync(dir, { recursive: true });
   }

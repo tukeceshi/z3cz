@@ -84,6 +84,12 @@ install_binary() {
   sums="$(mktemp)"
   trap 'rm -f "$tmp" "$sums"' RETURN
 
+  if [[ -f "$local_bin" && -f "$local_sums" ]]; then
+    verify_checksum "$local_bin" "$local_sums" "$asset"
+    install -m 0755 "$local_bin" "$UPDATER_BIN"
+    return 0
+  fi
+
   if [[ -n "$RELEASE_TAG" ]]; then
     if download_file "https://github.com/${REPOSITORY}/releases/download/${RELEASE_TAG}/SHA256SUMS" "$sums" \
       && download_file "https://github.com/${REPOSITORY}/releases/download/${RELEASE_TAG}/${asset}" "$tmp"; then

@@ -110,6 +110,12 @@ function renderCaddyGlobal(config) {
  */
 export function renderCaddyfile(config) {
   const siteHandler = `	encode gzip zstd
+	route {
+	@maintenance file {
+		root /maintenance
+		try_files enabled
+	}
+	respond @maintenance "系统正在更新，请稍后刷新。" 503
 
 	handle_path /api/* {
 		reverse_proxy api:3102
@@ -118,6 +124,7 @@ export function renderCaddyfile(config) {
 		reverse_proxy app:80 {
 			flush_interval -1
 		}
+	}
 	}`;
 
   if (config.https) {
@@ -147,7 +154,9 @@ export const UPDATER_SOCKET_DIR = "/run/z3cz-updater";
  */
 export function dockerImageTag(imageTag) {
   const value = String(imageTag ?? "latest").trim() || "latest";
-  return value.startsWith("v") || value.startsWith("V") ? value.slice(1) : value;
+  return value.startsWith("v") || value.startsWith("V")
+    ? value.slice(1)
+    : value;
 }
 
 /**
@@ -200,10 +209,23 @@ export function resolveAppImages(config) {
 /**
  * @param {ReturnType<typeof loadAppConfig>} config
  */
-export function renderCompose(config) {
+export function renderCompose(config, source = null) {
   const origin = config.origin.replace(/\/$/, "");
   const staticConf = "../docker/nginx/app.static.conf";
   const images = resolveAppImages(config);
+  if (source) {
+    images.api = source.runtimeImage;
+    images.app = source.appImage;
+  }
+  const sourceApi = source
+    ? `\n    working_dir: /app/apps/api\n    command: ["pnpm", "exec", "tsx", "--import", "./src/shims/cloudflare-register.mjs", "src/server.ts"]`
+    : "";
+  const sourceVolume = source
+    ? `\n      - ${JSON.stringify(`${source.sourceDir}:/app:ro`)}`
+    : "";
+  const sourceAppVolume = source
+    ? `\n      - ${JSON.stringify(`${source.sourceDir}/apps/app/dist:/usr/share/nginx/html:ro`)}`
+    : "";
   const updaterEnabled = Boolean(config.env.UPDATER_TOKEN?.trim());
   const appVersion =
     images.tag === "latest" ? "latest" : `v${images.tag.replace(/^v/i, "")}`;
@@ -239,7 +261,7 @@ services:
 
   api:
     image: ${images.api}
-    pull_policy: missing
+    pull_policy: ${source ? "never" : "missing"}${sourceApi}
     depends_on:
       postgres:
         condition: service_healthy
@@ -250,6 +272,8 @@ services:
       DATABASE_URL: postgresql://postgres:postgres@postgres:5432/postgres
       LOCAL_STORAGE_PATH: /app/data/storage
       RUN_DB_MIGRATE: "false"
+      BOOTSTRAP_ASSETS_DIR: ${source ? "/app/apps/app/dist" : "/app/data/bootstrap"}
+      Z3CZ_MAINTENANCE_FILE: /maintenance/enabled
       APP_VERSION: "${appVersion}"
       WEB_HOST: "${origin}"
       WEBSITE_URL: "${origin}"
@@ -257,12 +281,13 @@ services:
       SECRET_MASTER_KEY: \${SECRET_MASTER_KEY}
       CLOUDFLARE_ENV: production${updaterEnv}
     volumes:
-      - ./shared/storage:/app/data/storage${updaterVolume}
+      - ./shared/storage:/app/data/storage${updaterVolume}${sourceVolume}
+      - ./shared/maintenance:/maintenance:ro
     healthcheck:
       test:
         [
           "CMD-SHELL",
-          "node -e \\"fetch('http://127.0.0.1:3102/health').then((r)=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\\"",
+          ${JSON.stringify("node -e \"fetch('http://127.0.0.1:3102/health').then((r)=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\"")},
         ]
       interval: 10s
       timeout: 5s
@@ -272,12 +297,12 @@ services:
 
   app:
     image: ${images.app}
-    pull_policy: missing
+    pull_policy: ${source ? "never" : "missing"}
     depends_on:
       api:
         condition: service_healthy
     volumes:
-      - ${staticConf}:/etc/nginx/conf.d/default.conf:ro
+      - ${staticConf}:/etc/nginx/conf.d/default.conf:ro${sourceAppVolume}
     restart: unless-stopped
 
   caddy:
@@ -293,6 +318,7 @@ services:
       - ./Caddyfile.generated:/etc/caddy/Caddyfile:ro
       - ./shared/caddy:/data
       - ./shared/caddy-config:/config
+      - ./shared/maintenance:/maintenance:ro
 ${caddyExtraVolumes(config)}    restart: unless-stopped
 `;
 }
@@ -334,8 +360,12 @@ export function writeGeneratedFiles() {
     recursive: true,
   });
   const config = loadAppConfig();
+  const sourceFile = path.join(dockerHostRoot, "source-deployment.json");
+  const source = fs.existsSync(sourceFile)
+    ? JSON.parse(fs.readFileSync(sourceFile, "utf8"))
+    : null;
   fs.writeFileSync(generatedCaddyfilePath, renderCaddyfile(config), "utf8");
-  fs.writeFileSync(generatedComposePath, renderCompose(config), "utf8");
+  fs.writeFileSync(generatedComposePath, renderCompose(config, source), "utf8");
   fs.writeFileSync(generatedEnvPath, renderEnvFile(config), "utf8");
   writePackagedImagesEnv(config);
   return config;

@@ -8,6 +8,7 @@ import type { Bindings } from "./context";
 import { createNodeBindings } from "./env/create-node-bindings";
 import { registerNodeWsRoutes } from "./routes/ws-node";
 import { handleScheduledEvent } from "./scheduled";
+import { existsSync } from "node:fs";
 
 export async function runServer(
   envVars: Record<string, string>
@@ -25,6 +26,10 @@ export async function runServer(
 
   writeBootPhase("creating_bindings");
   const bindings: Bindings = await createNodeBindings(envVars);
+  const inMaintenance = () =>
+    Boolean(
+      envVars.Z3CZ_MAINTENANCE_FILE && existsSync(envVars.Z3CZ_MAINTENANCE_FILE)
+    );
 
   writeBootPhase("creating_app");
   const app = createApp({ runtime: "node" });
@@ -34,6 +39,9 @@ export async function runServer(
     request: Request,
     serverEnv?: { incoming: unknown; outgoing: unknown }
   ): Response | Promise<Response> => {
+    if (inMaintenance() && new URL(request.url).pathname !== "/health") {
+      return new Response("系统正在更新，请稍后重试。", { status: 503 });
+    }
     if (serverEnv && "incoming" in serverEnv) {
       Object.assign(serverEnv, bindings);
       return honoFetch(
@@ -98,6 +106,7 @@ export async function runServer(
 
   if (envVars.ENABLE_SCHEDULED_WORKER !== "false") {
     const runScheduled = () => {
+      if (inMaintenance()) return;
       void handleScheduledEvent(
         {} as ScheduledEvent,
         bindings,

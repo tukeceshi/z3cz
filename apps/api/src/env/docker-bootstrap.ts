@@ -112,6 +112,7 @@ export async function waitForPostgres(
 }
 
 export function runDatabaseMigrations(databaseUrl: string): void {
+  if (process.env.RUN_DB_MIGRATE === "false") return;
   if (shouldSkipDatabaseMigrations()) {
     return;
   }

@@ -1,0 +1,8 @@
+FROM node:22.12.0-bookworm-slim
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends ca-certificates git python3 make g++ \
+ && rm -rf /var/lib/apt/lists/* \
+ && corepack disable \
+ && npm install -g pnpm@10.3.0
+WORKDIR /app/apps/api
+CMD ["pnpm", "exec", "tsx", "--import", "./src/shims/cloudflare-register.mjs", "src/server.ts"]

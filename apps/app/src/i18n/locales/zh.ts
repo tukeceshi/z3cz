@@ -909,7 +909,7 @@ export const zh: TranslationDictionary = {
     systemUpdate: {
       title: "系统更新",
       description:
-        "检查正式版本，备份后升级。更新期间站点会短暂不可用；失败会回到上一版。",
+        "获取正式版本源码，在服务器构建后切换。准备期间可继续使用，切换期间进入维护模式。",
       check: "检查更新",
       checking: "正在检查…",
       checkFound: "发现新版本 {{version}}",
@@ -943,7 +943,7 @@ export const zh: TranslationDictionary = {
         pending: "待执行",
       },
       progressTitle: "更新进度",
-      progressHint: "进度保存在服务器上，页面刷新后仍可继续查看。",
+      progressHint: "进度保存在服务器上。维护期间连接可能暂时中断，恢复后继续显示；关闭网页不影响更新。",
       progressEmpty: "检查更新后，这里会显示操作记录。",
       backupTitle: "备份与回退",
       backupHint: "只使用最近一次通过校验的备份。",
@@ -955,7 +955,7 @@ export const zh: TranslationDictionary = {
       rollback: "回退到上一版本",
       rollbackTitle: "回退到 {{version}}？",
       rollbackDetail:
-        "会停止当前服务、恢复最近一次备份并启动旧版本。请确认业务影响。",
+        "会停止服务、恢复备份和旧版本。备份之后新增的数据将丢失，请确认业务影响。",
       rollbackReasonPlaceholder: "填写回退原因（必填）",
       rollbackReasonRequired: "请填写回退原因",
       rollbackConfirm: "开始回退",
@@ -963,7 +963,7 @@ export const zh: TranslationDictionary = {
       rollbackFailed: "无法开始回退",
       confirmTitle: "更新到 {{version}}？",
       confirmDetail:
-        "系统会先备份数据库和上传文件，再停止旧服务、迁移并切换版本。更新期间站点会短暂不可用。",
+        "先获取代码、安装依赖并构建，再停止写入、备份和切换版本。关闭网页不影响更新。",
       confirm: "确认并开始更新",
       cancel: "取消",
       phases: {
@@ -973,7 +973,7 @@ export const zh: TranslationDictionary = {
         no_update: "已是最新",
         preflight: "前置检查",
         backing_up: "正在备份",
-        pulling: "拉取镜像",
+        pulling: "获取源码与构建",
         draining: "停止旧服务",
         migrating: "迁移数据库",
         switching: "切换版本",

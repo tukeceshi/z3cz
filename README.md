@@ -57,13 +57,17 @@ sudo bash /var/dafthunk/scripts/host/deploy.sh
 
 证书签发走公网 HTTP-01：CA 按 **当前 DNS** 访问 `http://你的域名/.well-known/acme-challenge/`。多台机器时，**只在域名已解析到的那一台**上跑 `https-setup.sh`；新机先改 A 记录并等生效，再申请。80 端口须对公网开放，且不要把校验请求强制跳到 HTTPS。
 
-渲染配置用 Docker 跑 Node 镜像，**系统不装 Node**。bootstrap 会给 Docker 配镜像加速；官方 Docker Hub（`registry-1.docker.io`）连不上时改从加速源拉。api / app 镜像在 Docker Hub（`tukeceshi/z3cz-api`、`tukeceshi/z3cz-app`），更新时只拉有变化的层。
+日常更新通过 Git 获取源码，在 Docker 内安装依赖、构建前端，**宿主机只需 Docker 和 Git，不装 Node**。代码和构建结果按版本保存在 `docker-host/shared/releases`，依赖下载缓存可复用。基础环境没有变化时，不再下载 API / app 应用镜像。
 
 #### 更新
 
 管理后台 **系统设置 → 系统更新**：检查正式版本、一键升级、失败回退。
 
-`deploy.sh` 会自动安装宿主机更新器（二进制，不在系统上装 Node）。旧机器再跑一次部署即可启用在线更新。
+`deploy.sh` 自动安装宿主机更新器。旧机器须先安装包含 `SOURCE_REVISION` 的新版部署包，再运行 `deploy.sh` 完成一次源码部署迁移；仅重跑旧脚本不会启用新方式。首次迁移会下载基础环境并在服务器构建，旧服务保持运行直到构建成功。
+
+更新顺序：获取正式版源码 → 安装依赖、构建 → 维护模式、停止应用 → 备份 → 数据库迁移 → 启动并验证 → 恢复访问。关闭网页不影响更新；维护期间后台连接可能中断，日志由宿主机保存。构建失败不会停服，切换失败恢复本次备份和上一版配置。人工回退会覆盖备份之后新增的数据。
+
+基础环境由 `docker/Dockerfile.source` 决定，仅该文件变化时发布新的 `tukeceshi/z3cz-runtime` 镜像。更新器在日志中提示基础环境下载。`docker/source-protocol` 变化时需先安装新版宿主机更新器。版本目录暂不自动清理，避免删除正在使用或回退需要的文件。
 
 命令行备用：
 
@@ -75,7 +79,7 @@ sudo bash /var/dafthunk/scripts/host/update.sh v1.0.0
 sudo bash /var/dafthunk/scripts/host/update.sh --reset
 ```
 
-打包镜像需要在 GitHub 仓库 Secrets 中配置 `DOCKERHUB_USERNAME`、`DOCKERHUB_TOKEN`，并确保该账号能推送 `tukeceshi/z3cz-api` 与 `tukeceshi/z3cz-app`。
+发布需要配置 GitHub Secrets `DOCKERHUB_USERNAME`、`DOCKERHUB_TOKEN`，并允许推送 `tukeceshi/z3cz-runtime`。正常版本发布复用已有基础环境。服务器须能访问 GitHub、依赖仓库和首次安装所需的镜像源；可通过更新器环境变量 `Z3CZ_SOURCE_REMOTE` 指定可信的 HTTPS Git 仓库镜像。
 
 #### HTTPS 模式
 

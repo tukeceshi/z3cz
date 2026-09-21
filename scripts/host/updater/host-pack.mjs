@@ -8,6 +8,7 @@ export const HOST_PACK_EXCLUDES = [
   "docker-host/docker-compose.generated.yml",
   "docker-host/.env.generated",
   "docker-host/Caddyfile.generated",
+  "docker-host/source-deployment.json",
 ];
 
 /**

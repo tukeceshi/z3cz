@@ -4,7 +4,7 @@ import { spawn } from "node:child_process";
  * @param {string} cwd
  * @param {string} command
  * @param {string[]} args
- * @param {{ timeoutMs?: number, input?: import("node:stream").Readable, env?: Record<string, string> }} [options]
+ * @param {{ timeoutMs?: number, input?: import("node:stream").Readable, env?: Record<string, string>, onOutput?: (chunk: string) => void }} [options]
  * @returns {Promise<{ stdout: string, stderr: string }>}
  */
 export function runCommand(cwd, command, args, options = {}) {
@@ -24,12 +24,14 @@ export function runCommand(cwd, command, args, options = {}) {
     child.stdout.setEncoding("utf8");
     child.stderr.setEncoding("utf8");
     child.stdout.on("data", (chunk) => {
+      options.onOutput?.(chunk);
       stdout += chunk;
       if (stdout.length > 200_000) {
         stdout = stdout.slice(-100_000);
       }
     });
     child.stderr.on("data", (chunk) => {
+      options.onOutput?.(chunk);
       stderr += chunk;
       if (stderr.length > 200_000) {
         stderr = stderr.slice(-100_000);

@@ -990,7 +990,7 @@ export const en = {
       rollback: "Roll back to previous version",
       rollbackTitle: "Roll back to {{version}}?",
       rollbackDetail:
-        "This stops the current services, restores the latest backup, and starts the previous version.",
+        "This stops services, restores the backup and the previous version. Data added since that backup will be lost.",
       rollbackReasonPlaceholder: "Reason for rollback (required)",
       rollbackReasonRequired: "Enter a rollback reason",
       rollbackConfirm: "Start rollback",
@@ -998,7 +998,7 @@ export const en = {
       rollbackFailed: "Could not start rollback",
       confirmTitle: "Update to {{version}}?",
       confirmDetail:
-        "The system backs up the database and uploads, then stops the old services, migrates, and switches versions. The site is briefly unavailable.",
+        "Source and dependencies are prepared while the site runs. The system then pauses writes, backs up data, migrates, and switches versions. Closing this page does not stop the update.",
       confirm: "Confirm and start update",
       cancel: "Cancel",
       phases: {
@@ -1008,7 +1008,7 @@ export const en = {
         no_update: "Up to date",
         preflight: "Preflight",
         backing_up: "Backing up",
-        pulling: "Pulling images",
+        pulling: "Fetching source and building",
         draining: "Stopping old services",
         migrating: "Migrating database",
         switching: "Switching version",

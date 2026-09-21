@@ -114,7 +114,8 @@ async function dumpBinaryPostgres(input, dumpPath) {
       { cwd: input.hostDir, stdio: ["ignore", "pipe", "pipe"] }
     );
     const out = createWriteStream(dumpPath);
-    child.stdout.pipe(out);
+    const written = pipeline(child.stdout, out);
+    written.catch(reject);
     let stderr = "";
     child.stderr.setEncoding("utf8");
     child.stderr.on("data", (chunk) => {
@@ -124,7 +125,7 @@ async function dumpBinaryPostgres(input, dumpPath) {
     out.on("error", reject);
     child.on("close", (code) => {
       if (code === 0) {
-        resolve();
+        written.then(resolve, reject);
         return;
       }
       reject(new Error(stderr.trim() || `pg_dump 退出码 ${code}`));
@@ -145,7 +146,7 @@ export async function verifyBackupArchive(archivePath, expected) {
     "-tzf",
     archivePath,
   ]);
-  const names = listing.stdout.split("\n");
+  const names = listing.stdout.split(/\r?\n/);
   for (const required of ["metadata.json", "database.dump", "storage.tar"]) {
     if (!names.some((name) => name.endsWith(required))) {
       throw new Error(`备份缺少 ${required}`);
@@ -215,11 +216,13 @@ async function restorePostgresDump(hostDir, dumpPath) {
         "-U",
         "postgres",
         "-d",
-        "postgres",
+        "template1",
+        "--create",
         "--clean",
         "--if-exists",
         "--no-owner",
         "--no-privileges",
+        "--exit-on-error",
       ],
       { cwd: hostDir, stdio: ["pipe", "ignore", "pipe"] }
     );
@@ -231,8 +234,7 @@ async function restorePostgresDump(hostDir, dumpPath) {
     });
     child.on("error", reject);
     child.on("close", (code) => {
-      // pg_restore --clean may exit 1 on benign warnings
-      if (code === 0 || code === 1) {
+      if (code === 0) {
         resolve();
         return;
       }

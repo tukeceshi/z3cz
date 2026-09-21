@@ -30,6 +30,22 @@ done
 [[ -f "$APP_YML" ]] || die "Missing $APP_YML — run configure.sh first"
 [[ -x "${HOST_DIR}/launcher" ]] || die "Missing ${HOST_DIR}/launcher"
 
+if [[ "$DETACH" == "1" && -f "${INSTALL_DIR}/SOURCE_REVISION" ]]; then
+  systemd-run --unit=z3cz-source-install --collect \
+    --setenv="DAFTHUNK_INSTALL_DIR=${INSTALL_DIR}" \
+    /bin/bash "${INSTALL_DIR}/scripts/host/deploy.sh"
+  info "后台部署已启动：journalctl -fu z3cz-source-install"
+  exit 0
+fi
+
+if [[ -f "${INSTALL_DIR}/SOURCE_REVISION" ]]; then
+  if ! command -v git >/dev/null 2>&1; then
+    command -v apt-get >/dev/null 2>&1 || die "请先安装 git"
+    apt-get update -qq
+    apt-get install -y -qq git
+  fi
+fi
+
 if [[ -f "${INSTALL_DIR}/scripts/host/install-host-updater.sh" ]]; then
   log "Ensure host updater"
   bash "${INSTALL_DIR}/scripts/host/install-host-updater.sh"
@@ -41,6 +57,17 @@ log "Deploy (log: $REBUILD_LOG)"
 
 cd "$HOST_DIR"
 rebuild_cmd="./launcher rebuild 2>&1 | tee -a '${REBUILD_LOG}'"
+if [[ -f "${INSTALL_DIR}/SOURCE_REVISION" ]]; then
+  source "${INSTALL_DIR}/scripts/host/postgres-data-dir.sh"
+  prepare_postgres_data_dir "${HOST_DIR}/shared/postgres"
+  mkdir -p "${HOST_DIR}/shared/storage" "${HOST_DIR}/shared/maintenance" "${HOST_DIR}/shared/caddy-config"
+  # The service owns background updates. Stop it during the one-time CLI migration.
+  systemctl stop z3cz-updater.service
+  trap 'systemctl start z3cz-updater.service' EXIT
+  export Z3CZ_INSTALL_DIR="$INSTALL_DIR"
+  /usr/local/bin/z3cz-host-updater install-source 2>&1 | tee -a "$REBUILD_LOG"
+  exit 0
+fi
 
 if [[ "$DETACH" == "1" ]] && command -v tmux >/dev/null 2>&1; then
   tmux kill-session -t "$TMUX_SESSION" 2>/dev/null || true

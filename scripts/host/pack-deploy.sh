@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Build api/app images, push to Docker Hub, pack host scripts (no image tarballs).
+# Publish a reusable base environment and pack the source updater.
 #   DAFTHUNK_PUSH_IMAGES=1 bash scripts/host/pack-deploy.sh [outfile]
 set -euo pipefail
 
@@ -16,56 +16,18 @@ fi
 
 log() { printf '==> %s\n' "$*"; }
 
-build_images() {
-  log "Building ${API_IMAGE}"
-  docker build \
-    --target prod-api \
-    -t "$API_IMAGE" \
-    --build-arg VITE_API_HOST=/api \
-    --build-arg VITE_WS_VIA_PROXY=1 \
-    --build-arg VITE_WEBSITE_URL=http://localhost:3101 \
-    --build-arg VITE_APP_URL=http://localhost:3101 \
-    "$ROOT"
-
-  log "Building ${APP_IMAGE}"
-  docker build \
-    --target prod-app \
-    -t "$APP_IMAGE" \
-    --build-arg VITE_API_HOST=/api \
-    --build-arg VITE_WS_VIA_PROXY=1 \
-    --build-arg VITE_WEBSITE_URL=http://localhost:3101 \
-    --build-arg VITE_APP_URL=http://localhost:3101 \
-    "$ROOT"
-}
-
-push_images() {
-  if [[ "${DAFTHUNK_PUSH_IMAGES:-}" != "1" ]]; then
-    log "Skip Docker Hub push (set DAFTHUNK_PUSH_IMAGES=1 to push)"
-    return 0
-  fi
-  log "Pushing ${API_IMAGE}"
-  docker push "$API_IMAGE"
-  log "Pushing ${APP_IMAGE}"
-  docker push "$APP_IMAGE"
-  if git -C "$ROOT" rev-parse --short HEAD >/dev/null 2>&1; then
-    local sha api_sha app_sha
-    sha="$(git -C "$ROOT" rev-parse --short HEAD)"
-    api_sha="${API_IMAGE%:*}:${sha}"
-    app_sha="${APP_IMAGE%:*}:${sha}"
-    docker tag "$API_IMAGE" "$api_sha"
-    docker tag "$APP_IMAGE" "$app_sha"
-    log "Pushing ${api_sha}"
-    docker push "$api_sha"
-    log "Pushing ${app_sha}"
-    docker push "$app_sha"
-  fi
-  if [[ -n "$VERSION_TAG" ]]; then
-    docker tag "$API_IMAGE" "tukeceshi/z3cz-api:latest"
-    docker tag "$APP_IMAGE" "tukeceshi/z3cz-app:latest"
-    log "Pushing tukeceshi/z3cz-api:latest"
-    docker push "tukeceshi/z3cz-api:latest"
-    log "Pushing tukeceshi/z3cz-app:latest"
-    docker push "tukeceshi/z3cz-app:latest"
+build_runtime() {
+  local hash image
+  hash="$(tr -d '\r' < "$ROOT/docker/Dockerfile.source" | sha256sum | cut -c1-20)"
+  image="tukeceshi/z3cz-runtime:env-${hash}"
+  if [[ "${DAFTHUNK_PUSH_IMAGES:-}" == "1" ]]; then
+    if docker manifest inspect "$image" >/dev/null 2>&1; then
+      log "Reusing base environment $image"
+    else
+      docker buildx build --platform linux/amd64,linux/arm64 -f "$ROOT/docker/Dockerfile.source" -t "$image" --push "$ROOT"
+    fi
+  else
+    docker build -f "$ROOT/docker/Dockerfile.source" -t "$image" "$ROOT"
   fi
 }
 
@@ -98,6 +60,7 @@ copy_host_files() {
   cp "$ROOT/CHANGELOG.md" "$stage/CHANGELOG.md"
   if git -C "$ROOT" rev-parse HEAD >/dev/null 2>&1; then
     git -C "$ROOT" rev-parse HEAD >"$stage/DEPLOY_REVISION"
+    cp "$stage/DEPLOY_REVISION" "$stage/SOURCE_REVISION"
   else
     date -u +"%Y-%m-%dT%H:%M:%SZ" >"$stage/DEPLOY_REVISION"
   fi
@@ -105,8 +68,7 @@ copy_host_files() {
     >"$stage/docker-host/packaged-images.env"
 }
 
-build_images
-push_images
+build_runtime
 bash "${ROOT}/scripts/host/compile-updater.sh"
 STAGE="$(mktemp -d)"
 trap 'rm -rf "$STAGE"' EXIT

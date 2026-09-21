@@ -1,31 +1,20 @@
 import fs from "node:fs";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
-
-import { spawn } from "node:child_process";
-
 import {
   checkBackupDiskSpace,
   createBackup,
   restoreBackup,
-  sha256File,
 } from "./backup.mjs";
 import { createComposeRunner, runCommand } from "./docker.mjs";
-import {
-  checksumForAsset,
-  downloadReleaseAsset,
-  fetchLatestRelease,
-  updaterArch,
-  updaterAssetName,
-} from "./github.mjs";
-import { applyHostPack } from "./host-pack.mjs";
+import { fetchLatestRelease } from "./github.mjs";
+import { prepareSourceRelease } from "./source-release.mjs";
+import { runSourceUpdate, rollbackSource } from "./source-update.mjs";
 import {
   parseAppYml,
   stringifyAppYml,
 } from "../../../docker-host/lib/parse-app-yml.mjs";
 import {
-  apiImageName,
-  appImageName,
   appYmlPath,
   composePath,
   defaultBackupDir,
@@ -73,6 +62,9 @@ function emptyState() {
 export class UpdateManager {
   /**
    * @param {Partial<{
+   *   prepareSource: typeof prepareSourceRelease,
+   *   createBackup: typeof createBackup,
+   *   restoreBackup: typeof restoreBackup,
    *   repository: string,
    *   installDir: string,
    *   hostDir: string,
@@ -85,48 +77,30 @@ export class UpdateManager {
    *   githubToken: string,
    *   stableMs: number,
    *   installDir: string,
-   *   binaryPath: string,
-   *   serviceName: string,
-   *   selfUpdate: boolean,
    *   fetchLatest: typeof fetchLatestRelease,
    *   compose: ReturnType<typeof createComposeRunner>,
    *   runCommand: typeof runCommand,
-   *   downloadAsset: typeof downloadReleaseAsset,
-   *   applyHostPack: typeof applyHostPack,
-   *   replaceBinary: (source: string, dest: string) => void,
-   *   restartService: () => void,
    *   sleep: (ms: number) => Promise<void>
    * }>} [options]
    */
   constructor(options = {}) {
+    this.prepareSource = options.prepareSource || prepareSourceRelease;
+    this.createBackup = options.createBackup || createBackup;
+    this.restoreBackup = options.restoreBackup || restoreBackup;
     this.repository = options.repository || defaultRepository;
     this.hostDir = options.hostDir || hostDir;
-    this.installDir =
-      options.installDir || path.dirname(this.hostDir);
+    this.installDir = options.installDir || path.dirname(this.hostDir);
     this.appYmlPath = options.appYmlPath || appYmlPath;
     this.composePath = options.composePath || composePath;
     this.envPath = options.envPath || envPath;
     this.stateDir = options.stateDir || defaultStateDir;
     this.backupDir = options.backupDir || defaultBackupDir;
     this.storageDir = options.storageDir || storageDir;
-    this.binaryPath =
-      options.binaryPath ||
-      process.env.Z3CZ_UPDATER_BINARY_PATH ||
-      "/usr/local/bin/z3cz-host-updater";
-    this.serviceName =
-      options.serviceName ||
-      process.env.Z3CZ_UPDATER_SERVICE_NAME ||
-      "z3cz-updater.service";
-    this.selfUpdate =
-      options.selfUpdate ?? process.env.Z3CZ_UPDATER_SELF_UPDATE !== "false";
-    this.githubToken = options.githubToken || process.env.Z3CZ_UPDATER_GITHUB_TOKEN || "";
+    this.githubToken =
+      options.githubToken || process.env.Z3CZ_UPDATER_GITHUB_TOKEN || "";
     this.stableMs = options.stableMs ?? 30_000;
     this.fetchLatest = options.fetchLatest || fetchLatestRelease;
     this.runCommand = options.runCommand || runCommand;
-    this.downloadAsset = options.downloadAsset || downloadReleaseAsset;
-    this.applyHostPackFn = options.applyHostPack || applyHostPack;
-    this.replaceBinaryFn = options.replaceBinary || replaceFile;
-    this.restartService = options.restartService;
     this.compose =
       options.compose ||
       createComposeRunner(
@@ -142,13 +116,6 @@ export class UpdateManager {
     fs.mkdirSync(this.backupDir, { recursive: true });
     this.statePath = path.join(this.stateDir, "state.json");
     this.state = this.loadState();
-    if (ACTIVE.has(this.state.operation.phase)) {
-      this.state.operation.phase = "manual_intervention";
-      this.state.operation.error =
-        "更新器在操作期间退出，请检查容器与数据库后手动处理";
-      this.appendLog("manual_intervention", this.state.operation.error);
-      this.saveState();
-    }
   }
 
   loadState() {
@@ -166,7 +133,7 @@ export class UpdateManager {
 
   saveState() {
     const tmp = `${this.statePath}.tmp`;
-    fs.writeFileSync(tmp, JSON.stringify(this.state, null, 2));
+    fs.writeFileSync(tmp, JSON.stringify(this.state, null, 2), { mode: 0o600 });
     fs.renameSync(tmp, this.statePath);
   }
 
@@ -210,7 +177,8 @@ export class UpdateManager {
       updateAvailable,
       checks: this.checksFromState(),
       lastBackup: this.state.lastBackup,
-      rollbackVersion: this.state.rollbackVersion || undefined,
+      rollbackVersion: (this.state.pendingUpdate && !this.state.pendingUpdate.fresh
+        ? this.state.pendingUpdate.version : this.state.rollbackVersion) || undefined,
       operation: this.state.operation,
     };
   }
@@ -264,6 +232,9 @@ export class UpdateManager {
   }
 
   async check() {
+    if (fs.existsSync(path.join(this.stateDir, "operation.lock"))) {
+      throw new Error("存在更新锁，请等待当前操作完成或检查中断的更新");
+    }
     if (ACTIVE.has(this.state.operation.phase)) {
       throw Object.assign(new Error("更新操作正在进行，暂时不能检查新版本"), {
         status: this.snapshot(),
@@ -303,20 +274,28 @@ export class UpdateManager {
         error instanceof Error ? error.message : String(error);
       this.appendLog("failed", "检查更新失败");
       this.saveState();
-      throw Object.assign(error instanceof Error ? error : new Error(String(error)), {
-        status: this.snapshot(),
-      });
+      throw Object.assign(
+        error instanceof Error ? error : new Error(String(error)),
+        {
+          status: this.snapshot(),
+        }
+      );
     }
   }
 
   startUpdate(targetVersion) {
+    if (fs.existsSync(path.join(this.stateDir, "operation.lock")))
+      throw new Error("已有更新操作，请先检查其状态");
     const target = displayVersion(String(targetVersion || "").trim());
     if (ACTIVE.has(this.state.operation.phase)) {
       throw Object.assign(new Error("已有更新操作正在进行"), {
         status: this.snapshot(),
       });
     }
-    if (!this.state.latestRelease || this.state.latestRelease.version !== target) {
+    if (
+      !this.state.latestRelease ||
+      this.state.latestRelease.version !== target
+    ) {
       throw Object.assign(
         new Error("目标版本与最近一次检查结果不一致，请重新检查更新"),
         { status: this.snapshot() }
@@ -352,18 +331,31 @@ export class UpdateManager {
   }
 
   startRollback(reason) {
+    if (fs.existsSync(path.join(this.stateDir, "operation.lock"))) {
+      const pid = Number(
+        fs.readFileSync(path.join(this.stateDir, "operation.lock"), "utf8")
+      );
+      if (!Number.isInteger(pid) || pid <= 0)
+        throw new Error("更新锁无效，请人工检查");
+      try {
+        process.kill(pid, 0);
+        throw new Error("更新进程仍在运行");
+      } catch (error) {
+        if (error.code !== "ESRCH") throw error;
+      }
+    }
     if (ACTIVE.has(this.state.operation.phase)) {
       throw Object.assign(new Error("已有更新操作正在进行"), {
         status: this.snapshot(),
       });
     }
-    if (!this.state.rollbackVersion || !this.state.lastBackup) {
+    if (!this.state.pendingUpdate && (!this.state.rollbackVersion || !this.state.lastBackup)) {
       throw Object.assign(new Error("没有可用的回退版本或已校验备份"), {
         status: this.snapshot(),
       });
     }
     const current = this.currentVersion();
-    const target = this.state.rollbackVersion;
+    const target = this.state.pendingUpdate?.version || this.state.rollbackVersion;
     this.state.operation = {
       id: randomUUID(),
       phase: "rolling_back",
@@ -400,248 +392,12 @@ export class UpdateManager {
     this.saveState();
   }
 
-  async runUpdate(fromVersion, targetVersion) {
-    let startedDrain = false;
-    let nextBinaryPath = "";
-    try {
-      await this.collectChecks();
-      const blockingFailed = (this.state.checks || []).some(
-        (check) => check.blocking && check.status === "failed"
-      );
-      if (blockingFailed) {
-        throw new Error("更新前检查未通过");
-      }
-      this.setPhase("backing_up", "创建数据库与上传文件备份");
-      const backup = await createBackup({
-        backupDir: this.backupDir,
-        hostDir: this.hostDir,
-        compose: this.compose,
-        storageDir: this.storageDir,
-        version: fromVersion,
-      });
-      this.state.lastBackup = backup;
-      this.state.rollbackVersion = fromVersion;
-      this.saveState();
-
-      const tag = dockerImageTag(targetVersion);
-      this.setPhase("pulling", `拉取 ${apiImageName}:${tag} 与 ${appImageName}:${tag}`);
-      await this.refreshHostPack(targetVersion);
-      nextBinaryPath = await this.prepareUpdaterBinary(targetVersion);
-      await this.runCommand(this.hostDir, "docker", [
-        "pull",
-        `${apiImageName}:${tag}`,
-      ]);
-      await this.runCommand(this.hostDir, "docker", [
-        "pull",
-        `${appImageName}:${tag}`,
-      ]);
-      await this.verifyImages(targetVersion);
-
-      this.setPhase("draining", "停止 api 与 app，数据库保持运行");
-      startedDrain = true;
-      await this.compose(["stop", "api", "app"]);
-
-      this.setPhase("migrating", "用目标版本镜像执行数据库迁移");
-      this.writeImageTag(targetVersion);
-      await this.runCommand(this.hostDir, path.join(this.hostDir, "launcher"), [
-        "migrate",
-      ]);
-
-      this.setPhase("switching", "启动目标版本");
-      await this.compose(["up", "-d", "--force-recreate", "--no-deps", "api", "app"]);
-
-      this.setPhase("verifying", "等待服务健康");
-      await this.verifyHealth(targetVersion);
-      await this.finalizeSuccessfulUpdate(targetVersion, nextBinaryPath);
-    } catch (error) {
-      if (startedDrain && this.state.lastBackup && this.state.rollbackVersion) {
-        await this.runRollback(fromVersion, this.state.lastBackup, true, error);
-        return;
-      }
-      this.failWithoutRollback(error);
-    }
+  async runUpdate(fromVersion, targetVersion, ref = targetVersion) {
+    return runSourceUpdate(this, fromVersion, targetVersion, ref);
   }
 
   async runRollback(targetVersion, backup, automatic, cause) {
-    this.state.operation.automaticRollback = automatic;
-    this.setPhase(
-      "rolling_back",
-      automatic
-        ? `更新失败，正在回退到 ${targetVersion}`
-        : `正在回退到 ${targetVersion}`
-    );
-    try {
-      await this.compose(["stop", "api", "app"]).catch(() => undefined);
-      this.writeImageTag(targetVersion);
-      await this.runCommand(this.hostDir, path.join(this.hostDir, "launcher"), [
-        "render",
-      ]);
-      await restoreBackup({
-        backup,
-        hostDir: this.hostDir,
-        storageDir: this.storageDir,
-      });
-      await this.compose(["up", "-d", "--wait", "postgres"]);
-      await this.compose(["up", "-d", "--force-recreate", "--no-deps", "api", "app"]);
-      await this.verifyHealth(targetVersion);
-      this.state.operation.phase = "rolled_back";
-      this.state.operation.finishedAt = new Date().toISOString();
-      if (cause) {
-        this.state.operation.error =
-          cause instanceof Error ? cause.message : String(cause);
-      }
-      this.appendLog("rolled_back", `已回退到 ${targetVersion}`);
-      this.saveState();
-    } catch (error) {
-      this.state.operation.phase = "manual_intervention";
-      this.state.operation.rollbackError =
-        error instanceof Error ? error.message : String(error);
-      this.state.operation.finishedAt = new Date().toISOString();
-      this.appendLog(
-        "manual_intervention",
-        this.state.operation.rollbackError
-      );
-      this.saveState();
-    }
-  }
-
-  async refreshHostPack(targetVersion) {
-    const archivePath = path.join(
-      this.stateDir,
-      `z3cz-deploy-${dockerImageTag(targetVersion)}.tar.gz`
-    );
-    await this.downloadAsset(
-      this.repository,
-      targetVersion,
-      "z3cz-deploy.tar.gz",
-      archivePath,
-      { token: this.githubToken }
-    );
-    this.appendLog("pulling", "正在刷新宿主机部署脚本");
-    await this.applyHostPackFn({
-      archivePath,
-      installDir: this.installDir,
-      runCommand: this.runCommand,
-    });
-  }
-
-  /**
-   * @param {string} targetVersion
-   */
-  async verifyImages(targetVersion) {
-    const tag = dockerImageTag(targetVersion);
-    const digests = {};
-    for (const [key, image] of [
-      ["api", `${apiImageName}:${tag}`],
-      ["app", `${appImageName}:${tag}`],
-    ]) {
-      const result = await this.runCommand(this.hostDir, "docker", [
-        "image",
-        "inspect",
-        image,
-        "--format",
-        "{{json .RepoDigests}}",
-      ]);
-      const output = String(result.stdout || "");
-      if (!output.includes("@sha256:")) {
-        throw new Error(`目标镜像 ${image} 未包含仓库摘要`);
-      }
-      const match = output.match(/[^"\s]+@sha256:[a-f0-9]+/);
-      digests[key] = match ? match[0] : output.trim();
-    }
-    this.state.imageDigests = digests;
-    this.saveState();
-  }
-
-  /**
-   * @param {string} targetVersion
-   */
-  async prepareUpdaterBinary(targetVersion) {
-    if (!this.selfUpdate) {
-      return "";
-    }
-    try {
-      const asset = updaterAssetName(updaterArch());
-      const sumsPath = path.join(
-        this.stateDir,
-        `SHA256SUMS-${dockerImageTag(targetVersion)}`
-      );
-      const binaryPath = path.join(
-        this.stateDir,
-        `${asset}-${dockerImageTag(targetVersion)}.next`
-      );
-      await this.downloadAsset(
-        this.repository,
-        targetVersion,
-        "SHA256SUMS",
-        sumsPath,
-        { token: this.githubToken, limitBytes: 1 << 20 }
-      );
-      const expected = checksumForAsset(
-        fs.readFileSync(sumsPath, "utf8"),
-        asset
-      );
-      if (!/^[a-f0-9]{64}$/.test(expected)) {
-        throw new Error(`目标 Release 的 SHA256SUMS 缺少 ${asset}`);
-      }
-      await this.downloadAsset(this.repository, targetVersion, asset, binaryPath, {
-        token: this.githubToken,
-      });
-      const actual = (await sha256File(binaryPath)).replace(/^sha256:/, "");
-      if (actual !== expected) {
-        throw new Error(
-          `Host Updater 校验失败：期望 ${expected}，实际 ${actual}`
-        );
-      }
-      fs.chmodSync(binaryPath, 0o700);
-      return binaryPath;
-    } catch (error) {
-      this.appendLog(
-        "pulling",
-        `跳过更新器自更新：${error instanceof Error ? error.message : String(error)}`
-      );
-      this.saveState();
-      return "";
-    }
-  }
-
-  /**
-   * @param {string} targetVersion
-   * @param {string} nextBinaryPath
-   */
-  async finalizeSuccessfulUpdate(targetVersion, nextBinaryPath) {
-    this.state.operation.phase = "succeeded";
-    this.state.operation.finishedAt = new Date().toISOString();
-    this.appendLog("succeeded", `已更新到 ${targetVersion}`);
-    this.saveState();
-    if (!nextBinaryPath || !this.selfUpdate) {
-      return;
-    }
-    try {
-      this.replaceBinaryFn(nextBinaryPath, this.binaryPath);
-      this.appendLog("succeeded", "Host Updater 二进制已同步到目标版本");
-      this.saveState();
-      this.queueRestart();
-    } catch (error) {
-      this.state.operation.phase = "manual_intervention";
-      this.state.operation.error = `应用已更新，但 Host Updater 自更新失败：${
-        error instanceof Error ? error.message : String(error)
-      }`;
-      this.appendLog("manual_intervention", this.state.operation.error);
-      this.saveState();
-    }
-  }
-
-  queueRestart() {
-    if (this.restartService) {
-      this.restartService();
-      return;
-    }
-    const child = spawn("systemctl", ["restart", this.serviceName], {
-      detached: true,
-      stdio: "ignore",
-    });
-    child.unref();
+    return rollbackSource(this, targetVersion, backup, automatic, cause);
   }
 
   async verifyHealth(targetVersion) {

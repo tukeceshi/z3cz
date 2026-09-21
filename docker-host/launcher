@@ -203,6 +203,10 @@ case "$COMMAND" in
     pull_app_images
     ;;
   bootstrap|rebuild)
+    if [[ -f "$HOST_DIR/source-deployment.json" || -f "$REPO_ROOT/SOURCE_REVISION" ]]; then
+      echo "源码部署请使用 scripts/host/update.sh 更新，或 scripts/host/deploy.sh 首次迁移。" >&2
+      exit 1
+    fi
     echo ""
     echo "Note: if SSH disconnects, reconnect and run: ./launcher rebuild"
     echo "      (shared/ data is kept; logs: ../install.log, ../setup.log, ../rebuild.log)"
