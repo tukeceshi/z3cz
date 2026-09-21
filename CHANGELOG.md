@@ -1,6 +1,6 @@
 # Changelog
 
-## v1.0.1
+## v1.0.2
 
 - 自托管更新改为从 Git 获取正式版源码，在 Docker 内安装依赖并构建；宿主机只需 Docker 和 Git。
 - 基础环境由 `docker/Dockerfile.source` 决定，仅该文件变化时发布新的 `tukeceshi/z3cz-runtime` 镜像。

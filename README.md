@@ -73,7 +73,7 @@ sudo bash /var/dafthunk/scripts/host/deploy.sh
 
 ```bash
 sudo bash /var/dafthunk/scripts/host/update.sh
-sudo bash /var/dafthunk/scripts/host/update.sh v1.0.1
+sudo bash /var/dafthunk/scripts/host/update.sh v1.0.2
 
 # 重置安装：清 DB 与上传，保留域名配置与证书
 sudo bash /var/dafthunk/scripts/host/update.sh --reset
