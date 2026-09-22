@@ -37,4 +37,13 @@ else
 fi
 
 chmod +x "$TARGET"
+
+# This wrapper is intentionally usable as `curl ... | sudo bash`.  At this
+# point the bootstrap file has already been downloaded, so detach its stdin
+# from curl's pipe before handing control to the installer.  The optional
+# domain question (and every child script) will then read from the terminal.
+if [[ ! -t 0 ]] && ( : </dev/tty ) 2>/dev/null; then
+  exec </dev/tty
+fi
+
 exec bash "$TARGET" "$@"

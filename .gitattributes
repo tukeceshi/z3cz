@@ -1,6 +1,12 @@
 # Shell scripts must use LF so Linux containers can execute them.
 *.sh text eol=lf
 
+# Extensionless Linux entrypoints must also retain LF in Windows checkouts.
+bootstrap-install text eol=lf
+install-dafthunk text eol=lf
+docker-host/dafthunk-setup text eol=lf
+docker-host/launcher text eol=lf
+
 # Docker / env templates
 Dockerfile text eol=lf
 docker-compose*.yml text eol=lf
