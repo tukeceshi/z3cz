@@ -231,5 +231,13 @@ ensure_swap
 ensure_pack
 log "Configure and deploy"
 export DAFTHUNK_FROM_INSTALL=1
-bash "${INSTALL_DIR}/docker-host/dafthunk-setup" --no-rebuild
+if [[ "${DAFTHUNK_NON_INTERACTIVE:-0}" != "1" ]] \
+  && ( : </dev/tty ) 2>/dev/null; then
+  # The bootstrap script is commonly executed as `curl ... | sudo bash`, so
+  # its stdin is the curl pipe. Attach the setup child to the controlling
+  # terminal explicitly; otherwise Enter may continue going to the pipe.
+  bash "${INSTALL_DIR}/docker-host/dafthunk-setup" --no-rebuild </dev/tty
+else
+  bash "${INSTALL_DIR}/docker-host/dafthunk-setup" --no-rebuild
+fi
 bash "${INSTALL_DIR}/scripts/host/deploy.sh"

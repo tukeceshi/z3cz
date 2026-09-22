@@ -309,10 +309,10 @@ ask_into() {
 
   # Put every question on its own line. The previous inline prompt was easy to
   # miss when the installer was launched through a pipe in Windows Terminal.
-  write_prompt_tty "\n$prompt"
+  write_prompt_tty $'\n'"$prompt"
   log_wait_input "$prompt"
   read_interactive_line "$__var"
-  write_prompt_tty "\n$(M input_received)\n"
+  write_prompt_tty $'\n'"$(M input_received)"$'\n'
   if [[ -z "${!__var:-}" ]]; then
     printf -v "$__var" '%s' "$default"
   fi
