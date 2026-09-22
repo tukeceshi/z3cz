@@ -1,11 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
-import {
-  checkBackupDiskSpace,
-  createBackup,
-  restoreBackup,
-} from "./backup.mjs";
+import { createBackup, restoreBackup, reusableBackup } from "./backup.mjs";
 import { createComposeRunner, runCommand } from "./docker.mjs";
 import { fetchLatestRelease } from "./github.mjs";
 import { prepareSourceRelease } from "./source-release.mjs";
@@ -55,8 +51,14 @@ function emptyState() {
     latestRelease: undefined,
     lastBackup: undefined,
     rollbackVersion: "",
+    rollbackDatabaseFingerprint: "",
+    sourceChannel: "github",
     operation: emptyOperation(),
   };
+}
+
+function readSourceChannel(value) {
+  return value === "gitee" ? "gitee" : "github";
 }
 
 export class UpdateManager {
@@ -65,6 +67,8 @@ export class UpdateManager {
    *   prepareSource: typeof prepareSourceRelease,
    *   createBackup: typeof createBackup,
    *   restoreBackup: typeof restoreBackup,
+   *   reusableBackup: typeof reusableBackup,
+   *   backupMaxAgeMs: number,
    *   repository: string,
    *   installDir: string,
    *   hostDir: string,
@@ -87,6 +91,12 @@ export class UpdateManager {
     this.prepareSource = options.prepareSource || prepareSourceRelease;
     this.createBackup = options.createBackup || createBackup;
     this.restoreBackup = options.restoreBackup || restoreBackup;
+    this.reusableBackup = options.reusableBackup || reusableBackup;
+    this.backupMaxAgeMs =
+      options.backupMaxAgeMs ??
+      Number(process.env.Z3CZ_BACKUP_MAX_AGE_HOURS || 24) * 60 * 60_000;
+    if (!Number.isFinite(this.backupMaxAgeMs) || this.backupMaxAgeMs <= 0)
+      throw new Error("备份有效期配置无效");
     this.repository = options.repository || defaultRepository;
     this.hostDir = options.hostDir || hostDir;
     this.installDir = options.installDir || path.dirname(this.hostDir);
@@ -118,12 +128,46 @@ export class UpdateManager {
     this.state = this.loadState();
   }
 
+  recoverInterruptedOperation() {
+    const lock = path.join(this.stateDir, "operation.lock");
+    if (fs.existsSync(lock)) {
+      const pid = Number(fs.readFileSync(lock, "utf8"));
+      if (!Number.isInteger(pid) || pid <= 0)
+        throw new Error("更新锁损坏，请人工检查");
+      try {
+        process.kill(pid, 0);
+        return; // Another CLI or service still owns the operation.
+      } catch (error) {
+        if (error.code !== "ESRCH") throw error;
+        fs.unlinkSync(lock);
+      }
+    }
+    const maintenance = fs.existsSync(
+      path.join(this.hostDir, "shared/maintenance/enabled")
+    );
+    if (this.state.pendingUpdate || maintenance) {
+      this.state.operation.phase = "manual_intervention";
+      this.state.operation.error =
+        "上次切换未完成，可使用回退恢复旧版本；请勿重复更新";
+    } else if (
+      ACTIVE.has(this.state.operation.phase) ||
+      this.state.operation.phase === "checking"
+    ) {
+      this.state.operation.phase = "failed";
+      this.state.operation.error =
+        "更新准备已中断，当前服务未切换，可以重新检查更新";
+    } else return;
+    this.state.operation.finishedAt = new Date().toISOString();
+    this.saveState();
+  }
+
   loadState() {
     try {
       const raw = JSON.parse(fs.readFileSync(this.statePath, "utf8"));
       return {
         ...emptyState(),
         ...raw,
+        sourceChannel: readSourceChannel(raw.sourceChannel),
         operation: { ...emptyOperation(), ...raw.operation },
       };
     } catch {
@@ -156,13 +200,15 @@ export class UpdateManager {
   }
 
   snapshot() {
-    const currentVersion = (() => {
-      try {
-        return this.currentVersion();
-      } catch {
-        return "unknown";
-      }
-    })();
+    const currentVersion =
+      this.state.pendingUpdate?.version ||
+      (() => {
+        try {
+          return this.currentVersion();
+        } catch {
+          return "unknown";
+        }
+      })();
     const latest = this.state.latestRelease;
     const updateAvailable = Boolean(
       latest && compareVersions(currentVersion, latest.version) < 0
@@ -173,14 +219,57 @@ export class UpdateManager {
       repository: this.repository,
       deployment: "docker-self-host",
       currentVersion,
+      sourceChannel: this.sourceChannel(),
       latestRelease: latest,
       updateAvailable,
+      checkedAt: this.state.checkedAt,
+      checkError: this.state.checkError,
+      stale:
+        !Number.isFinite(Date.parse(this.state.checkedAt)) ||
+        Date.now() - Date.parse(this.state.checkedAt) > 24 * 60 * 60_000,
       checks: this.checksFromState(),
       lastBackup: this.state.lastBackup,
-      rollbackVersion: (this.state.pendingUpdate && !this.state.pendingUpdate.fresh
-        ? this.state.pendingUpdate.version : this.state.rollbackVersion) || undefined,
+      rollbackVersion:
+        (this.state.pendingUpdate && !this.state.pendingUpdate.fresh
+          ? this.state.pendingUpdate.version
+          : this.state.rollbackVersion) || undefined,
+      rollbackRequiresRestore: this.state.pendingUpdate
+        ? Boolean(
+            this.state.pendingUpdate.migrationStarted &&
+              (!this.state.pendingUpdate.migrationCompleted ||
+                !this.state.pendingUpdate.rollbackCompatible)
+          )
+        : this.state.rollbackRequiresRestore !== false,
+      rollbackBackup:
+        this.state.pendingUpdate?.backup ||
+        this.state.rollbackBackup ||
+        undefined,
       operation: this.state.operation,
     };
+  }
+
+  sourceChannel() {
+    return readSourceChannel(this.state.sourceChannel);
+  }
+
+  setSourceChannel(value) {
+    if (value !== "github" && value !== "gitee") {
+      throw new Error("源码渠道无效");
+    }
+    if (fs.existsSync(path.join(this.stateDir, "operation.lock"))) {
+      throw new Error("存在更新锁，请等待当前操作完成或检查中断的更新");
+    }
+    if (
+      ACTIVE.has(this.state.operation.phase) ||
+      this.state.operation.phase === "checking"
+    ) {
+      throw Object.assign(new Error("更新操作正在进行，暂时不能更改源码渠道"), {
+        status: this.snapshot(),
+      });
+    }
+    this.state.sourceChannel = value;
+    this.saveState();
+    return this.snapshot();
   }
 
   checksFromState() {
@@ -209,13 +298,10 @@ export class UpdateManager {
         throw new Error("未找到 containers/app.yml");
       }
     });
-    push("compose", "Compose 文件", true, () => {
+    push("compose", "Compose 文件", false, () => {
       if (!fs.existsSync(this.composePath) || !fs.existsSync(this.envPath)) {
-        throw new Error("请先完成首次部署以生成 Compose");
+        throw new Error("尚未生成 Compose，将按首次部署继续");
       }
-    });
-    push("disk", "备份磁盘空间", true, () => {
-      checkBackupDiskSpace(this.backupDir);
     });
     const current = this.currentVersion();
     checks.push({
@@ -232,10 +318,18 @@ export class UpdateManager {
   }
 
   async check() {
+    if (
+      this.state.pendingUpdate ||
+      this.state.operation.phase === "manual_intervention"
+    )
+      throw new Error("请先恢复上次中断的更新");
     if (fs.existsSync(path.join(this.stateDir, "operation.lock"))) {
       throw new Error("存在更新锁，请等待当前操作完成或检查中断的更新");
     }
-    if (ACTIVE.has(this.state.operation.phase)) {
+    if (
+      ACTIVE.has(this.state.operation.phase) ||
+      this.state.operation.phase === "checking"
+    ) {
       throw Object.assign(new Error("更新操作正在进行，暂时不能检查新版本"), {
         status: this.snapshot(),
       });
@@ -246,12 +340,14 @@ export class UpdateManager {
       logs: [],
     };
     this.appendLog("checking", "正在读取 GitHub Release");
+    this.state.checkError = undefined;
     this.saveState();
     try {
       const release = await this.fetchLatest(this.repository, {
         token: this.githubToken,
       });
       this.state.latestRelease = release;
+      this.state.checkedAt = new Date().toISOString();
       await this.collectChecks();
       const current = this.currentVersion();
       if (compareVersions(current, release.version) < 0) {
@@ -272,6 +368,7 @@ export class UpdateManager {
       this.state.operation.phase = "failed";
       this.state.operation.error =
         error instanceof Error ? error.message : String(error);
+      this.state.checkError = this.state.operation.error;
       this.appendLog("failed", "检查更新失败");
       this.saveState();
       throw Object.assign(
@@ -284,10 +381,20 @@ export class UpdateManager {
   }
 
   startUpdate(targetVersion) {
+    if (
+      this.state.pendingUpdate ||
+      this.state.operation.phase === "manual_intervention"
+    )
+      throw new Error("请先恢复上次中断的更新");
+    if (this.snapshot().stale || this.state.checkError)
+      throw new Error("请重新检查更新后再开始");
     if (fs.existsSync(path.join(this.stateDir, "operation.lock")))
       throw new Error("已有更新操作，请先检查其状态");
     const target = displayVersion(String(targetVersion || "").trim());
-    if (ACTIVE.has(this.state.operation.phase)) {
+    if (
+      ACTIVE.has(this.state.operation.phase) ||
+      this.state.operation.phase === "checking"
+    ) {
       throw Object.assign(new Error("已有更新操作正在进行"), {
         status: this.snapshot(),
       });
@@ -344,18 +451,29 @@ export class UpdateManager {
         if (error.code !== "ESRCH") throw error;
       }
     }
-    if (ACTIVE.has(this.state.operation.phase)) {
+    if (
+      ACTIVE.has(this.state.operation.phase) ||
+      this.state.operation.phase === "checking"
+    ) {
       throw Object.assign(new Error("已有更新操作正在进行"), {
         status: this.snapshot(),
       });
     }
-    if (!this.state.pendingUpdate && (!this.state.rollbackVersion || !this.state.lastBackup)) {
+    if (
+      !this.state.pendingUpdate &&
+      (!this.state.rollbackVersion ||
+        !this.state.rollbackDeployment ||
+        (this.state.rollbackRequiresRestore !== false &&
+          !this.state.rollbackBackup &&
+          !this.state.lastBackup))
+    ) {
       throw Object.assign(new Error("没有可用的回退版本或已校验备份"), {
         status: this.snapshot(),
       });
     }
     const current = this.currentVersion();
-    const target = this.state.pendingUpdate?.version || this.state.rollbackVersion;
+    const target =
+      this.state.pendingUpdate?.version || this.state.rollbackVersion;
     this.state.operation = {
       id: randomUUID(),
       phase: "rolling_back",
@@ -443,16 +561,4 @@ export class UpdateManager {
     }
     throw new Error("健康验证超时");
   }
-}
-
-/**
- * @param {string} source
- * @param {string} dest
- */
-function replaceFile(source, dest) {
-  fs.mkdirSync(path.dirname(dest), { recursive: true });
-  const tmp = `${dest}.tmp`;
-  fs.copyFileSync(source, tmp);
-  fs.chmodSync(tmp, 0o755);
-  fs.renameSync(tmp, dest);
 }

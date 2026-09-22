@@ -1,4 +1,7 @@
-import type { SystemUpdateStatus } from "@dafthunk/types";
+import type {
+  SystemUpdateSourceChannel,
+  SystemUpdateStatus,
+} from "@dafthunk/types";
 
 import { makeRequest } from "./utils";
 
@@ -21,6 +24,18 @@ export async function startSystemUpdate(
     method: "POST",
     body: JSON.stringify({ targetVersion }),
   });
+}
+
+export async function setSystemUpdateSourceChannel(
+  sourceChannel: SystemUpdateSourceChannel
+): Promise<SystemUpdateStatus> {
+  return makeRequest<SystemUpdateStatus>(
+    `${SYSTEM_UPDATE_KEY}/source-channel`,
+    {
+      method: "POST",
+      body: JSON.stringify({ sourceChannel }),
+    }
+  );
 }
 
 export async function rollbackSystemUpdate(

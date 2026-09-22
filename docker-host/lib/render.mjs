@@ -213,17 +213,18 @@ export function renderCompose(config, source = null) {
   const origin = config.origin.replace(/\/$/, "");
   const staticConf = "../docker/nginx/app.static.conf";
   const images = resolveAppImages(config);
+  const mountedSource = source && source.kind !== "image";
   if (source) {
     images.api = source.runtimeImage;
     images.app = source.appImage;
   }
-  const sourceApi = source
+  const sourceApi = mountedSource
     ? `\n    working_dir: /app/apps/api\n    command: ["pnpm", "exec", "tsx", "--import", "./src/shims/cloudflare-register.mjs", "src/server.ts"]`
     : "";
-  const sourceVolume = source
+  const sourceVolume = mountedSource
     ? `\n      - ${JSON.stringify(`${source.sourceDir}:/app:ro`)}`
     : "";
-  const sourceAppVolume = source
+  const sourceAppVolume = mountedSource
     ? `\n      - ${JSON.stringify(`${source.sourceDir}/apps/app/dist:/usr/share/nginx/html:ro`)}`
     : "";
   const updaterEnabled = Boolean(config.env.UPDATER_TOKEN?.trim());
@@ -274,7 +275,7 @@ services:
       LOCAL_STORAGE_PATH: /app/data/storage
       API_BOOT_CACHE_DIR: /app/data/storage/cache
       RUN_DB_MIGRATE: "false"
-      BOOTSTRAP_ASSETS_DIR: ${source ? "/app/apps/app/dist" : "/app/data/bootstrap"}
+      BOOTSTRAP_ASSETS_DIR: ${mountedSource ? "/app/apps/app/dist" : source?.kind === "image" ? "/app/bootstrap" : "/app/data/bootstrap"}
       Z3CZ_MAINTENANCE_FILE: /maintenance/enabled
       APP_VERSION: "${appVersion}"
       WEB_HOST: "${origin}"

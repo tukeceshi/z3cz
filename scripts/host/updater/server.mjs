@@ -45,6 +45,12 @@ async function handle(request, response, manager, token) {
       writeJson(response, 200, status);
       return;
     }
+    if (request.method === "POST" && url.pathname === "/v1/source-channel") {
+      const body = await readJson(request);
+      const status = manager.setSourceChannel(String(body.sourceChannel || ""));
+      writeJson(response, 200, status);
+      return;
+    }
     if (request.method === "POST" && url.pathname === "/v1/update") {
       const body = await readJson(request);
       const status = manager.startUpdate(String(body.targetVersion || ""));

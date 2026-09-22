@@ -6,6 +6,23 @@ import { createReadStream, createWriteStream } from "node:fs";
 
 import { runCommand } from "./docker.mjs";
 
+export async function reusableBackup(
+  backup,
+  fingerprint,
+  maxAgeMs = 24 * 60 * 60_000
+) {
+  if (!backup || !fingerprint || backup.databaseFingerprint !== fingerprint)
+    return false;
+  const age = Date.now() - Date.parse(backup.createdAt);
+  if (!Number.isFinite(age) || age < 0 || age > maxAgeMs) return false;
+  try {
+    await verifyBackupArchive(backup.path, backup.checksum);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 /**
  * @param {string} filePath
  */
@@ -39,7 +56,10 @@ export function checkBackupDiskSpace(backupDir) {
  */
 export async function createBackup(input) {
   const now = new Date();
-  const stamp = now.toISOString().replace(/[-:]/g, "").replace(/\.\d+Z$/, "Z");
+  const stamp = now
+    .toISOString()
+    .replace(/[-:]/g, "")
+    .replace(/\.\d+Z$/, "Z");
   const id = `backup-${stamp.slice(0, 15)}`;
   const staging = path.join(input.backupDir, id);
   const archivePath = `${staging}.tar.gz`;
@@ -178,7 +198,9 @@ export async function restoreBackup(input) {
     const dumpPath = path.join(staging, "database.dump");
     const storageTar = path.join(staging, "storage.tar");
     if (!fs.existsSync(dumpPath) || !fs.existsSync(storageTar)) {
-      const nested = fs.readdirSync(staging).find((name) => name.startsWith("backup-"));
+      const nested = fs
+        .readdirSync(staging)
+        .find((name) => name.startsWith("backup-"));
       const dumpNested = nested
         ? path.join(staging, nested, "database.dump")
         : dumpPath;

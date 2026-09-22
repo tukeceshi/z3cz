@@ -34,6 +34,9 @@ jobs:
         with:
           bun-version: "1.2.21"
 
+      - name: Verify update policy
+        run: bun scripts/host/validate-update-policy.mjs
+
       - name: Login to Docker Hub
         uses: docker/login-action@v4
         with:

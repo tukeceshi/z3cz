@@ -8,14 +8,24 @@ export function disconnectedUpdateStatus(
   env: Bindings,
   extras: Partial<SystemUpdateStatus> = {}
 ): SystemUpdateStatus {
+  const updaterConfigured = Boolean(
+    env.RUNTIME === "node" &&
+      env.UPDATER_SOCKET?.trim() &&
+      env.UPDATER_TOKEN?.trim()
+  );
   const runtime =
-    env.RUNTIME === "node" ? "docker-self-host" : "cloudflare-workers";
+    env.RUNTIME === "node"
+      ? updaterConfigured
+        ? "docker-self-host"
+        : "local-development"
+      : "cloudflare-workers";
   return {
-    supported: false,
+    supported: updaterConfigured,
     connected: false,
     repository: SYSTEM_UPDATE_REPOSITORY,
     deployment: runtime,
     currentVersion: env.APP_VERSION || "unknown",
+    sourceChannel: "github",
     updateAvailable: false,
     checks: [],
     operation: {

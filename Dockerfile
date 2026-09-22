@@ -34,7 +34,7 @@ COPY docker/entrypoint.sh /usr/local/bin/entrypoint.sh
 RUN sed -i 's/\r$//' /usr/local/bin/entrypoint-common.sh /usr/local/bin/entrypoint.sh \
   && chmod +x /usr/local/bin/entrypoint-common.sh /usr/local/bin/entrypoint.sh
 
-EXPOSE 3101 3102
+EXPOSE 3000 3102
 
 ENTRYPOINT ["entrypoint.sh"]
 CMD ["pnpm", "dev:docker"]
@@ -47,7 +47,7 @@ COPY docker/entrypoint-frontend.sh /usr/local/bin/entrypoint-frontend.sh
 RUN sed -i 's/\r$//' /usr/local/bin/entrypoint-common.sh /usr/local/bin/entrypoint-frontend.sh \
   && chmod +x /usr/local/bin/entrypoint-common.sh /usr/local/bin/entrypoint-frontend.sh
 
-EXPOSE 3101
+EXPOSE 3000
 
 ENTRYPOINT ["entrypoint-frontend.sh"]
 CMD ["pnpm", "--filter", "@dafthunk/app", "dev"]
@@ -60,7 +60,7 @@ COPY docker/entrypoint-api.sh /usr/local/bin/entrypoint-api.sh
 RUN sed -i 's/\r$//' /usr/local/bin/entrypoint-common.sh /usr/local/bin/entrypoint-api.sh \
   && chmod +x /usr/local/bin/entrypoint-common.sh /usr/local/bin/entrypoint-api.sh
 
-EXPOSE 3102
+EXPOSE 3001
 
 ENTRYPOINT ["entrypoint-api.sh"]
 CMD ["pnpm", "--filter", "@dafthunk/api", "dev:docker:api"]
@@ -83,8 +83,8 @@ RUN pnpm build
 FROM deps AS build-app-prod
 
 ARG VITE_API_HOST=/api
-ARG VITE_WEBSITE_URL=http://localhost:3101
-ARG VITE_APP_URL=http://localhost:3101
+ARG VITE_WEBSITE_URL=http://localhost:8080
+ARG VITE_APP_URL=http://localhost:8080
 ARG VITE_WS_VIA_PROXY=1
 
 ENV VITE_API_HOST=${VITE_API_HOST}
@@ -124,11 +124,11 @@ RUN sed -i 's/\r$//' /usr/local/bin/prod-api-entrypoint.sh \
 WORKDIR /app/apps/api
 
 ENV HOST=0.0.0.0
-ENV PORT=3102
+ENV PORT=3001
 ENV NODE_ENV=production
 ENV BOOTSTRAP_ASSETS_DIR=/app/data/bootstrap
 
-EXPOSE 3102
+EXPOSE 3001
 
 ENTRYPOINT ["prod-api-entrypoint.sh"]
 CMD ["pnpm", "exec", "tsx", "--import", "./src/shims/cloudflare-register.mjs", "src/server.ts"]

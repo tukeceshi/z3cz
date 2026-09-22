@@ -25,8 +25,7 @@ services:
     extra_hosts:
       - "host.docker.internal:host-gateway"
     ports:
-      - "3101:3101"
-      - "3102:3102"
+      - "${APP_PORT:-3000}:3000"
     volumes:
       - .:/app
       # 单容器内隔离 root / 各包 node_modules（与四服务命名区分，避免混卷）

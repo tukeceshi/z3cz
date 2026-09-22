@@ -1,11 +1,12 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
+import { parseAppYml, stringifyAppYml } from "../lib/parse-app-yml.mjs";
 import {
-  parseAppYml,
-  stringifyAppYml,
-} from "../lib/parse-app-yml.mjs";
-import { publicOrigin, renderCaddyfile, renderCompose } from "../lib/render.mjs";
+  publicOrigin,
+  renderCaddyfile,
+  renderCompose,
+} from "../lib/render.mjs";
 
 test("parseAppYml reads hostname https and env", () => {
   const config = parseAppYml(`
@@ -45,7 +46,10 @@ test("stringifyAppYml round-trip", () => {
 });
 
 test("publicOrigin includes non-default ports", () => {
-  assert.equal(publicOrigin("localhost", false, 8080, 443), "http://localhost:8080");
+  assert.equal(
+    publicOrigin("localhost", false, 8080, 443),
+    "http://localhost:8080"
+  );
   assert.equal(publicOrigin("ex.com", true, 80, 443), "https://ex.com");
 });
 
@@ -285,4 +289,33 @@ test("renderCompose mounts updater socket when token is set", () => {
   });
   assert.match(yaml, /\/run\/z3cz-updater:\/run\/z3cz-updater/);
   assert.match(yaml, /UPDATER_SOCKET: \/run\/z3cz-updater\/updater\.sock/);
+});
+
+test("renderCompose runs prepared images without mounting the build checkout", () => {
+  const image = `sha256:${"a".repeat(64)}`;
+  const yaml = renderCompose(
+    {
+      hostname: "example.com",
+      https: true,
+      tls: "auto",
+      le_email: "",
+      http_port: 80,
+      https_port: 443,
+      image_tag: "1.0.0",
+      origin: "https://example.com",
+      env: {
+        JWT_SECRET: "a".repeat(64),
+        SECRET_MASTER_KEY: "b".repeat(64),
+      },
+    },
+    {
+      kind: "image",
+      sourceDir: "/must-not-be-mounted",
+      runtimeImage: image,
+      appImage: image,
+    }
+  );
+  assert.doesNotMatch(yaml, /must-not-be-mounted/);
+  assert.match(yaml, new RegExp(`image: ${image}`));
+  assert.match(yaml, /BOOTSTRAP_ASSETS_DIR: \/app\/bootstrap/);
 });

@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
-import { createHash, randomUUID } from "node:crypto";
+import { createHash } from "node:crypto";
+import { databaseFingerprint, readUpdatePolicy } from "./update-policy.mjs";
 
 export function runtimeImage(dockerfile) {
   const hash = createHash("sha256")
@@ -15,10 +16,25 @@ export function validateSourceRef(ref) {
   }
 }
 
-// Keep the repository cache separate from built releases. Never reset a running checkout.
+export const GITEE_SOURCE_REMOTE = "https://gitee.com/daotuke/z3cz.git";
+export function sourceRemote(channel, repository) {
+  return channel === "gitee"
+    ? GITEE_SOURCE_REMOTE
+    : `https://github.com/${repository}.git`;
+}
+
+export function installationId(hostDir) {
+  return createHash("sha256")
+    .update(path.resolve(hostDir))
+    .digest("hex")
+    .slice(0, 16);
+}
+
+// Only this owned checkout is mutable; running containers use immutable images.
 export async function prepareSourceRelease({
   hostDir,
   repository,
+  sourceChannel = "github",
   ref,
   version,
   run,
@@ -27,20 +43,28 @@ export async function prepareSourceRelease({
   validateSourceRef(ref);
   if (!/^[\w.-]+\/[\w.-]+$/.test(repository))
     throw new Error("源码仓库地址无效");
-  const shared = path.join(hostDir, "shared");
+  const shared = path.resolve(hostDir, "shared");
   const cache = path.join(shared, "source.git");
-  const releases = path.join(shared, "releases");
-  const store = path.join(shared, "pnpm-store");
-  fs.mkdirSync(releases, { recursive: true });
-  fs.mkdirSync(store, { recursive: true });
+  const buildDir = path.join(shared, "build");
+  const sourceDir = path.join(buildDir, "source");
+  for (const dir of [shared, buildDir, sourceDir]) {
+    if (fs.existsSync(dir) && fs.lstatSync(dir).isSymbolicLink())
+      throw new Error("构建目录不能使用符号链接");
+  }
+  fs.mkdirSync(buildDir, { recursive: true });
+  const ownerFile = path.join(buildDir, "owner.json");
+  const owner = installationId(hostDir);
+  const existing = fs.existsSync(sourceDir);
+  if (
+    existing &&
+    (!fs.existsSync(ownerFile) || fs.readFileSync(ownerFile, "utf8") !== owner)
+  ) {
+    throw new Error("构建目录不是更新器创建的，请检查 shared/build");
+  }
   await run(hostDir, "git", ["--version"]);
   if (!fs.existsSync(cache))
     await run(hostDir, "git", ["init", "--bare", cache]);
-  log("获取目标版本代码（复用已有 Git 对象）");
-  const remote =
-    process.env.Z3CZ_SOURCE_REMOTE || `https://github.com/${repository}.git`;
-  if (!remote.startsWith("https://"))
-    throw new Error("源码远程地址必须使用 HTTPS");
+  log(`从 ${sourceChannel === "gitee" ? "Gitee" : "GitHub"} 增量获取目标版本`);
   await run(
     hostDir,
     "git",
@@ -49,95 +73,121 @@ export async function prepareSourceRelease({
       cache,
       "fetch",
       "--no-tags",
-      remote,
+      sourceRemote(sourceChannel, repository),
       ref.startsWith("v") ? `refs/tags/${ref}` : ref,
     ],
     { timeoutMs: 10 * 60_000 }
   );
-  const result = await run(hostDir, "git", [
-    "--git-dir",
-    cache,
-    "rev-parse",
-    "FETCH_HEAD^{commit}",
-  ]);
-  const commit = result.stdout.trim();
+  const commit = (
+    await run(hostDir, "git", [
+      "--git-dir",
+      cache,
+      "rev-parse",
+      "FETCH_HEAD^{commit}",
+    ])
+  ).stdout.trim();
   if (!/^[a-f0-9]{40}$/.test(commit)) throw new Error("无法确认目标提交");
-  const sourceDir = path.join(
-    releases,
-    `${commit}-${randomUUID().slice(0, 8)}`
-  );
-  await run(hostDir, "git", [
-    "--git-dir",
-    cache,
-    "worktree",
-    "add",
-    "--detach",
-    sourceDir,
-    commit,
-  ]);
+  if (existing) {
+    const root = (
+      await run(hostDir, "git", [
+        "-C",
+        sourceDir,
+        "rev-parse",
+        "--show-toplevel",
+      ])
+    ).stdout.trim();
+    if (path.resolve(root) !== sourceDir)
+      throw new Error("构建目录不是独立工作区");
+    const changes = (
+      await run(hostDir, "git", [
+        "-C",
+        sourceDir,
+        "status",
+        "--porcelain",
+        "--untracked-files=all",
+      ])
+    ).stdout.trim();
+    if (changes)
+      throw new Error("构建目录存在本地修改，已停止更新以保留这些文件");
+    await run(hostDir, "git", [
+      "-C",
+      sourceDir,
+      "checkout",
+      "--detach",
+      commit,
+    ]);
+  } else {
+    await run(hostDir, "git", [
+      "--git-dir",
+      cache,
+      "worktree",
+      "add",
+      "--detach",
+      sourceDir,
+      commit,
+    ]);
+    fs.writeFileSync(ownerFile, owner, { mode: 0o600 });
+  }
   if (
     ref.startsWith("v") &&
     fs.readFileSync(path.join(sourceDir, "VERSION"), "utf8").trim() !== ref
-  ) {
+  )
     throw new Error("源码 VERSION 与正式版本标签不一致");
-  }
+  if (
+    fs
+      .readFileSync(path.join(sourceDir, "docker/source-protocol"), "utf8")
+      .trim() !== "2"
+  )
+    throw new Error("目标版本与镜像构建协议不一致，请使用配套部署包");
+  const policy = readUpdatePolicy(sourceDir);
+  if (!policy || policy.format !== 2)
+    throw new Error("目标版本缺少新版更新说明");
+  const fingerprint = databaseFingerprint(sourceDir);
   const runtime = runtimeImage(
-    fs.readFileSync(path.join(sourceDir, "docker", "Dockerfile.source"), "utf8")
+    fs.readFileSync(path.join(sourceDir, "docker/Dockerfile.source"), "utf8")
   );
-  const protocol = fs
-    .readFileSync(path.join(sourceDir, "docker/source-protocol"), "utf8")
-    .trim();
-  if (protocol !== "1")
-    throw new Error("此版本需要先更新宿主机更新器，请安装目标版本部署包");
-  const appImage = "nginx:1.27-alpine";
   for (const image of [
     runtime,
-    appImage,
+    "nginx:1.27-alpine",
     "postgres:16-alpine",
     "caddy:2.9-alpine",
   ]) {
     try {
       await run(hostDir, "docker", ["image", "inspect", image]);
     } catch {
-      log(`基础环境需要下载：${image}`);
+      log(`下载基础环境：${image}`);
       await run(hostDir, "docker", ["pull", image]);
     }
   }
-  log("安装依赖并构建前端；当前服务继续运行");
-  const container = `z3cz-build-${randomUUID()}`;
-  let lastLog = 0;
-  try {
+  const ids = [];
+  for (const target of ["api", "app"]) {
+    const tag = `z3cz-local-${owner}/${target}:${commit}`;
+    log(
+      `构建 ${target === "api" ? "后端" : "前端"}镜像，复用已有依赖与构建缓存`
+    );
     await run(
       hostDir,
       "docker",
       [
-        "run",
-        "--rm",
-        "--name",
-        container,
-        "--pull=never",
-        "--mount",
-        `type=bind,source=${sourceDir},target=/app`,
-        "--mount",
-        `type=bind,source=${store},target=/pnpm-store`,
-        "-w",
-        "/app",
-        "-e",
-        "NODE_OPTIONS=--max-old-space-size=2048",
-        "-e",
-        "VITE_API_HOST=/api",
-        "-e",
-        "VITE_WS_VIA_PROXY=1",
-        runtime,
-        "sh",
-        "-ec",
-        "pnpm install --frozen-lockfile --store-dir /pnpm-store --package-import-method copy && pnpm --filter @dafthunk/types build && pnpm --filter @dafthunk/app build:docker-prod",
+        "build",
+        "--file",
+        path.join(sourceDir, "docker/Dockerfile.update"),
+        "--target",
+        target,
+        "--build-arg",
+        `RUNTIME_IMAGE=${runtime}`,
+        "--label",
+        `org.z3cz.installation=${owner}`,
+        "--label",
+        `org.opencontainers.image.revision=${commit}`,
+        "--tag",
+        tag,
+        sourceDir,
       ],
       {
         timeoutMs: 60 * 60_000,
+        env: { DOCKER_BUILDKIT: "1" },
         onOutput: (chunk) => {
-          if (Date.now() - lastLog < 2000) return;
-          lastLog = Date.now();
           const line = chunk
             .trim()
             .split(/[\r\n]+/)
@@ -146,34 +196,60 @@ export async function prepareSourceRelease({
         },
       }
     );
-  } finally {
-    await run(hostDir, "docker", ["rm", "-f", container]).catch(() => {});
-  }
-  if (!fs.existsSync(path.join(sourceDir, "apps/app/dist/index.html"))) {
-    throw new Error("前端构建结果缺少 index.html");
-  }
-  fs.mkdirSync(path.join(sourceDir, "data/storage"), { recursive: true });
-  // Pin both runtime images locally. A rollback never resolves a mutable registry tag.
-  const ids = [];
-  for (const image of [runtime, appImage]) {
-    const inspected = await run(hostDir, "docker", [
-      "image",
-      "inspect",
-      image,
-      "--format",
-      "{{.Id}}",
-    ]);
-    const id = inspected.stdout.trim();
-    if (!/^sha256:[a-f0-9]{64}$/.test(id))
-      throw new Error("无法锁定基础环境镜像");
+    const id = (
+      await run(hostDir, "docker", [
+        "image",
+        "inspect",
+        tag,
+        "--format",
+        "{{.Id}}",
+      ])
+    ).stdout.trim();
+    if (!/^sha256:[a-f0-9]{64}$/.test(id)) throw new Error("无法锁定应用镜像");
     ids.push(id);
   }
   return {
-    sourceDir,
+    kind: "image",
     commit,
     version,
     runtimeImage: ids[0],
     appImage: ids[1],
     runtimeTag: runtime,
+    databaseFingerprint: fingerprint,
+    updatePolicy: policy,
   };
+}
+
+export async function cleanupReleases(manager) {
+  const active = JSON.parse(
+    fs.readFileSync(
+      path.join(manager.hostDir, "source-deployment.json"),
+      "utf8"
+    )
+  );
+  if (active.kind !== "image") return;
+  const keep = new Set([active.runtimeImage, active.appImage]);
+  const rollback =
+    manager.state.rollbackDeployment?.["docker-compose.generated.yml"];
+  if (rollback) {
+    const services = JSON.parse(rollback).services;
+    keep.add(services.api.image);
+    keep.add(services.app.image);
+  }
+  const found = await manager.runCommand(manager.hostDir, "docker", [
+    "image",
+    "ls",
+    "--no-trunc",
+    "--filter",
+    `label=org.z3cz.installation=${installationId(manager.hostDir)}`,
+    "--format",
+    "{{.ID}}",
+  ]);
+  for (const id of new Set(found.stdout.trim().split(/\r?\n/))) {
+    if (!/^sha256:[a-f0-9]{64}$/.test(id) || keep.has(id)) continue;
+    // No force: Docker refuses to remove images still referenced by any container.
+    await manager
+      .runCommand(manager.hostDir, "docker", ["image", "rm", id])
+      .catch(() => {});
+  }
 }

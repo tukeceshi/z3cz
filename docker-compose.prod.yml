@@ -4,15 +4,17 @@
 #
 # 本文件保留作过渡；app 镜像默认为静态-only，故此处挂载旧版 nginx 反代 conf。
 #
-# 启动：docker compose -f docker-compose.prod.yml --env-file .env.docker.prod up -d --build
+# 启动：docker compose -f docker-compose.prod.yml up -d --build --wait
+
+name: z3cz-prod
 
 x-prod-build-args: &prod-build-args
   NODE_VERSION: ${NODE_VERSION:-22.12.0}
   PNPM_VERSION: ${PNPM_VERSION:-10.3.0}
   NODE_MAX_OLD_SPACE_SIZE: ${NODE_MAX_OLD_SPACE_SIZE:-2048}
   VITE_API_HOST: /api
-  VITE_WEBSITE_URL: ${VITE_WEBSITE_URL:-http://localhost:3101}
-  VITE_APP_URL: ${VITE_APP_URL:-http://localhost:3101}
+  VITE_WEBSITE_URL: ${VITE_WEBSITE_URL:-http://localhost:8080}
+  VITE_APP_URL: ${VITE_APP_URL:-http://localhost:8080}
   VITE_WS_VIA_PROXY: "1"
 
 services:
@@ -47,28 +49,27 @@ services:
         condition: service_healthy
     environment:
       NODE_ENV: production
+      RUNTIME: docker
       HOST: 0.0.0.0
-      PORT: 3102
+      PORT: 3001
+      SECRETS_FILE: /data/secrets/.dev.vars
       DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@supabase-db:5432/${POSTGRES_DB:-postgres}
       LOCAL_STORAGE_PATH: /app/data/storage
       RUN_DB_MIGRATE: ${RUN_DB_MIGRATE:-true}
-      WEB_HOST: ${WEB_HOST:-http://localhost:3101}
-      WEBSITE_URL: ${WEBSITE_URL:-http://localhost:3101}
+      WEB_HOST: ${WEB_HOST:-http://localhost:8080}
+      WEBSITE_URL: ${WEBSITE_URL:-http://localhost:8080}
       EMAIL_DOMAIN: ${EMAIL_DOMAIN:-mail.dafthunk.com}
-      JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET in .env.docker.prod}
-      SECRET_MASTER_KEY: ${SECRET_MASTER_KEY:?Set SECRET_MASTER_KEY in .env.docker.prod}
       CLOUDFLARE_ACCOUNT_ID: ${CLOUDFLARE_ACCOUNT_ID:-}
       CLOUDFLARE_API_TOKEN: ${CLOUDFLARE_API_TOKEN:-}
       CLOUDFLARE_ENV: ${CLOUDFLARE_ENV:-production}
     volumes:
       - dafthunk_prod_storage:/app/data/storage
-    ports:
-      - "${API_PORT:-3102}:3102"
+      - dafthunk_prod_secrets:/data/secrets
     healthcheck:
       test:
         [
           "CMD-SHELL",
-          "node -e \"fetch('http://127.0.0.1:3102/health').then((r)=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\"",
+          "node -e \"fetch('http://127.0.0.1:3001/health').then((r)=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\"",
         ]
       interval: 10s
       timeout: 5s
@@ -87,12 +88,13 @@ services:
       api:
         condition: service_healthy
     volumes:
-      # Legacy direct :3101 access — proxy /api inside nginx (host stack uses Caddy instead)
+      # Legacy direct :8080 access — proxy /api inside nginx (host stack uses Caddy instead)
       - ./docker/nginx/app.conf:/etc/nginx/conf.d/default.conf:ro
     ports:
-      - "${APP_PORT:-3101}:80"
+      - "${APP_PORT:-8080}:80"
     restart: unless-stopped
 
 volumes:
   dafthunk_prod_postgres_data:
   dafthunk_prod_storage:
+  dafthunk_prod_secrets:

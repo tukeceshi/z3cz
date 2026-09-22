@@ -1,11 +1,11 @@
-# Dev gateway（profile: gateway）— http://localhost:8080
-# /api/* → api:3102（剥前缀）；其余 → Vite app:3101
+# Dev gateway — http://localhost:3000
+# /api/* → api:3001（剥前缀）；其余 → Vite app:3000
 :8080 {
 	handle_path /api/* {
-		reverse_proxy api:3102
+		reverse_proxy api:3001
 	}
 
 	handle {
-		reverse_proxy app:3101
+		reverse_proxy app:3000
 	}
 }

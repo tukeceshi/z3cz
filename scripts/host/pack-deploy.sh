@@ -42,6 +42,8 @@ copy_host_files() {
 
   cp "$ROOT/scripts/host/"*.sh "$stage/scripts/host/"
   cp "$ROOT/scripts/host/updater/"*.mjs "$stage/scripts/host/updater/"
+  mkdir -p "$stage/packages/utils/src"
+  cp "$ROOT/packages/utils/src/release-version.mjs" "$stage/packages/utils/src/"
   rm -f "$stage/scripts/host/updater/"*.test.mjs
   cp "$ROOT/docker-host/launcher" "$stage/docker-host/launcher"
   cp "$ROOT/docker-host/launcher.mjs" "$stage/docker-host/launcher.mjs"

@@ -907,10 +907,28 @@ export const zh: TranslationDictionary = {
       open: "进行中",
     },
     systemUpdate: {
+      settings: "更新设置",
+      details: "检查、日志与恢复",
+      preparing: "准备更新",
+      installing: "安装更新",
+      checkedAt: "上次检查",
+      stale: "（结果已过期，请重新检查）",
+      reconnecting: "暂时无法连接，正在重试。服务器上的更新不会因此停止。",
+      blocked: "更新前检查未通过，请展开详情查看原因。",
+      rollbackCodeOnly:
+        "恢复上一版本代码，保留当前数据库和上传文件。切换期间访问会短暂中断。",
       title: "系统更新",
       description:
         "获取正式版本源码，在服务器构建后切换。准备期间可继续使用，切换期间进入维护模式。",
       check: "检查更新",
+      sourceChannel: "源码渠道",
+      sourceChannelHint: "只用于拉取源码，检查新版本仍走 GitHub。",
+      sourceChannelSaved: "已切换到 {{channel}}",
+      sourceChannelFailed: "无法保存源码渠道",
+      sourceChannels: {
+        github: "GitHub",
+        gitee: "Gitee",
+      },
       checking: "正在检查…",
       checkFound: "发现新版本 {{version}}",
       checkLatest: "当前已是最新版本",
@@ -919,6 +937,8 @@ export const zh: TranslationDictionary = {
       unsupportedTitle: "当前部署不支持后台在线更新",
       unsupportedDetail:
         "请先完成自托管部署（sudo bash /var/dafthunk/scripts/host/deploy.sh）。部署会自动安装更新器；此状态下不会执行任何更新。若仍看到本提示，请检查 z3cz-updater.service 后重建 API 容器。",
+      localDevelopmentDetail:
+        "本地开发环境没有宿主机更新器，不能在后台执行系统更新。这不会影响本地开发。",
       manualTitle: "需要人工介入",
       manualDetail: "请检查更新器与容器日志。",
       releaseTitle: "可用版本",
@@ -943,11 +963,13 @@ export const zh: TranslationDictionary = {
         pending: "待执行",
       },
       progressTitle: "更新进度",
-      progressHint: "进度保存在服务器上。维护期间连接可能暂时中断，恢复后继续显示；关闭网页不影响更新。",
+      progressHint:
+        "进度保存在服务器上。维护期间连接可能暂时中断，恢复后继续显示；关闭网页不影响更新。",
       progressEmpty: "检查更新后，这里会显示操作记录。",
       backupTitle: "备份与回退",
-      backupHint: "只使用最近一次通过校验的备份。",
-      backupEmpty: "第一次开始更新时会自动备份；备份失败不会切换版本。",
+      backupHint: "优先复用近期已校验备份；需要时会在切换前创建新备份。",
+      backupEmpty:
+        "更新会校验近期备份；缺少可用备份或版本要求新备份时，会在切换前创建。",
       backupId: "备份编号",
       backupVersion: "来源版本",
       backupAt: "创建时间",
@@ -963,7 +985,7 @@ export const zh: TranslationDictionary = {
       rollbackFailed: "无法开始回退",
       confirmTitle: "更新到 {{version}}？",
       confirmDetail:
-        "先获取代码、安装依赖并构建，再停止写入、备份和切换版本。关闭网页不影响更新。",
+        "准备和构建期间可继续使用，切换时短暂中断。更新会校验备份并按版本说明处理数据库。关闭网页不影响更新。",
       confirm: "确认并开始更新",
       cancel: "取消",
       phases: {

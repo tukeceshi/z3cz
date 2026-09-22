@@ -1,0 +1,36 @@
+ARG RUNTIME_IMAGE=tukeceshi/z3cz-runtime:latest
+FROM ${RUNTIME_IMAGE} AS dependencies
+WORKDIR /app
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml .npmrc ./
+COPY apps/api/package.json apps/api/package.json
+COPY apps/app/package.json apps/app/package.json
+COPY apps/persist-worker/package.json apps/persist-worker/package.json
+COPY packages/types/package.json packages/types/package.json
+COPY packages/utils/package.json packages/utils/package.json
+COPY packages/runtime/package.json packages/runtime/package.json
+COPY packages/geo/package.json packages/geo/package.json
+RUN --mount=type=cache,id=z3cz-update-pnpm,target=/pnpm-store,sharing=locked \
+    pnpm install --frozen-lockfile --store-dir /pnpm-store --package-import-method copy
+
+FROM dependencies AS frontend
+COPY tsconfig.json ./
+COPY packages ./packages
+COPY apps/app ./apps/app
+ENV NODE_OPTIONS=--max-old-space-size=2048
+ENV VITE_API_HOST=/api
+ENV VITE_WS_VIA_PROXY=1
+RUN pnpm --filter @dafthunk/types build && pnpm --filter @dafthunk/app build:docker-prod
+
+FROM dependencies AS api
+COPY tsconfig.json VERSION ./
+COPY packages ./packages
+COPY apps/api ./apps/api
+COPY --from=frontend /app/apps/app/dist /app/bootstrap
+WORKDIR /app/apps/api
+ENV NODE_ENV=production
+ENV BOOTSTRAP_ASSETS_DIR=/app/bootstrap
+CMD ["pnpm", "exec", "tsx", "--import", "./src/shims/cloudflare-register.mjs", "src/server.ts"]
+
+FROM nginx:1.27-alpine AS app
+COPY docker/nginx/app.static.conf /etc/nginx/conf.d/default.conf
+COPY --from=frontend /app/apps/app/dist /usr/share/nginx/html

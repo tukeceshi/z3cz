@@ -57,7 +57,7 @@ sudo bash /var/dafthunk/scripts/host/deploy.sh
 
 证书签发走公网 HTTP-01：CA 按 **当前 DNS** 访问 `http://你的域名/.well-known/acme-challenge/`。多台机器时，**只在域名已解析到的那一台**上跑 `https-setup.sh`；新机先改 A 记录并等生效，再申请。80 端口须对公网开放，且不要把校验请求强制跳到 HTTPS。
 
-日常更新通过 Git 获取源码，在 Docker 内安装依赖、构建前端，**宿主机只需 Docker 和 Git，不装 Node**。代码和构建结果按版本保存在 `docker-host/shared/releases`，依赖下载缓存可复用。基础环境没有变化时，不再下载 API / app 应用镜像。
+日常更新通过 Git 增量获取源码，在 Docker 内构建应用镜像，**宿主机只需 Docker 和 Git，不装 Node**。更新器复用固定构建目录、依赖层和前端构建层；运行中的容器使用已完成的镜像，不依赖源码目录。
 
 #### 更新
 
@@ -65,9 +65,17 @@ sudo bash /var/dafthunk/scripts/host/deploy.sh
 
 `deploy.sh` 自动安装宿主机更新器。旧机器须先安装包含 `SOURCE_REVISION` 的新版部署包，再运行 `deploy.sh` 完成一次源码部署迁移；仅重跑旧脚本不会启用新方式。首次迁移会下载基础环境并在服务器构建，旧服务保持运行直到构建成功。
 
-更新顺序：获取正式版源码 → 安装依赖、构建 → 维护模式、停止应用 → 备份 → 数据库迁移 → 启动并验证 → 恢复访问。关闭网页不影响更新；维护期间后台连接可能中断，日志由宿主机保存。构建失败不会停服，切换失败恢复本次备份和上一版配置。人工回退会覆盖备份之后新增的数据。
+普通更新：增量获取源码、复用缓存构建镜像 → 校验近期备份 → 短暂暂停访问、切换应用 → 验证并恢复访问。没有可用的近期备份时会创建一份。数据库文件一致时跳过迁移。准备期间原服务继续运行。
 
-基础环境由 `docker/Dockerfile.source` 决定，仅该文件变化时发布新的 `tukeceshi/z3cz-runtime` 镜像。更新器在日志中提示基础环境下载。`docker/source-protocol` 变化时需先安装新版宿主机更新器。版本目录暂不自动清理，避免删除正在使用或回退需要的文件。
+数据库更新或无法确认兼容性的旧部署：准备完成后进入维护模式 → 按版本要求创建或复用备份 → 迁移 → 切换并验证。迁移未完成或新旧数据库不兼容时保持维护状态，由管理员明确执行备份恢复；已声明兼容的迁移可以只回退应用镜像并保留数据。
+
+关闭网页不影响更新；短暂断线会自动重连。更新器重启后，准备阶段中断可重试，切换阶段中断会提示使用回退恢复，不会自动重复执行迁移。
+
+基础环境由 `docker/Dockerfile.source` 决定，仅该文件变化时发布新的 `tukeceshi/z3cz-runtime` 镜像。`docker/Dockerfile.update` 把应用代码装入本机镜像。更新器只清理属于当前安装、且不再用于运行或回退的旧镜像；备份与用户文件不自动删除。
+
+发布前维护根目录 `update-policy.json`：`minimumVersion` 限制可直接升级的最低版本；`requiresBackup` 要求本次创建新备份；`databaseChanges` 强制执行迁移；`minimumRollbackVersion` 和 `rollbackCompatible` 共同声明旧代码能否继续使用迁移后的数据。更新器仍会比较新旧数据库文件，历史不明确时按需要新备份、需要人工恢复处理。发布流程会校验该文件和更新协议。
+
+启用本次优化需先通过新版部署包安装宿主机更新器；仅更新应用代码不会替换已经安装的更新器二进制。
 
 命令行备用：
 
@@ -79,7 +87,7 @@ sudo bash /var/dafthunk/scripts/host/update.sh v1.0.2
 sudo bash /var/dafthunk/scripts/host/update.sh --reset
 ```
 
-发布需要配置 GitHub Secrets `DOCKERHUB_USERNAME`、`DOCKERHUB_TOKEN`，并允许推送 `tukeceshi/z3cz-runtime`。正常版本发布复用已有基础环境。服务器须能访问 GitHub、依赖仓库和首次安装所需的镜像源；可通过更新器环境变量 `Z3CZ_SOURCE_REMOTE` 指定可信的 HTTPS Git 仓库镜像。
+发布需要配置 GitHub Secrets `DOCKERHUB_USERNAME`、`DOCKERHUB_TOKEN`，并允许推送 `tukeceshi/z3cz-runtime`。正常版本发布复用已有基础环境。服务器须能访问 GitHub、依赖仓库和首次安装所需的镜像源。后台系统更新可选择 GitHub 或 Gitee 拉取源码；检查新版本仍使用 GitHub。
 
 #### HTTPS 模式
 
@@ -139,7 +147,7 @@ CentOS / RHEL 若未自动启动：`sudo systemctl enable --now docker`。
 ```bash
 git clone https://github.com/tukeceshi/z3cz.git
 cd z3cz
-docker compose up -d --build --wait   # 或 pnpm dev
+docker compose up -d --build --wait
 ```
 
 国内访问 Docker Hub 容易超时（报错含 `registry-1.docker.io`）。可在 Docker Desktop → **Settings → Docker Engine** 配置镜像加速，一次生效、无需改项目里的镜像名：
@@ -157,12 +165,10 @@ docker compose up -d --build --wait   # 或 pnpm dev
 
 | 地址                                             | 服务                               |
 | ---------------------------------------------- | -------------------------------- |
-| [http://localhost:3101](http://localhost:3101) | 产品 app（`/api` 反代至 API）           |
-| [http://localhost:3102](http://localhost:3102) | API                              |
-| [http://localhost:8080](http://localhost:8080) | 可选同源 Gateway（`pnpm dev:gateway`） |
+| [http://localhost:3000](http://localhost:3000) | 产品 app（`/api` 经 Caddy 反代至 API） |
 
 
-请用 **3101** 使用产品；勿把浏览器 API 指到 3102（Cookie 同源）。验证单域名时用 **8080**，勿与 3101 混用 Cookie。
+请用 **3000** 使用产品。API 仅在 Docker 网络内以 `http://api:3001` 提供服务；浏览器通过同源的 `/api` 访问它。
 
 #### 更新
 
@@ -180,20 +186,33 @@ docker compose up -d --build --wait
 
 #### 登录
 
-1. 打开 [http://localhost:3101/login](http://localhost:3101/login)
+1. 打开 [http://localhost:3000/login](http://localhost:3000/login)
 2. 邮箱 + 密码「登录 / 注册」
 3. **首个注册用户**为超级管理员
 
 ---
 
-## Docker 日常命令
+## Docker 命令总览
 
-```bash
-docker compose up -d --build --wait    # 构建并启动
-docker compose up -d --wait            # 已构建过
-docker compose logs -f api app         # 查看日志，可以只带对应的桶
-docker compose down                    # 停止容器
-```
+开发与部署可同时运行：开发入口为 `http://localhost:3000`，部署入口为 `http://localhost:8080`。两套 API 都只在各自 Docker 网络内的 `api:3001` 提供服务，不发布宿主机端口。
+
+| 场景 | 命令 |
+| --- | --- |
+| 开发：构建并启动 | `docker compose up -d --build --wait` |
+| 开发：使用已有镜像启动 | `docker compose up -d --wait` |
+| 开发：查看状态 | `docker compose ps` |
+| 开发：查看全部日志 | `docker compose logs -f` |
+| 开发：查看 API / App 日志 | `docker compose logs -f api app` |
+| 开发：停止 | `docker compose down` |
+| 开发：完全重置数据 | `docker compose down -v` |
+| 部署：构建并启动 | `docker compose -f docker-compose.prod.yml up -d --build --wait` |
+| 部署：查看状态 | `docker compose -f docker-compose.prod.yml ps` |
+| 部署：查看日志 | `docker compose -f docker-compose.prod.yml logs -f` |
+| 部署：停止 | `docker compose -f docker-compose.prod.yml down` |
+
+部署首次启动时，API 会在持久 Docker 卷 `z3cz-prod_dafthunk_prod_secrets` 中自动生成密钥；后续启动会复用。部署环境也不要使用 `down -v`，否则密钥、数据库和上传文件都会被删除。
+
+更新代码后，开发或部署均重新执行对应的“构建并启动”命令即可。`docker-compose.prod.yml` 仍为旧版过渡方案；新的公开自托管部署请使用上文自托管流程。
 
 ---
 

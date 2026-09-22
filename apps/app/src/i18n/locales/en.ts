@@ -940,10 +940,30 @@ export const en = {
       open: "Open",
     },
     systemUpdate: {
+      settings: "Update settings",
+      details: "Checks, logs and recovery",
+      preparing: "Preparing update",
+      installing: "Installing update",
+      checkedAt: "Last checked",
+      stale: "(outdated; check again)",
+      reconnecting:
+        "Connection interrupted. Retrying; the server continues the update.",
+      blocked: "Preflight checks failed. Expand details to see why.",
+      rollbackCodeOnly:
+        "Restore the previous code while keeping the current database and uploads. Access is briefly interrupted.",
       title: "System update",
       description:
-        "Check official releases and upgrade after a backup. The site is briefly unavailable; a failed update rolls back.",
+        "Prepare the official release while the site runs, then briefly pause access to switch versions.",
       check: "Check for updates",
+      sourceChannel: "Source channel",
+      sourceChannelHint:
+        "Only used to pull source code. Version checks still use GitHub.",
+      sourceChannelSaved: "Switched to {{channel}}",
+      sourceChannelFailed: "Could not save the source channel",
+      sourceChannels: {
+        github: "GitHub",
+        gitee: "Gitee",
+      },
       checking: "Checking…",
       checkFound: "New version {{version}} is available",
       checkLatest: "You are on the latest version",
@@ -952,6 +972,8 @@ export const en = {
       unsupportedTitle: "In-app updates are not available here",
       unsupportedDetail:
         "Finish self-host deploy (sudo bash /var/dafthunk/scripts/host/deploy.sh). Deploy installs the host updater automatically; nothing will be upgraded in this state. If this message remains, check z3cz-updater.service and recreate the API container.",
+      localDevelopmentDetail:
+        "The local development environment has no host updater, so it cannot run system updates in the background. This does not affect local development.",
       manualTitle: "Manual intervention required",
       manualDetail: "Check updater and container logs.",
       releaseTitle: "Available version",
@@ -980,9 +1002,10 @@ export const en = {
         "Progress is stored on the server and survives a page refresh.",
       progressEmpty: "Operation logs appear after you check for updates.",
       backupTitle: "Backup and rollback",
-      backupHint: "Only the latest verified backup is used.",
+      backupHint:
+        "A recent verified backup is reused when possible; a new one is created before switching when required.",
       backupEmpty:
-        "The first update creates a backup. A failed backup does not switch versions.",
+        "Updates verify recent backups. A new backup is created when none is usable or the release requires one.",
       backupId: "Backup id",
       backupVersion: "Source version",
       backupAt: "Created",
@@ -998,7 +1021,7 @@ export const en = {
       rollbackFailed: "Could not start rollback",
       confirmTitle: "Update to {{version}}?",
       confirmDetail:
-        "Source and dependencies are prepared while the site runs. The system then pauses writes, backs up data, migrates, and switches versions. Closing this page does not stop the update.",
+        "The site stays available while source and images are prepared. Switching briefly interrupts access. Backups and database changes follow the release policy. Closing this page does not stop the update.",
       confirm: "Confirm and start update",
       cancel: "Cancel",
       phases: {

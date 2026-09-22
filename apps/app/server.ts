@@ -4,7 +4,7 @@ import { fileURLToPath } from "node:url";
 import { createServer } from "vite";
 
 const currentDir = dirname(fileURLToPath(import.meta.url));
-const port = process.env.PORT ? Number.parseInt(process.env.PORT, 10) : 3101;
+const port = process.env.PORT ? Number.parseInt(process.env.PORT, 10) : 3000;
 
 const vite = await createServer({
   configFile: resolve(currentDir, "vite.config.ts"),

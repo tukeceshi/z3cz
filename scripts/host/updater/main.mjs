@@ -12,11 +12,22 @@ const command = process.argv[2] || "serve";
 
 async function main() {
   const manager = new UpdateManager();
+  manager.recoverInterruptedOperation();
   if (command === "install-source") {
-    const ref = process.argv[3] || fs.readFileSync(path.join(manager.installDir, "SOURCE_REVISION"), "utf8").trim();
+    const ref =
+      process.argv[3] ||
+      fs
+        .readFileSync(path.join(manager.installDir, "SOURCE_REVISION"), "utf8")
+        .trim();
     validateSourceRef(ref);
-    const version = fs.readFileSync(path.join(manager.installDir, "VERSION"), "utf8").trim();
-    manager.state.operation = { phase: "preflight", logs: [], automaticRollback: false };
+    const version = fs
+      .readFileSync(path.join(manager.installDir, "VERSION"), "utf8")
+      .trim();
+    manager.state.operation = {
+      phase: "preflight",
+      logs: [],
+      automaticRollback: false,
+    };
     await manager.runUpdate(manager.currentVersion(), version, ref);
     console.log(JSON.stringify(manager.snapshot(), null, 2));
     if (manager.state.operation.phase !== "succeeded") process.exitCode = 1;
@@ -54,28 +65,13 @@ async function main() {
     return;
   }
   if (command !== "serve") {
-    console.error("Usage: updater serve|status|check|update [version]|rollback [reason]");
+    console.error(
+      "Usage: updater serve|status|check|update [version]|rollback [reason]"
+    );
     process.exitCode = 1;
     return;
   }
   const socket = process.env.Z3CZ_UPDATER_SOCKET || defaultSocketPath;
-  if (fs.existsSync(path.join(manager.stateDir, "operation.lock"))) {
-    const pid = Number(fs.readFileSync(path.join(manager.stateDir, "operation.lock"), "utf8"));
-    if (!Number.isInteger(pid) || pid <= 0) throw new Error("更新锁损坏，请人工检查");
-    try {
-      process.kill(pid, 0);
-    } catch (error) {
-      if (error.code !== "ESRCH") throw error;
-      manager.state.operation.phase = "manual_intervention";
-      manager.state.operation.error = "更新进程中断，请检查维护状态和备份后恢复；不要重复执行迁移";
-      manager.saveState();
-    }
-  }
-  if (manager.state.pendingUpdate) {
-    manager.state.operation.phase = "manual_intervention";
-    manager.state.operation.error = "上次切换未完成，请检查日志；可使用回退恢复上次部署";
-    manager.saveState();
-  }
   const server = createUpdaterServer(manager, token);
   await listenUnix(socket, server);
   console.log(`z3cz host updater listening on ${socket}`);

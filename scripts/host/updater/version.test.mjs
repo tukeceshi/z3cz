@@ -9,6 +9,8 @@ import {
 } from "./version.mjs";
 
 test("official versions compare by semver", () => {
+  assert.equal(compareVersions("v1.9.0", "1.10.0"), -1);
+  assert.equal(compareVersions("1.10.0", "v1.10.0"), 0);
   assert.equal(compareVersions("v1.2.0", "v1.3.0"), -1);
   assert.equal(compareVersions("1.3.0", "v1.2.9"), 1);
   assert.equal(compareVersions("v1.5.0", "v1.5.0"), 0);

@@ -2,6 +2,7 @@ import type { SystemUpdateStatus } from "@dafthunk/types";
 import { zValidator } from "@hono/zod-validator";
 import { Hono } from "hono";
 import { z } from "zod";
+import { compareVersions } from "../../../../../packages/utils/src/release-version.mjs";
 
 import { ApiContext } from "../../context";
 import { fetchLatestGithubRelease } from "../../services/github-latest-release";
@@ -11,6 +12,10 @@ const adminSystemUpdateRoutes = new Hono<ApiContext>();
 
 const startSchema = z.object({
   targetVersion: z.string().trim().min(1).max(64),
+});
+
+const sourceChannelSchema = z.object({
+  sourceChannel: z.enum(["github", "gitee"]),
 });
 
 const rollbackSchema = z.object({
@@ -32,16 +37,6 @@ async function callUpdater(
     "../../services/host-updater-client-node"
   );
   return requestHostUpdater(socket, token, method, pathname, body);
-}
-
-function compareLoose(current: string, latest: string): boolean {
-  const informal = !/^v?\d+\.\d+\.\d+/.test(current);
-  if (informal) {
-    return true;
-  }
-  return (
-    current.replace(/^v/, "") !== latest.replace(/^v/, "") && latest > current
-  );
 }
 
 adminSystemUpdateRoutes.get("/", async (c) => {
@@ -67,12 +62,16 @@ adminSystemUpdateRoutes.post("/check", async (c) => {
     try {
       const latestRelease = await fetchLatestGithubRelease();
       const currentVersion = c.env.APP_VERSION || "unknown";
+      const updateAvailable =
+        compareVersions(currentVersion, latestRelease.version) < 0;
       return c.json(
         disconnectedUpdateStatus(c.env, {
           latestRelease,
-          updateAvailable: compareLoose(currentVersion, latestRelease.version),
+          updateAvailable,
+          checkedAt: new Date().toISOString(),
+          stale: false,
           operation: {
-            phase: latestRelease ? "ready" : "no_update",
+            phase: updateAvailable ? "ready" : "no_update",
             automaticRollback: false,
             logs: [],
           },
@@ -91,6 +90,37 @@ adminSystemUpdateRoutes.post("/check", async (c) => {
 });
 
 adminSystemUpdateRoutes.post(
+  "/source-channel",
+  zValidator("json", sourceChannelSchema),
+  async (c) => {
+    const body = c.req.valid("json");
+    try {
+      const status = await callUpdater(c.env, "POST", "/v1/source-channel", {
+        sourceChannel: body.sourceChannel,
+      });
+      return c.json(status);
+    } catch (error) {
+      if (error instanceof Error && error.message === "unsupported") {
+        return c.json(
+          {
+            error: "当前部署不支持后台在线更新，请先完成自托管部署以安装更新器",
+          },
+          409
+        );
+      }
+      const status = (error as Error & { status?: SystemUpdateStatus }).status;
+      return c.json(
+        {
+          error: error instanceof Error ? error.message : "无法保存源码渠道",
+          data: status,
+        },
+        409
+      );
+    }
+  }
+);
+
+adminSystemUpdateRoutes.post(
   "/start",
   zValidator("json", startSchema),
   async (c) => {
@@ -103,7 +133,9 @@ adminSystemUpdateRoutes.post(
     } catch (error) {
       if (error instanceof Error && error.message === "unsupported") {
         return c.json(
-          { error: "当前部署不支持后台在线更新，请先完成自托管部署以安装更新器" },
+          {
+            error: "当前部署不支持后台在线更新，请先完成自托管部署以安装更新器",
+          },
           409
         );
       }
