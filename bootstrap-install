@@ -43,7 +43,10 @@ chmod +x "$TARGET"
 # from curl's pipe before handing control to the installer.  The optional
 # domain question (and every child script) will then read from the terminal.
 if [[ ! -t 0 ]] && ( : </dev/tty ) 2>/dev/null; then
-  exec </dev/tty
+  # Do not redirect this process: it is still reading this wrapper from curl's
+  # pipe. Start the downloaded installer in a child shell, then give that
+  # child the controlling terminal for its prompts.
+  exec bash -c 'exec </dev/tty; exec bash "$@"' bash "$TARGET" "$@"
 fi
 
 exec bash "$TARGET" "$@"
