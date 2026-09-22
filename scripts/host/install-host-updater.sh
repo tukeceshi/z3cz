@@ -165,6 +165,13 @@ EOF
 
 main() {
   require_root
+  # Docker Desktop exposes the daemon to WSL without a docker.service unit.
+  # The updater depends on that unit, but the application stack itself does
+  # not; skip the optional updater instead of blocking first deployment.
+  if ! systemctl cat docker.service >/dev/null 2>&1; then
+    printf '提示：未检测到 docker.service（Docker Desktop / WSL 环境），跳过宿主机更新器安装。\n'
+    return 0
+  fi
   read_image_tag
   install_binary
   ensure_token
