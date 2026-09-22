@@ -178,7 +178,6 @@ looks_like_install() {
 }
 
 pull_packaged_images() {
-  [[ -f "${INSTALL_DIR}/SOURCE_REVISION" ]] && return 0
   [[ -x "${INSTALL_DIR}/docker-host/launcher" ]] || die "Missing docker-host/launcher"
   log "Pulling api/app images"
   (cd "${INSTALL_DIR}/docker-host" && ./launcher pull-app-images)
@@ -198,6 +197,8 @@ download_and_extract_pack() {
       if tar -xzf "$tmp" -C "$INSTALL_DIR"; then
         rm -f "$tmp"
         chmod +x "${INSTALL_DIR}/scripts/host/"*.sh "${INSTALL_DIR}/docker-host/launcher" 2>/dev/null || true
+        [[ ! -f "${INSTALL_DIR}/SOURCE_REVISION" ]] \
+          || die "This is a legacy source deployment pack. Download a current image deployment pack and retry."
         pull_packaged_images
         if [[ -f "${INSTALL_DIR}/DEPLOY_REVISION" ]]; then
           info "Pack $(cat "${INSTALL_DIR}/DEPLOY_REVISION")"

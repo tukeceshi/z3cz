@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Publish a reusable base environment and pack the source updater.
+# Publish a lightweight deployment pack that references prebuilt API/App images.
 #   DAFTHUNK_PUSH_IMAGES=1 bash scripts/host/pack-deploy.sh [outfile]
 set -euo pipefail
 
@@ -15,21 +15,6 @@ if [[ "${DAFTHUNK_RELEASE:-}" == "1" && -f "$ROOT/VERSION" ]]; then
 fi
 
 log() { printf '==> %s\n' "$*"; }
-
-build_runtime() {
-  local hash image
-  hash="$(tr -d '\r' < "$ROOT/docker/Dockerfile.source" | sha256sum | cut -c1-20)"
-  image="tukeceshi/z3cz-runtime:env-${hash}"
-  if [[ "${DAFTHUNK_PUSH_IMAGES:-}" == "1" ]]; then
-    if docker manifest inspect "$image" >/dev/null 2>&1; then
-      log "Reusing base environment $image"
-    else
-      docker buildx build --platform linux/amd64,linux/arm64 -f "$ROOT/docker/Dockerfile.source" -t "$image" --push "$ROOT"
-    fi
-  else
-    docker build -f "$ROOT/docker/Dockerfile.source" -t "$image" "$ROOT"
-  fi
-}
 
 copy_host_files() {
   local stage="$1"
@@ -62,7 +47,6 @@ copy_host_files() {
   cp "$ROOT/CHANGELOG.md" "$stage/CHANGELOG.md"
   if git -C "$ROOT" rev-parse HEAD >/dev/null 2>&1; then
     git -C "$ROOT" rev-parse HEAD >"$stage/DEPLOY_REVISION"
-    cp "$stage/DEPLOY_REVISION" "$stage/SOURCE_REVISION"
   else
     date -u +"%Y-%m-%dT%H:%M:%SZ" >"$stage/DEPLOY_REVISION"
   fi
@@ -70,7 +54,6 @@ copy_host_files() {
     >"$stage/docker-host/packaged-images.env"
 }
 
-build_runtime
 bash "${ROOT}/scripts/host/compile-updater.sh"
 STAGE="$(mktemp -d)"
 trap 'rm -rf "$STAGE"' EXIT

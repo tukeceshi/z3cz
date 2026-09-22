@@ -49,13 +49,13 @@ curl -fsSL "https://raw.githubusercontent.com/tukeceshi/z3cz/main/bootstrap-inst
 
 安装期间可输入域名，也可直接回车跳过。输入域名时，Caddy 自动申请 HTTPS 证书；回车时系统以 `http://服务器公网IP` 进入初始化模式。之后可在 Admin 后台的“域名与 HTTPS”中绑定或更换域名、查看证书状态并重新签发。HTTP 初始化模式仅用于完成管理配置，正式业务建议在 HTTPS 启用后使用。
 
-日常更新通过 Git 增量获取源码，在 Docker 内构建应用镜像，**宿主机只需 Docker 和 Git，不装 Node**。更新器复用固定构建目录、依赖层和前端构建层；运行中的容器使用已完成的镜像，不依赖源码目录。
+首次安装下载轻量部署包，再拉取发布时已构建好的版本化 API/App 镜像；服务器不构建应用源码。运行中的容器始终使用已完成的镜像。
 
 #### 更新
 
 管理后台 **系统设置 → 系统更新**：检查正式版本、一键升级、失败回退。
 
-`deploy.sh` 自动安装宿主机更新器。旧机器须先安装包含 `SOURCE_REVISION` 的新版部署包，再运行 `deploy.sh` 完成一次源码部署迁移；仅重跑旧脚本不会启用新方式。首次迁移会下载基础环境并在服务器构建，旧服务保持运行直到构建成功。
+`deploy.sh` 自动安装宿主机更新器。旧版 `SOURCE_REVISION` 源码部署包不能用于新的首装流程；请使用当前发布的镜像部署包。
 
 普通更新：增量获取源码、复用缓存构建镜像 → 校验近期备份 → 短暂暂停访问、切换应用 → 验证并恢复访问。没有可用的近期备份时会创建一份。数据库文件一致时跳过迁移。准备期间原服务继续运行。
 
@@ -73,7 +73,7 @@ curl -fsSL "https://raw.githubusercontent.com/tukeceshi/z3cz/main/bootstrap-inst
 
 ```bash
 sudo bash /var/dafthunk/scripts/host/update.sh
-sudo bash /var/dafthunk/scripts/host/update.sh v1.0.3
+sudo bash /var/dafthunk/scripts/host/update.sh v1.0.4
 
 # 重置安装：清 DB 与上传，保留域名配置与证书
 sudo bash /var/dafthunk/scripts/host/update.sh --reset
