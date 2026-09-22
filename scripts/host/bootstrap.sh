@@ -233,10 +233,10 @@ log "Configure and deploy"
 export DAFTHUNK_FROM_INSTALL=1
 if [[ "${DAFTHUNK_NON_INTERACTIVE:-0}" != "1" ]] \
   && ( : </dev/tty ) 2>/dev/null; then
-  # The bootstrap script is commonly executed as `curl ... | sudo bash`, so
-  # its stdin is the curl pipe. Attach the setup child to the controlling
-  # terminal explicitly; otherwise Enter may continue going to the pipe.
-  bash "${INSTALL_DIR}/docker-host/dafthunk-setup" --no-rebuild </dev/tty
+  # bootstrap-install has already attached this process to the controlling
+  # terminal. Let setup inherit that fd; reopening /dev/tty here can suspend
+  # the child under sudo's pseudo-terminal mode.
+  bash "${INSTALL_DIR}/docker-host/dafthunk-setup" --no-rebuild
 else
   bash "${INSTALL_DIR}/docker-host/dafthunk-setup" --no-rebuild
 fi
