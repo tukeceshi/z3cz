@@ -211,11 +211,14 @@ log_wait_input() {
 }
 
 has_tty() {
-  [[ -r /dev/tty && -w /dev/tty ]]
+  # Testing the device node's permissions is not enough: under `curl | sudo
+  # bash`, /dev/tty can exist while it is not usable by this process.  Opening
+  # it verifies that there is an actual controlling terminal.
+  ( : </dev/tty ) 2>/dev/null
 }
 
 ensure_stdin_tty() {
-  if [[ "$NON_INTERACTIVE" == "1" ]] || [[ -t 0 ]]; then
+  if [[ "$NON_INTERACTIVE" == "1" || -t 0 ]]; then
     return 0
   fi
   if has_tty; then
@@ -225,12 +228,13 @@ ensure_stdin_tty() {
 
 write_prompt_tty() {
   local msg="$1"
-  if has_tty; then
-    stty -F /dev/tty sane 2>/dev/null || true
+  # stderr remains connected to the invoking terminal when stdin is a pipe.
+  # Prefer it so prompts are visible in WSL/Windows Terminal as well as SSH.
+  # Only fall back to /dev/tty when stderr itself was redirected to a log.
+  if [[ -t 2 ]]; then
+    printf '%s' "$msg" >&2
+  elif has_tty; then
     printf '%s' "$msg" >/dev/tty
-  elif [[ -t 1 ]]; then
-    stty sane 2>/dev/null || true
-    printf '%s' "$msg"
   else
     printf '%s' "$msg" >&2
   fi
@@ -240,7 +244,7 @@ can_prompt() {
   if [[ "$NON_INTERACTIVE" == "1" ]]; then
     return 1
   fi
-  [[ -t 0 ]] || has_tty
+  [[ -t 0 ]]
 }
 
 ask_timeout_exit() {
@@ -260,31 +264,24 @@ read_interactive_line() {
   local value=""
   local rc=0
 
-  # Prefer /dev/tty over fd 0 — install logging may redirect stdout while stdin is still ambiguous under sudo.
-  if has_tty; then
-    stty -F /dev/tty sane 2>/dev/null || true
-    if ((ASK_TIMEOUT_SEC > 0)); then
-      if ! read -r -t "$ASK_TIMEOUT_SEC" value </dev/tty; then
-        rc=$?
-        if ((rc == 142 || rc == 143)); then
-          ask_timeout_exit
-        fi
-        ask_read_failed_exit
-      fi
-    elif ! read -r value </dev/tty; then
-      ask_read_failed_exit
-    fi
-  elif [[ -t 0 ]]; then
+  # ensure_stdin_tty above makes fd 0 the controlling terminal before any
+  # prompt.  Reading that fd is more reliable than reopening /dev/tty for
+  # every answer when this script was launched via `curl | sudo bash`.
+  if [[ -t 0 ]]; then
     stty sane 2>/dev/null || true
     if ((ASK_TIMEOUT_SEC > 0)); then
-      if ! read -r -t "$ASK_TIMEOUT_SEC" value; then
+      if read -r -t "$ASK_TIMEOUT_SEC" value; then
+        :
+      else
         rc=$?
         if ((rc == 142 || rc == 143)); then
           ask_timeout_exit
         fi
         ask_read_failed_exit
       fi
-    elif ! read -r value; then
+    elif read -r value; then
+      :
+    else
       ask_read_failed_exit
     fi
   else

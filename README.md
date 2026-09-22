@@ -49,6 +49,27 @@ curl -fsSL "https://raw.githubusercontent.com/tukeceshi/z3cz/main/bootstrap-inst
 
 安装期间可输入域名，也可直接回车跳过。输入域名时，Caddy 自动申请 HTTPS 证书；回车时系统以 `http://服务器公网IP` 进入初始化模式。之后可在 Admin 后台的“域名与 HTTPS”中绑定或更换域名、查看证书状态并重新签发。HTTP 初始化模式仅用于完成管理配置，正式业务建议在 HTTPS 启用后使用。
 
+#### Windows（Docker Desktop + WSL2）
+
+Windows 不使用 PowerShell 原生部署。请先自行安装并启动 Docker Desktop，然后在 **Settings → Resources → WSL Integration** 中为 Ubuntu 启用集成；Docker Desktop 必须处于 Linux containers 模式。
+
+在 PowerShell 安装 WSL 与 Ubuntu（已安装可跳过）：
+
+```powershell
+wsl --install -d Ubuntu
+```
+
+重启并打开 Ubuntu 后，在 WSL 的 Linux 文件系统中执行同一条安装命令：
+
+- 在开始菜单搜索并打开 **Ubuntu**；或
+- 打开 PowerShell，执行 `wsl -d Ubuntu`。
+
+```bash
+curl -fsSL "https://raw.githubusercontent.com/tukeceshi/z3cz/main/bootstrap-install" | sudo bash
+```
+
+部署数据默认写入 `/var/dafthunk`。请勿在 `/mnt/c/...` 等 Windows 挂载路径中部署或保存运行数据，以避免 Docker 文件权限和 I/O 问题。若脚本提示 Docker Desktop 不可用，请确认 Docker Desktop 已启动且已为当前 Ubuntu 发行版启用 WSL Integration。
+
 首次安装下载轻量部署包，再拉取发布时已构建好的版本化 API/App 镜像；服务器不构建应用源码。运行中的容器始终使用已完成的镜像。
 
 #### 更新

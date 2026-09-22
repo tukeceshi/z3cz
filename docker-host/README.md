@@ -12,6 +12,26 @@ curl -fsSL "https://raw.githubusercontent.com/tukeceshi/z3cz/main/bootstrap-inst
 
 安装器会优先检查 Docker 与 Docker Compose。Linux 上缺失 Docker 时会自动安装；Windows 用户请先安装并启动 Docker Desktop、启用 WSL2 Integration，再在 Ubuntu WSL 中执行同一条命令。请将安装目录放在 WSL Linux 文件系统中，而不是 `/mnt/c`。
 
+### Windows（WSL2）
+
+1. 安装并启动 Docker Desktop，切换到 Linux containers 模式。
+2. 在 Docker Desktop 的 **Settings → Resources → WSL Integration** 中启用 Ubuntu。
+3. 若尚未安装 Ubuntu WSL，在管理员 PowerShell 执行：
+
+   ```powershell
+   wsl --install -d Ubuntu
+   ```
+
+4. 打开 Ubuntu WSL 命令窗口：在开始菜单搜索 **Ubuntu** 并打开；或在 PowerShell 执行：
+
+   ```powershell
+   wsl -d Ubuntu
+   ```
+
+5. 在打开的 Ubuntu 窗口中执行本页的一键安装命令。不要在 PowerShell、Git Bash 或 `/mnt/c/...` 路径中部署。
+
+安装脚本会验证 Docker Desktop 是否已通过 WSL 可用；检查失败时不会下载部署包或创建半成品容器。
+
 域名为可选输入：填写后由 Caddy 自动申请证书；直接回车会以 HTTP 初始化模式启动。之后通过 Admin 后台的“域名与 HTTPS”绑定、更换域名并管理证书。HTTPS 自动续期由 Caddy 完成。
 
 渲染配置用 Docker 跑 Node 镜像，系统不装 Node。bootstrap 会配 Docker 镜像加速；连不上 Docker Hub 时走加速源。api / app 镜像在 Docker Hub，更新时只拉有变化的层。
