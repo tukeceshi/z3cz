@@ -223,6 +223,15 @@ ensure_stdin_tty() {
   if [[ "$NON_INTERACTIVE" == "1" || -t 0 ]]; then
     return 0
   fi
+  # sudo with use_pty can leave stdin attached to curl's pipe while stdout and
+  # stderr point to its active pseudo-terminal.  Reopen that active terminal
+  # instead of /dev/tty: the latter may point at the invoking shell and cause
+  # SIGTTIN when this process reads from it.
+  if [[ -t 1 ]]; then
+    exec </proc/self/fd/1
+  elif [[ -t 2 ]]; then
+    exec </proc/self/fd/2
+  fi
   if has_tty; then
     exec </dev/tty
   fi

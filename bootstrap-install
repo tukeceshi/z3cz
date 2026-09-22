@@ -38,15 +38,7 @@ fi
 
 chmod +x "$TARGET"
 
-# This wrapper is intentionally usable as `curl ... | sudo bash`.  At this
-# point the bootstrap file has already been downloaded, so detach its stdin
-# from curl's pipe before handing control to the installer.  The optional
-# domain question (and every child script) will then read from the terminal.
-if [[ ! -t 0 ]] && ( : </dev/tty ) 2>/dev/null; then
-  # Do not redirect this process: it is still reading this wrapper from curl's
-  # pipe. Start the downloaded installer in a child shell, then give that
-  # child the controlling terminal for its prompts.
-  exec bash -c 'exec </dev/tty; exec bash "$@"' bash "$TARGET" "$@"
-fi
-
+# Leave stdin untouched.  With sudo's use_pty mode, /dev/tty can refer to the
+# invoking terminal rather than sudo's pseudo-terminal; bootstrap setup then
+# selects the active terminal from stdout/stderr when it needs a response.
 exec bash "$TARGET" "$@"
