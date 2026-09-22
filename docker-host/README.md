@@ -2,24 +2,17 @@
 
 单域名 · Caddy · monorepo 旁路栈（Compose 项目名仍为 `dafthunk-host`）。
 
-**须通过 `https://你的域名` 访问**（HTTP 不支持登录与 AI 上传）。
+首次安装可不填域名：系统会以 HTTP 初始化模式启动；绑定域名并启用 HTTPS 后再使用完整业务功能。
 
-## 安装（四步）
+## 安装（一条命令）
 
 ```bash
 curl -fsSL "https://raw.githubusercontent.com/tukeceshi/z3cz/main/bootstrap-install" | sudo bash
-
-sudo bash /var/dafthunk/scripts/host/configure.sh
-
-sudo bash /var/dafthunk/scripts/host/https-setup.sh
-
-sudo bash /var/dafthunk/scripts/host/deploy.sh
-# 后台：sudo /var/dafthunk/scripts/host/deploy.sh --detach
 ```
 
-`https-setup.sh` 在 deploy 前用 acme.sh 申请证书（LE → ZeroSSL），写入 `shared/caddy/certs/<域名>/`，并设 `tls: fallback`。
+安装器会优先检查 Docker 与 Docker Compose。Linux 上缺失 Docker 时会自动安装；Windows 用户请先安装并启动 Docker Desktop、启用 WSL2 Integration，再在 Ubuntu WSL 中执行同一条命令。请将安装目录放在 WSL Linux 文件系统中，而不是 `/mnt/c`。
 
-**证书必须在域名实际解析到本机后才能签发。** CA 按公网 DNS 访问 `http://域名/.well-known/acme-challenge/`；有两台（或多台）服务器时，先把 A 记录改到要出证的那台，生效后再跑 `https-setup.sh`。旧机上申请会打到旧 IP；新机 DNS 未切过去会校验失败。同时放行入站 80，申请期间不要把该路径强制跳 HTTPS。
+域名为可选输入：填写后由 Caddy 自动申请证书；直接回车会以 HTTP 初始化模式启动。之后通过 Admin 后台的“域名与 HTTPS”绑定、更换域名并管理证书。HTTPS 自动续期由 Caddy 完成。
 
 渲染配置用 Docker 跑 Node 镜像，系统不装 Node。bootstrap 会配 Docker 镜像加速；连不上 Docker Hub 时走加速源。api / app 镜像在 Docker Hub，更新时只拉有变化的层。
 

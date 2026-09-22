@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Step 1: Docker + swap + download deploy pack.
+# One-command installer: Docker check + download + optional domain setup + deploy.
 #   curl -fsSL .../bootstrap-install | sudo bash
 #   或: curl -fsSL ".../bootstrap.sh" -o "/tmp/bootstrap.sh" && sudo bash "/tmp/bootstrap.sh"
 set -euo pipefail
@@ -15,6 +15,11 @@ die() { printf 'ERROR: %s\n' "$*" >&2; exit 1; }
 [[ "${EUID:-$(id -u)}" -eq 0 ]] || die "Run as root (sudo)"
 
 need_cmd() { command -v "$1" >/dev/null 2>&1; }
+
+is_wsl() {
+  grep -qiE '(microsoft|wsl)' /proc/sys/kernel/osrelease 2>/dev/null \
+    || grep -qiE '(microsoft|wsl)' /proc/version 2>/dev/null
+}
 
 GITHUB_MIRROR="${DAFTHUNK_GITHUB_MIRROR:-https://ghfast.top/}"
 GITHUB_MIRROR="${GITHUB_MIRROR%/}/"
@@ -55,6 +60,10 @@ mem_mib() {
 }
 
 ensure_swap() {
+  if is_wsl; then
+    info "WSL detected — memory and swap are managed by Windows"
+    return 0
+  fi
   local ram swap total need
   local target=5800
   ram="$(mem_mib MemTotal)"
@@ -87,31 +96,59 @@ ensure_swap() {
   grep -q '^/swapfile ' /etc/fstab 2>/dev/null || echo '/swapfile none swap sw 0 0' >>/etc/fstab
 }
 
-ensure_packages() {
-  if need_cmd docker && need_cmd curl && need_cmd tar && need_cmd gzip && need_cmd git; then
-    info "Docker already installed"
-  else
-    need_cmd apt-get || die "Need apt-get to install Docker"
-    log "Installing Docker"
-    export DEBIAN_FRONTEND=noninteractive
-    apt-get update -qq
-    apt-get install -y -qq docker.io ca-certificates curl tar gzip git
-    systemctl enable --now docker 2>/dev/null || true
-    need_cmd docker || die "Docker install failed"
-    need_cmd curl || die "curl install failed"
-    need_cmd tar || die "tar install failed"
+ensure_docker() {
+  # Docker must be checked before downloading or changing any deployment files.
+  if need_cmd docker && docker info >/dev/null 2>&1 \
+    && (docker compose version >/dev/null 2>&1 || need_cmd docker-compose); then
+    info "Docker and Compose are ready"
+    return 0
   fi
+
+  if is_wsl; then
+    die "Docker Desktop is unavailable in this WSL distribution. Install and start Docker Desktop on Windows, enable Settings → Resources → WSL Integration for this distro, then re-run this command."
+  fi
+
+  need_cmd apt-get || die "Docker is required. Install Docker and Docker Compose, then re-run this command."
+  log "Docker is not ready — installing Docker"
+  export DEBIAN_FRONTEND=noninteractive
+  apt-get update -qq
+  apt-get install -y -qq docker.io ca-certificates curl tar gzip git
+  systemctl enable --now docker 2>/dev/null || true
   if ! docker compose version >/dev/null 2>&1 && ! need_cmd docker-compose; then
     apt-get install -y -qq docker-compose-v2 2>/dev/null \
       || apt-get install -y -qq docker-compose-plugin 2>/dev/null \
       || apt-get install -y -qq docker-compose 2>/dev/null \
       || true
   fi
+  need_cmd docker || die "Docker install failed"
+  docker info >/dev/null 2>&1 || die "Docker daemon is not running"
+  (docker compose version >/dev/null 2>&1 || need_cmd docker-compose) \
+    || die "Docker Compose is unavailable"
+}
+
+ensure_host_tools() {
+  if need_cmd curl && need_cmd tar && need_cmd gzip && need_cmd git; then
+    return 0
+  fi
+  if is_wsl; then
+    die "Missing curl, tar, gzip, or git in WSL. Install them with apt, then re-run this command."
+  fi
+  if ! need_cmd apt-get; then
+    die "Need curl, tar, gzip, and git to continue"
+  fi
+  log "Installing host tools"
+  export DEBIAN_FRONTEND=noninteractive
+  apt-get update -qq
+  apt-get install -y -qq ca-certificates curl tar gzip git
 }
 
 # Docker Hub is the official image registry (registry-1.docker.io).
 # Registry mirrors only affect docker pull; they do not install Node on the host.
 ensure_docker_registry_mirrors() {
+  if is_wsl; then
+    info "WSL detected — Docker registry settings are managed by Docker Desktop"
+    return 0
+  fi
   need_cmd docker || return 0
   local conf=/etc/docker/daemon.json
   mkdir -p /etc/docker
@@ -186,9 +223,12 @@ ensure_pack() {
 }
 
 log "Bootstrap"
-ensure_packages
+ensure_docker
+ensure_host_tools
 ensure_docker_registry_mirrors
 ensure_swap
 ensure_pack
-info "Done. Next: sudo bash ${INSTALL_DIR}/scripts/host/configure.sh"
-info "Then: sudo bash ${INSTALL_DIR}/scripts/host/https-setup.sh"
+log "Configure and deploy"
+export DAFTHUNK_FROM_INSTALL=1
+bash "${INSTALL_DIR}/docker-host/dafthunk-setup" --no-rebuild
+bash "${INSTALL_DIR}/scripts/host/deploy.sh"

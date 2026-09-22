@@ -52,6 +52,7 @@ if [[ -f "${INSTALL_DIR}/scripts/host/install-host-updater.sh" ]]; then
 fi
 
 hostname="$(grep -E '^hostname:' "$APP_YML" | head -1 | sed 's/^hostname:[[:space:]]*//')"
+https="$(grep -E '^https:' "$APP_YML" | head -1 | sed 's/^https:[[:space:]]*//')"
 
 log "Deploy (log: $REBUILD_LOG)"
 
@@ -81,15 +82,14 @@ fi
 eval "$rebuild_cmd"
 
 if [[ -n "$hostname" ]] && command -v curl >/dev/null 2>&1; then
-  code="$(curl -sI -m 20 "https://${hostname}" 2>/dev/null | awk 'NR==1{print $2}')"
+  scheme="http"
+  [[ "$https" == "true" ]] && scheme="https"
+  code="$(curl -sI -m 20 "${scheme}://${hostname}" 2>/dev/null | awk 'NR==1{print $2}')"
   if [[ -n "$code" ]]; then
-    info "HTTPS https://${hostname} → $code"
+    info "${scheme^^} ${scheme}://${hostname} → $code"
   else
-    info "HTTPS not ready for https://${hostname} — check: sudo docker logs dafthunk-host-caddy-1 2>&1 | tail -30"
-    info "Re-run: sudo bash ${INSTALL_DIR}/scripts/host/https-setup.sh"
-    info "Or ZeroSSL only: sudo bash ${INSTALL_DIR}/scripts/host/https-fallback.sh"
-    info "Manual: upload to ${HOST_DIR}/shared/caddy/certs/${hostname}/, tls: manual, then https-reload.sh"
+    info "${scheme^^} not ready for ${scheme}://${hostname} — check: sudo docker logs dafthunk-host-caddy-1 2>&1 | tail -30"
   fi
 fi
 
-info "Open https://${hostname} — first registered user is admin"
+info "Open ${scheme:-http}://${hostname} — first registered user is admin"

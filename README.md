@@ -39,23 +39,15 @@
 - Linux（推荐 Ubuntu）
 - 内存 6G + （不足时自动 swap 增加虚拟内存）
 
-#### 安装（四步）
+#### 安装（一条命令）
 
 ```bash
-# 1. 环境 + 下载部署包
 curl -fsSL "https://raw.githubusercontent.com/tukeceshi/z3cz/main/bootstrap-install" | sudo bash
-
-# 2. 写域名配置
-sudo bash /var/dafthunk/scripts/host/configure.sh
-
-# 3. 申请 HTTPS 证书（须先把域名 A 记录指到本机公网 IP）
-sudo bash /var/dafthunk/scripts/host/https-setup.sh
-
-# 4. 启动（后台：加 --detach）
-sudo bash /var/dafthunk/scripts/host/deploy.sh
 ```
 
-证书签发走公网 HTTP-01：CA 按 **当前 DNS** 访问 `http://你的域名/.well-known/acme-challenge/`。多台机器时，**只在域名已解析到的那一台**上跑 `https-setup.sh`；新机先改 A 记录并等生效，再申请。80 端口须对公网开放，且不要把校验请求强制跳到 HTTPS。
+安装器首先检查 Docker 与 Docker Compose；普通 Linux 缺失 Docker 时会安装，WSL 中不会安装 Docker，而是要求先在 Windows 安装并启动 Docker Desktop，并启用当前发行版的 WSL Integration。
+
+安装期间可输入域名，也可直接回车跳过。输入域名时，Caddy 自动申请 HTTPS 证书；回车时系统以 `http://服务器公网IP` 进入初始化模式。之后可在 Admin 后台的“域名与 HTTPS”中绑定或更换域名、查看证书状态并重新签发。HTTP 初始化模式仅用于完成管理配置，正式业务建议在 HTTPS 启用后使用。
 
 日常更新通过 Git 增量获取源码，在 Docker 内构建应用镜像，**宿主机只需 Docker 和 Git，不装 Node**。更新器复用固定构建目录、依赖层和前端构建层；运行中的容器使用已完成的镜像，不依赖源码目录。
 
