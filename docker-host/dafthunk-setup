@@ -60,7 +60,8 @@ M() {
         then_register) echo "Then open $1 and register the first user (platform admin)." ;;
         starting_rebuild) echo "Starting ./launcher rebuild..." ;;
         when_ready) echo "When ready, open $1 and register the first user (platform admin)." ;;
-        need_input) echo ">>> Waiting for input below (also logged). Scroll up if you do not see the prompt." ;;
+        need_input) echo ">>> Enter a domain below and press Enter. To configure it later, leave it blank and press Enter." ;;
+        input_received) echo ">>> Input received — continuing setup..." ;;
         ask_timeout) echo "Timed out waiting for input (${1}s)." ;;
         ask_timeout_hint) echo "Re-run: ./dafthunk-setup   or   sudo bash ../install-dafthunk --resume --force-setup" ;;
         ask_read_failed) echo "Could not read from terminal — will not silently use defaults." ;;
@@ -90,7 +91,8 @@ M() {
         then_register) echo "然后打开 $1 注册首个用户（平台管理员）。" ;;
         starting_rebuild) echo "正在执行 ./launcher rebuild..." ;;
         when_ready) echo "就绪后打开 $1 注册首个用户（平台管理员）。" ;;
-        need_input) echo ">>> 请在下方输入（提示会写入日志；若看不见请往上滚）" ;;
+        need_input) echo ">>> 请在下方输入域名并按 Enter；暂不配置域名则直接按 Enter。" ;;
+        input_received) echo ">>> 已收到输入，正在继续配置…" ;;
         ask_timeout) echo "等待输入超时（${1}s）。" ;;
         ask_timeout_hint) echo "请重新运行: ./dafthunk-setup   或   sudo bash ../install-dafthunk --resume --force-setup" ;;
         ask_read_failed) echo "无法从终端读取输入 — 不会静默使用默认值" ;;
@@ -305,9 +307,12 @@ ask_into() {
     return 0
   fi
 
-  write_prompt_tty "$prompt"
+  # Put every question on its own line. The previous inline prompt was easy to
+  # miss when the installer was launched through a pipe in Windows Terminal.
+  write_prompt_tty "\n$prompt"
   log_wait_input "$prompt"
   read_interactive_line "$__var"
+  write_prompt_tty "\n$(M input_received)\n"
   if [[ -z "${!__var:-}" ]]; then
     printf -v "$__var" '%s' "$default"
   fi
@@ -356,8 +361,7 @@ setup_log "# dafthunk-setup $(date '+%Y-%m-%dT%H:%M:%S' 2>/dev/null || date)"
 echo "$(M title)"
 echo "$(M rule)"
 echo "$(M admin_hint)"
-write_prompt_tty "$(M need_input)"
-echo ""
+write_prompt_tty "$(M need_input)"$'\n'
 
 site_hostname=""
 if can_prompt; then
