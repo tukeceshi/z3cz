@@ -94,7 +94,7 @@ curl -fsSL "https://raw.githubusercontent.com/tukeceshi/z3cz/main/bootstrap-inst
 
 ```bash
 sudo bash /var/dafthunk/scripts/host/update.sh
-sudo bash /var/dafthunk/scripts/host/update.sh v1.0.6
+sudo bash /var/dafthunk/scripts/host/update.sh v1.0.7
 
 # 重置安装：清 DB 与上传，保留域名配置与证书
 sudo bash /var/dafthunk/scripts/host/update.sh --reset
