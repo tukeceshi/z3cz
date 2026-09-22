@@ -270,18 +270,10 @@ read_interactive_line() {
   # prompt.  Reading that fd is more reliable than reopening /dev/tty for
   # every answer when this script was launched via `curl | sudo bash`.
   if [[ -t 0 ]]; then
-    stty sane 2>/dev/null || true
-    if ((ASK_TIMEOUT_SEC > 0)); then
-      if read -r -t "$ASK_TIMEOUT_SEC" value; then
-        :
-      else
-        rc=$?
-        if ((rc == 142 || rc == 143)); then
-          ask_timeout_exit
-        fi
-        ask_read_failed_exit
-      fi
-    elif read -r value; then
+    # Do not run `stty` or Bash's timed read here.  Under Docker Desktop's
+    # WSL sudo pseudo-terminal they can suspend the foreground process group
+    # before the user has a chance to submit this prompt.
+    if read -r value; then
       :
     else
       ask_read_failed_exit
