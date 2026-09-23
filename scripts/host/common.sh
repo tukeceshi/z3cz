@@ -37,6 +37,56 @@ compose_api_mount_dest() {
     }
   ' "$1"
 }
+# 空输入和 :80 都表示 HTTP 初始化：Caddy 只监听 80，不申请证书。
+# 从 /dev/tty 读是因为 sudo 会清掉环境变量，也可能不把安装器的标准输入留给提问。
+normalize_site_address() {
+  local raw="$1"
+  raw="${raw#"${raw%%[![:space:]]*}"}"
+  raw="${raw%"${raw##*[![:space:]]}"}"
+  raw="${raw,,}"
+  raw="${raw%/}"
+  if [[ -z "$raw" || "$raw" == ":80" ]]; then
+    printf '%s' ':80'
+    return 0
+  fi
+  raw="${raw#http://}"
+  raw="${raw#https://}"
+  raw="${raw%/}"
+  raw="${raw%.}"
+  if [[ "$raw" == *[:/?#@]* || "$raw" == *' '* ]]; then
+    echo "域名不能带端口、路径、账号或空格" >&2
+    return 1
+  fi
+  if [[ "$raw" == "localhost" || "$raw" == "127.0.0.1" || "$raw" == "::1" || "$raw" =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$ ]]; then
+    echo "IP 或本机名称不能作为站点域名；直接回车可使用 HTTP 初始化" >&2
+    return 1
+  fi
+  if [[ ${#raw} -gt 253 || ! "$raw" =~ ^([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]([a-z0-9-]{0,61}[a-z0-9])?$ ]]; then
+    echo "「${raw}」不是有效的公网域名" >&2
+    return 1
+  fi
+  printf '%s' "$raw"
+}
+resolve_site_address() {
+  if [[ -n "${Z3CZ_SITE_ADDRESS:-}" ]]; then
+    normalize_site_address "$Z3CZ_SITE_ADDRESS" || die "Z3CZ_SITE_ADDRESS 无效：$Z3CZ_SITE_ADDRESS"
+    return 0
+  fi
+  if [[ ! -r /dev/tty ]]; then
+    printf '%s' ':80'
+    return 0
+  fi
+  local raw normalized
+  while true; do
+    printf '\n%s' '公网域名（须已解析到本机并开放 80/443；证书未就绪或暂不配置请直接回车）: ' >/dev/tty
+    raw=""
+    IFS= read -r raw </dev/tty || true
+    if normalized="$(normalize_site_address "$raw")"; then
+      printf '%s' "$normalized"
+      return 0
+    fi
+  done
+}
 # 旧的本机安装把数据库和 API 绑在回环地址。容器内改走 compose 里的服务名和挂载路径。
 # 未配置域名时去掉 WEB_HOST，登录跟本次请求的 Host 走。
 prepare_docker_env() {

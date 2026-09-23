@@ -48,7 +48,13 @@ installer="$(mktemp)" && curl -fL --connect-timeout 20 --max-time 120 "https://r
 
 安装器下载 `self-host` 测试渠道的部署包并校验 SHA-256。生产只运行 `api`、`postgres`、`caddy` 三个容器，使用固定版本的通用 Node、PostgreSQL、Caddy 镜像；不会构建、发布或拉取 z3cz 专用镜像，也不会在服务器构建 App 或编译 API。
 
-安装前可设置 `Z3CZ_SITE_ADDRESS=example.com Z3CZ_PUBLIC_URL=https://example.com`；未设置时监听 HTTP 80。域名模式由容器内 Caddy 自动申请和续期证书。
+安装时会询问公网域名。填写后由容器内 Caddy 自动申请并续期证书；直接回车，或当前没有终端时，监听 HTTP 80，不写站点地址。自动化安装跳过提问：
+
+```bash
+sudo Z3CZ_SITE_ADDRESS=example.com Z3CZ_PUBLIC_URL=https://example.com bash "$installer"
+```
+
+未同时给出 `Z3CZ_PUBLIC_URL` 时，站点地址写为 `https://<域名>`。
 
 程序安装到 `/opt/z3cz/releases/<版本>`，`current`/`previous` 为原子版本指针；配置位于 `/etc/z3cz`，PostgreSQL、上传、Caddy 数据与备份位于 `/var/lib/z3cz`，pnpm store 位于 `/var/cache/z3cz/pnpm`。每个版本的 API 生产依赖由一次性 Node 容器以 `--prod --frozen-lockfile` 安装并复用该缓存。
 
@@ -57,7 +63,7 @@ installer="$(mktemp)" && curl -fL --connect-timeout 20 --max-time 120 "https://r
 当前使用宿主机更新命令升级正式版本：
 
 ```bash
-sudo bash /opt/z3cz/current/scripts/update.sh v1.0.10
+sudo bash /opt/z3cz/current/scripts/update.sh v1.0.12
 ```
 
 更新只接受显式 `v*` 正式版本。下载、校验、解压和依赖安装在旧服务运行期间完成；随后进入维护、备份 PostgreSQL、以新版本 `dist/migrate.mjs` 迁移、原子切换并健康检查。应用失败会自动切回；不兼容迁移会保持维护状态并要求显式恢复备份。
@@ -72,10 +78,9 @@ Release 与 CPU 架构无关，只含 App 静态产物、API 编译后 JS/迁移
 
 #### HTTPS
 
-自托管生产环境 **必须 HTTPS**：Cookie 与浏览器 API（如 `crypto.randomUUID`）仅在安全上下文中可用。请勿使用 HTTP 访问或 `--http` 模式。签发前确认域名已解析到 **正在申请证书的这台机器**（见上方安装步骤）。
+自托管生产环境 **必须 HTTPS**：Cookie 与浏览器 API（如 `crypto.randomUUID`）仅在安全上下文中可用。安装时填写的域名必须已经解析到这台机器，并开放 TCP/UDP 80、443。证书未就绪时直接回车，先以 HTTP 初始化。
 
-
-输入域名后由 Caddy 容器自动申请并续期证书。域名必须提前解析到当前服务器，并开放 TCP/UDP 80、443 端口。
+填写域名后由 Caddy 容器自动申请并续期证书。
 
 ---
 

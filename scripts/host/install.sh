@@ -8,7 +8,12 @@ if [[ "$RELEASE" != "$TARGET" ]]; then [[ ! -e "$TARGET" ]] || die "版本目录
 if [[ ! -f "$CONFIG_DIR/postgres.password" ]]; then umask 077; openssl rand -hex 32 > "$CONFIG_DIR/postgres.password"; fi
 if [[ ! -f "$ENV_FILE" ]]; then
   DB_PASSWORD="$(cat "$CONFIG_DIR/postgres.password")"; JWT_SECRET="$(openssl rand -hex 32)"; MASTER_KEY="$(openssl rand -hex 32)"
-  SITE_ADDRESS="${Z3CZ_SITE_ADDRESS:-:80}"; umask 077
+  SITE_ADDRESS="$(resolve_site_address)"; umask 077
+  if [[ "$SITE_ADDRESS" == ":80" ]]; then
+    log "未配置域名，Caddy 监听 HTTP 80"
+  else
+    log "站点域名 ${SITE_ADDRESS}，Caddy 将申请并续期证书"
+  fi
   db_svc="$(compose_database_service "$TARGET/compose.yml")"
   uploads_dest="$(compose_api_mount_dest "$TARGET/compose.yml" "/uploads:")"
   assets_dest="$(compose_api_mount_dest "$TARGET/compose.yml" "/app:/")"
@@ -29,6 +34,8 @@ SECRET_MASTER_KEY=${MASTER_KEY}
 EOF
   if [[ -n "${Z3CZ_PUBLIC_URL:-}" ]]; then
     printf 'WEB_HOST=%s\nWEBSITE_URL=%s\n' "$Z3CZ_PUBLIC_URL" "$Z3CZ_PUBLIC_URL" >>"$ENV_FILE"
+  elif [[ "$SITE_ADDRESS" != ":80" ]]; then
+    printf 'WEB_HOST=%s\nWEBSITE_URL=%s\n' "https://${SITE_ADDRESS}" "https://${SITE_ADDRESS}" >>"$ENV_FILE"
   fi
 fi
 chmod 600 "$ENV_FILE" "$CONFIG_DIR/postgres.password"
