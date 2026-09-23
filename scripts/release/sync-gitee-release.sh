@@ -19,7 +19,7 @@ download_attachment() {
 
 status="$(curl --retry 3 --retry-all-errors -sS -G -o "$tmp/release.json" -w '%{http_code}' \
   "${AUTH[@]}" --data-urlencode "access_token=$GITEE_ACCESS_TOKEN" "$API/releases/tags/$TAG")"
-if [[ "$status" == 404 ]]; then
+if [[ "$status" == 404 ]] || jq -e 'type == "null"' "$tmp/release.json" >/dev/null; then
   curl -fsS "${AUTH[@]}" -X POST "$API/releases" \
     --data-urlencode "access_token=$GITEE_ACCESS_TOKEN" \
     --data-urlencode "tag_name=$TAG" \
@@ -34,7 +34,7 @@ fi
 release_id="$(jq -r '.id // empty' "$tmp/release.json")"
 if [[ -z "$release_id" ]]; then
   echo "Gitee release response did not include an id" >&2
-  jq -c '{message, code, fields: keys}' "$tmp/release.json" >&2 || true
+  jq -c 'if type == "object" then {message, code, fields: keys} else {type: type} end' "$tmp/release.json" >&2 || true
   exit 1
 fi
 
