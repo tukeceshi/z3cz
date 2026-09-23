@@ -4,6 +4,12 @@ on:
   push:
     branches:
       - main
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: Optional existing release tag to resynchronize
+        required: false
+        type: string
 
 concurrency:
   group: sync-gitee-main
@@ -36,3 +42,26 @@ jobs:
         env:
           GITEE_ACCESS_TOKEN: ${{ secrets.GITEE_ACCESS_TOKEN }}
         run: bash scripts/release/sync-gitee-git.sh "$GITHUB_SHA"
+
+      - name: Recover an existing release
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.release_tag != '' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GITEE_ACCESS_TOKEN: ${{ secrets.GITEE_ACCESS_TOKEN }}
+          RELEASE_TAG: ${{ inputs.release_tag }}
+        shell: bash
+        run: |
+          [[ "$RELEASE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z.-]+)?$ ]]
+          git rev-parse --verify "refs/tags/$RELEASE_TAG^{commit}" >/dev/null
+          mkdir -p dist/recovery
+          gh release view "$RELEASE_TAG" --json body --jq .body > dist/recovery/RELEASE_NOTES.md
+          gh release download "$RELEASE_TAG" \
+            --pattern "z3cz-${RELEASE_TAG}-deploy.tar.gz" \
+            --pattern SHA256SUMS \
+            --dir dist/recovery
+          bash scripts/release/sync-gitee-git.sh "$GITHUB_SHA" "$RELEASE_TAG"
+          bash scripts/release/sync-gitee-release.sh \
+            "$RELEASE_TAG" \
+            dist/recovery/RELEASE_NOTES.md \
+            "dist/recovery/z3cz-${RELEASE_TAG}-deploy.tar.gz" \
+            dist/recovery/SHA256SUMS
