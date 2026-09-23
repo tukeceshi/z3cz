@@ -1,0 +1,29 @@
+name: Sync source to Gitee
+
+on:
+  push:
+    branches:
+      - main
+
+concurrency:
+  group: sync-gitee-main
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout full history
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Synchronize Gitee main
+        env:
+          GITEE_ACCESS_TOKEN: ${{ secrets.GITEE_ACCESS_TOKEN }}
+        run: bash scripts/release/sync-gitee-git.sh "$GITHUB_SHA"
+

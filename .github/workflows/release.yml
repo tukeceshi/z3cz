@@ -15,6 +15,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
 
       - name: Verify VERSION and changelog
         shell: bash
@@ -66,14 +68,39 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
-          prerelease_args=()
-          if [[ "$GITHUB_REF_NAME" == *-* ]]; then
-            prerelease_args+=(--prerelease)
+          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+            rm -f "dist/deploy/z3cz-${GITHUB_REF_NAME}-deploy.tar.gz" dist/deploy/SHA256SUMS
+            gh release download "$GITHUB_REF_NAME" \
+              --pattern "z3cz-${GITHUB_REF_NAME}-deploy.tar.gz" \
+              --pattern SHA256SUMS \
+              --dir dist/deploy
+          else
+            prerelease_args=()
+            if [[ "$GITHUB_REF_NAME" == *-* ]]; then
+              prerelease_args+=(--prerelease)
+            fi
+            gh release create "$GITHUB_REF_NAME" \
+              "dist/deploy/z3cz-${GITHUB_REF_NAME}-deploy.tar.gz" \
+              dist/deploy/SHA256SUMS \
+              --verify-tag \
+              --title "$GITHUB_REF_NAME" \
+              --notes-file RELEASE_NOTES.md \
+              "${prerelease_args[@]}"
           fi
-          gh release create "$GITHUB_REF_NAME" \
-            dist/deploy/z3cz-${GITHUB_REF_NAME}-deploy.tar.gz \
-            dist/deploy/SHA256SUMS \
-            --verify-tag \
-            --title "$GITHUB_REF_NAME" \
-            --notes-file RELEASE_NOTES.md \
-            "${prerelease_args[@]}"
+
+      - name: Synchronize Gitee source and tag
+        env:
+          GITEE_ACCESS_TOKEN: ${{ secrets.GITEE_ACCESS_TOKEN }}
+        shell: bash
+        run: bash scripts/release/sync-gitee-git.sh "$GITHUB_SHA" "$GITHUB_REF_NAME"
+
+      - name: Synchronize Gitee Release
+        env:
+          GITEE_ACCESS_TOKEN: ${{ secrets.GITEE_ACCESS_TOKEN }}
+        shell: bash
+        run: |
+          bash scripts/release/sync-gitee-release.sh \
+            "$GITHUB_REF_NAME" \
+            RELEASE_NOTES.md \
+            "dist/deploy/z3cz-${GITHUB_REF_NAME}-deploy.tar.gz" \
+            dist/deploy/SHA256SUMS

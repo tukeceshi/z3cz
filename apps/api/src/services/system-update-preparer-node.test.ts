@@ -1,6 +1,9 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
-import { releaseAssetUrls } from "./system-update-preparer-node";
+import {
+  releaseAssetUrls,
+  resolveReleaseAssetUrls,
+} from "./system-update-preparer-node";
 
 describe("releaseAssetUrls", () => {
   it("uses GitHub and its configured fallback mirror", () => {
@@ -16,11 +19,23 @@ describe("releaseAssetUrls", () => {
     expect(urls[1]).toContain(urls[0]);
   });
 
-  it("uses the Gitee release asset path", () => {
-    expect(
-      releaseAssetUrls("owner/repo", "gitee", "v1.2.3", "SHA256SUMS")
-    ).toEqual([
-      "https://gitee.com/owner/repo/releases/download/v1.2.3/SHA256SUMS",
+  it("resolves a Gitee release attachment through its API", async () => {
+    const fetchImpl = vi
+      .fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ id: 42 })))
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify([{ id: 7, name: "SHA256SUMS" }]))
+      );
+    await expect(
+      resolveReleaseAssetUrls(
+        "owner/repo",
+        "gitee",
+        "v1.2.3",
+        "SHA256SUMS",
+        fetchImpl
+      )
+    ).resolves.toEqual([
+      "https://gitee.com/api/v5/repos/owner/repo/releases/42/attach_files/7/download",
     ]);
   });
 

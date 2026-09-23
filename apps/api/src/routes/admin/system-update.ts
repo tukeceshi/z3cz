@@ -260,7 +260,7 @@ adminSystemUpdateRoutes.post(
       );
       preparationRunning = true;
       void prepareSystemUpdate({
-        repository: "tukeceshi/z3cz",
+        repository: source === "gitee" ? "daotuke/z3cz" : "tukeceshi/z3cz",
         source,
         version: body.targetVersion,
         root,

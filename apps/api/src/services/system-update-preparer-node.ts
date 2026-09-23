@@ -57,14 +57,59 @@ export function releaseAssetUrls(
   }
   const github = `https://github.com/${repository}/releases/download/${version}/${asset}`;
   if (source === "gitee") {
-    return [
-      `https://gitee.com/${repository}/releases/download/${version}/${asset}`,
-    ];
+    throw new Error("Gitee 附件地址必须通过 Release API 解析");
   }
   const mirror = String(
     process.env.Z3CZ_GITHUB_MIRROR || "https://ghfast.top"
   ).replace(/\/$/, "");
   return [github, `${mirror}/${github}`];
+}
+
+export async function resolveReleaseAssetUrls(
+  repository: string,
+  source: SystemUpdateSourceChannel,
+  version: string,
+  asset: string,
+  fetchImpl: typeof fetch = fetch
+): Promise<string[]> {
+  if (source === "github") {
+    return releaseAssetUrls(repository, source, version, asset);
+  }
+  if (
+    !VERSION_RE.test(version) ||
+    !/^z3cz-v[0-9A-Za-z.-]+-deploy\.tar\.gz$|^SHA256SUMS$/.test(asset)
+  ) {
+    throw new Error("更新版本或资产名称无效");
+  }
+  const api = `https://gitee.com/api/v5/repos/${repository}`;
+  const releaseResponse = await fetchImpl(`${api}/releases/tags/${version}`, {
+    headers: { "User-Agent": "z3cz-admin-updater" },
+  });
+  if (!releaseResponse.ok) {
+    throw new Error(`Gitee Release 返回 HTTP ${releaseResponse.status}`);
+  }
+  const release = (await releaseResponse.json()) as { id?: number };
+  if (!Number.isInteger(release.id)) throw new Error("Gitee Release 缺少 ID");
+  const attachmentsResponse = await fetchImpl(
+    `${api}/releases/${release.id}/attach_files`,
+    { headers: { "User-Agent": "z3cz-admin-updater" } }
+  );
+  if (!attachmentsResponse.ok) {
+    throw new Error(
+      `Gitee Release 附件返回 HTTP ${attachmentsResponse.status}`
+    );
+  }
+  const attachments = (await attachmentsResponse.json()) as Array<{
+    id?: number;
+    name?: string;
+  }>;
+  const attachment = attachments.find((entry) => entry.name === asset);
+  if (!attachment || !Number.isInteger(attachment.id)) {
+    throw new Error(`Gitee Release 缺少附件 ${asset}`);
+  }
+  return [
+    `${api}/releases/${release.id}/attach_files/${attachment.id}/download`,
+  ];
 }
 
 function appendLog(
@@ -156,13 +201,22 @@ export async function prepareSystemUpdate(options: {
     `从 ${source === "gitee" ? "Gitee" : "GitHub"} 下载 ${version}`
   );
   store.write(operation);
-  await fetchAsset(
-    releaseAssetUrls(repository, source, version, "SHA256SUMS"),
-    sumsPath
+  const sumsUrls = await resolveReleaseAssetUrls(
+    repository,
+    source,
+    version,
+    "SHA256SUMS"
   );
+  await fetchAsset(sumsUrls, sumsPath);
   let lastPersisted = 0;
+  const assetUrls = await resolveReleaseAssetUrls(
+    repository,
+    source,
+    version,
+    asset
+  );
   const result = await fetchAsset(
-    releaseAssetUrls(repository, source, version, asset),
+    assetUrls,
     archivePath,
     (downloaded, total) => {
       if (downloaded - lastPersisted < 1024 * 1024 && downloaded !== total)
