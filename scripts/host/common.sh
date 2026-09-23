@@ -111,6 +111,23 @@ prepare_docker_env() {
     /^WEBSITE_URL=https?:\/\/([0-9]{1,3}\.){3}[0-9]{1,3}(:[0-9]+)?\/?$/ { next }
     { print }
   ' "$ENV_FILE" >"$tmp"
+  # /app 是只读发布目录。API 在监听前会写启动阶段；写到上传卷上，进程才不会一启动就退出。
+  local cache_dir="${uploads_dest}/cache" cache_tmp
+  cache_tmp="$(mktemp)"
+  awk -v cache="$cache_dir" '
+    BEGIN { found = 0 }
+    /^API_BOOT_CACHE_DIR=/ {
+      found = 1
+      value = substr($0, length("API_BOOT_CACHE_DIR=") + 1)
+      if (value == "/app" || index(value, "/app/") == 1) {
+        print "API_BOOT_CACHE_DIR=" cache
+        next
+      }
+    }
+    { print }
+    END { if (!found) print "API_BOOT_CACHE_DIR=" cache }
+  ' "$tmp" >"$cache_tmp"
+  mv "$cache_tmp" "$tmp"
   if [[ -n "${Z3CZ_PUBLIC_URL:-}" ]]; then
     grep -v -E '^(WEB_HOST|WEBSITE_URL)=' "$tmp" >"${tmp}.pub"
     printf 'WEB_HOST=%s\nWEBSITE_URL=%s\n' "$Z3CZ_PUBLIC_URL" "$Z3CZ_PUBLIC_URL" >>"${tmp}.pub"

@@ -25,6 +25,7 @@ HOST=0.0.0.0
 PORT=3001
 DATABASE_URL=postgresql://z3cz:${DB_PASSWORD}@${db_svc}:5432/z3cz
 LOCAL_STORAGE_PATH=${uploads_dest}
+API_BOOT_CACHE_DIR=${uploads_dest}/cache
 BOOTSTRAP_ASSETS_DIR=${assets_dest}
 Z3CZ_MAINTENANCE_FILE=/var/lib/z3cz/maintenance/enabled
 RUN_DB_MIGRATE=false

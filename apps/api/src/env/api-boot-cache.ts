@@ -11,12 +11,23 @@ export interface ApiBootStamp {
   readonly initializedAt: string;
 }
 
+function dockerBootCacheDir(): string {
+  // Production mounts the release at /app read-only. The writable tree is
+  // LOCAL_STORAGE_PATH (the uploads volume). Dev Compose mounts a volume at
+  // /app/data/storage and sets LOCAL_STORAGE_PATH there, so this stays correct.
+  const storage = process.env.LOCAL_STORAGE_PATH;
+  if (storage && path.isAbsolute(storage)) {
+    return path.posix.join(storage, "cache");
+  }
+  return "/app/data/storage/cache";
+}
+
 export function getApiBootCacheDir(): string {
   if (process.env.API_BOOT_CACHE_DIR) {
     return path.resolve(process.env.API_BOOT_CACHE_DIR);
   }
   if (isRunningInDocker()) {
-    return "/app/data/storage/cache";
+    return dockerBootCacheDir();
   }
   return path.resolve(getApiRootPath(), ".cache", "boot");
 }
@@ -95,8 +106,13 @@ export function isBootStampCurrent(stamp: ApiBootStamp | null): boolean {
 }
 
 export function writeBootPhase(phase: string): void {
-  ensureCacheDir();
-  fs.writeFileSync(phasePath(), `${phase}\n`, "utf8");
+  try {
+    ensureCacheDir();
+    fs.writeFileSync(phasePath(), `${phase}\n`, "utf8");
+  } catch (error) {
+    // Boot phase is diagnostic. A read-only release mount must not stop /health.
+    console.error(`[api] Unable to record boot phase (${phase}):`, error);
+  }
 }
 
 export function readBootPhase(): string | null {
