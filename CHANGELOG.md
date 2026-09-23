@@ -1,6 +1,6 @@
 # Changelog
 
-## v1.0.13
+## v1.0.14
 
 - 生产部署改为仅使用固定版本 Node、PostgreSQL、Caddy 通用镜像，运行时缩减为 api、postgres、caddy 三个容器。
 - Release 现在包含 CI 预构建的 App 静态文件与 API JavaScript；服务器仅冻结安装裁剪后的生产依赖，不再构建源码或专用镜像。
