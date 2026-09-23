@@ -56,8 +56,10 @@ jobs:
           mkdir -p dist/recovery
           gh api "repos/$GITHUB_REPOSITORY/releases/tags/$RELEASE_TAG" > dist/recovery/release.json
           jq -r '.body // ""' dist/recovery/release.json > dist/recovery/RELEASE_NOTES.md
+          release_id="$(jq -er '.id' dist/recovery/release.json)"
+          gh api "repos/$GITHUB_REPOSITORY/releases/$release_id/assets" > dist/recovery/assets.json
           for asset_name in "z3cz-${RELEASE_TAG}-deploy.tar.gz" SHA256SUMS; do
-            asset_url="$(jq -er --arg name "$asset_name" '.assets[] | select(.name == $name) | .url' dist/recovery/release.json)"
+            asset_url="$(jq -er --arg name "$asset_name" '.[] | select(.name == $name) | .url' dist/recovery/assets.json)"
             gh api \
               -H 'Accept: application/octet-stream' \
               "$asset_url" > "dist/recovery/$asset_name"
