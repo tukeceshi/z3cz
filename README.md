@@ -62,10 +62,12 @@ sudo Z3CZ_SITE_ADDRESS=example.com Z3CZ_PUBLIC_URL=https://example.com bash "$in
 
 推荐在管理后台「系统设置 → 系统更新」选择 GitHub 或 Gitee 渠道并升级。后台负责版本检查、下载、SHA-256 校验和进度留痕；宿主机执行器只负责备份、迁移、原子切换、健康检查和失败回退。
 
+GitHub 是版本检查和源码发布的主站。GitHub Actions 将 `main` 与 `v*` 标签同步到 Gitee；Gitee Go 收到版本标签后在国内独立构建，并用自带的 Release 插件发布部署包。两边各自生成 `SHA256SUMS`，管理后台会按照所选下载源校验对应平台的包，因此不要求两个压缩包的 SHA-256 相同。Gitee 流水线需要在仓库中启用 `.workflow/gitee-release.yml`，不用配置私人令牌。GitHub 同步源码和标签仍使用 `GITEE_ACCESS_TOKEN`。
+
 也可以使用宿主机命令升级正式版本：
 
 ```bash
-sudo bash /opt/z3cz/current/scripts/update.sh v1.0.14
+sudo bash /opt/z3cz/current/scripts/update.sh v1.0.15
 ```
 
 更新只接受显式 `v*` 正式版本。下载、校验、解压和依赖安装在旧服务运行期间完成；随后进入维护、备份 PostgreSQL、以新版本 `dist/migrate.mjs` 迁移、原子切换并健康检查。应用失败会自动切回；不兼容迁移会保持维护状态并要求显式恢复备份。

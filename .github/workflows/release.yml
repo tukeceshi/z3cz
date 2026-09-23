@@ -97,14 +97,3 @@ jobs:
           GITEE_ACCESS_TOKEN: ${{ secrets.GITEE_ACCESS_TOKEN }}
         shell: bash
         run: bash scripts/release/sync-gitee-git.sh "$GITHUB_SHA" "$GITHUB_REF_NAME"
-
-      - name: Synchronize Gitee Release
-        env:
-          GITEE_ACCESS_TOKEN: ${{ secrets.GITEE_ACCESS_TOKEN }}
-        shell: bash
-        run: |
-          bash scripts/release/sync-gitee-release.sh \
-            "$GITHUB_REF_NAME" \
-            RELEASE_NOTES.md \
-            "dist/deploy/z3cz-${GITHUB_REF_NAME}-deploy.tar.gz" \
-            dist/deploy/SHA256SUMS
