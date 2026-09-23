@@ -5,6 +5,7 @@ source "$ROOT/scripts/release/gitee-auth.sh"
 
 TARGET_SHA="${1:?target commit is required}"
 TAG="${2:-}"
+TAG_TARGET="${3:-$TARGET_SHA}"
 git cat-file -e "${TARGET_SHA}^{commit}"
 TARGET_COMMIT="$(git rev-parse "${TARGET_SHA}^{commit}")"
 
@@ -23,9 +24,11 @@ else
 fi
 
 if [[ -n "$TAG" ]]; then
+  git cat-file -e "${TAG_TARGET}^{commit}"
+  TAG_COMMIT="$(git rev-parse "${TAG_TARGET}^{commit}")"
   local_tag_sha="$(git rev-list -n 1 "$TAG")"
-  [[ "$local_tag_sha" == "$TARGET_COMMIT" ]] || {
-    echo "$TAG does not point to $TARGET_COMMIT" >&2
+  [[ "$local_tag_sha" == "$TAG_COMMIT" ]] || {
+    echo "$TAG does not point to $TAG_COMMIT" >&2
     exit 1
   }
   remote_tag_sha="$(git ls-remote "$GITEE_REPOSITORY_URL" "refs/tags/$TAG" "refs/tags/$TAG^{}" | tail -1 | awk '{print $1}')"

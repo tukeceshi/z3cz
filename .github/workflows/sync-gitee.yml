@@ -65,7 +65,7 @@ jobs:
               "$asset_url" > "dist/recovery/$asset_name"
             test -s "dist/recovery/$asset_name"
           done
-          bash scripts/release/sync-gitee-git.sh "$GITHUB_SHA" "$RELEASE_TAG"
+          bash scripts/release/sync-gitee-git.sh "$GITHUB_SHA" "$RELEASE_TAG" "$RELEASE_TAG"
           bash scripts/release/sync-gitee-release.sh \
             "$RELEASE_TAG" \
             dist/recovery/RELEASE_NOTES.md \
