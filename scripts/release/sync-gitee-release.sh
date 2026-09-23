@@ -17,7 +17,8 @@ download_attachment() {
   curl -fsSL -G --data-urlencode "access_token=$GITEE_ACCESS_TOKEN" "$url" -o "$output"
 }
 
-status="$(curl -sS -o "$tmp/release.json" -w '%{http_code}' "${AUTH[@]}" "$API/releases/tags/$TAG")"
+status="$(curl --retry 3 --retry-all-errors -sS -G -o "$tmp/release.json" -w '%{http_code}' \
+  "${AUTH[@]}" --data-urlencode "access_token=$GITEE_ACCESS_TOKEN" "$API/releases/tags/$TAG")"
 if [[ "$status" == 404 ]]; then
   curl -fsS "${AUTH[@]}" -X POST "$API/releases" \
     --data-urlencode "access_token=$GITEE_ACCESS_TOKEN" \
@@ -30,9 +31,21 @@ elif [[ "$status" != 200 ]]; then
   cat "$tmp/release.json" >&2
   exit 1
 fi
-release_id="$(jq -er '.id' "$tmp/release.json")"
+release_id="$(jq -r '.id // empty' "$tmp/release.json")"
+if [[ -z "$release_id" ]]; then
+  echo "Gitee release response did not include an id" >&2
+  jq -c '{message, code, fields: keys}' "$tmp/release.json" >&2 || true
+  exit 1
+fi
 
-curl -fsS "${AUTH[@]}" "$API/releases/$release_id/attach_files" >"$tmp/assets.json"
+assets_status="$(curl --retry 3 --retry-all-errors -sS -G -o "$tmp/assets.json" -w '%{http_code}' \
+  "${AUTH[@]}" --data-urlencode "access_token=$GITEE_ACCESS_TOKEN" \
+  "$API/releases/$release_id/attach_files")"
+if [[ "$assets_status" != 200 ]] || ! jq -e 'type == "array"' "$tmp/assets.json" >/dev/null; then
+  echo "Gitee attachment listing returned HTTP $assets_status or an invalid response" >&2
+  jq -c '{message, code, fields: keys}' "$tmp/assets.json" >&2 || cat "$tmp/assets.json" >&2
+  exit 1
+fi
 for asset in "$@"; do
   [[ -f "$asset" ]] || { echo "Missing asset: $asset" >&2; exit 1; }
   name="$(basename "$asset")"
