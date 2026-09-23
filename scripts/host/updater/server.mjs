@@ -57,6 +57,16 @@ async function handle(request, response, manager, token) {
       writeJson(response, 202, status);
       return;
     }
+    if (request.method === "POST" && url.pathname === "/v1/prepared-update") {
+      const body = await readJson(request);
+      const status = manager.startPreparedUpdate({
+        targetVersion: String(body.targetVersion || ""),
+        archivePath: String(body.archivePath || ""),
+        checksum: String(body.checksum || ""),
+      });
+      writeJson(response, 202, status);
+      return;
+    }
     if (request.method === "POST" && url.pathname === "/v1/rollback") {
       const body = await readJson(request);
       const status = manager.startRollback(String(body.reason || ""));
@@ -65,9 +75,10 @@ async function handle(request, response, manager, token) {
     }
     writeJson(response, 404, { error: "未知接口", data: null });
   } catch (error) {
-    const status = error && typeof error === "object" && "status" in error
-      ? error.status
-      : manager.snapshot();
+    const status =
+      error && typeof error === "object" && "status" in error
+        ? error.status
+        : manager.snapshot();
     const message = error instanceof Error ? error.message : String(error);
     writeJson(response, 409, { error: message, data: status });
   }

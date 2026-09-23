@@ -57,6 +57,10 @@ export const AdminSystemUpdatePage = lazyRoutePage(
   () => import("@/pages/admin/admin-system-update-page"),
   "AdminSystemUpdatePage"
 );
+export const AdminSiteDomainPage = lazyRoutePage(
+  () => import("@/pages/admin/admin-site-domain-page"),
+  "AdminSiteDomainPage"
+);
 export const AdminCompetitorPricingPage = lazyRoutePage(
   () => import("@/pages/admin/admin-competitor-pricing-page"),
   "AdminCompetitorPricingPage"

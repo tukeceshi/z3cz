@@ -44,6 +44,10 @@ import {
 
 const ACTIVE_PHASES = new Set<SystemUpdatePhase>([
   "checking",
+  "downloading",
+  "verifying_download",
+  "extracting",
+  "preparing",
   "preflight",
   "backing_up",
   "pulling",
@@ -444,6 +448,20 @@ export function AdminSystemUpdatePage() {
                 <pre className="max-h-48 overflow-auto whitespace-pre-wrap rounded-md bg-muted/50 p-3 text-xs">
                   {status.latestRelease.body}
                 </pre>
+              ) : null}
+              {typeof status?.operation.progress === "number" ? (
+                <div className="space-y-1">
+                  <div className="flex justify-between text-xs text-muted-foreground">
+                    <span>{phaseLabel(status.operation.phase)}</span>
+                    <span>{status.operation.progress}%</span>
+                  </div>
+                  <div className="h-2 overflow-hidden rounded-full bg-muted">
+                    <div
+                      className="h-full bg-primary transition-[width]"
+                      style={{ width: `${status.operation.progress}%` }}
+                    />
+                  </div>
+                </div>
               ) : null}
             </CardContent>
             <CardFooter className="justify-end">

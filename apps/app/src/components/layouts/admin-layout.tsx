@@ -1,6 +1,7 @@
 import ArrowLeftRight from "lucide-react/icons/arrow-left-right";
 import Coins from "lucide-react/icons/coins";
 import FileText from "lucide-react/icons/file-text";
+import Globe from "lucide-react/icons/globe";
 import HardDriveUpload from "lucide-react/icons/hard-drive-upload";
 import Inbox from "lucide-react/icons/inbox";
 import KeyRound from "lucide-react/icons/key-round";
@@ -94,6 +95,12 @@ export function AdminLayout({ children }: AdminLayoutProps) {
           title: t("sidebar.systemUpdate"),
           url: "/admin/system-update",
           icon: RefreshCw,
+        },
+        {
+          id: "site-domain",
+          title: t("sidebar.siteDomain"),
+          url: "/admin/site-domain",
+          icon: Globe,
         },
         {
           id: "competitor-pricing",

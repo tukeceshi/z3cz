@@ -19,6 +19,7 @@ import adminOrganizationsRoutes from "./organizations";
 import adminPersistWorkerRoutes from "./persist-workers";
 import adminQueuesRoutes from "./queues";
 import adminSettingsRoutes from "./settings";
+import adminSiteDomainRoutes from "./site-domain";
 import adminStatsRoutes from "./stats";
 import adminSupportRoutes from "./support";
 import adminSystemUpdateRoutes from "./system-update";
@@ -37,6 +38,7 @@ adminRoutes.use("*", adminMiddleware);
 // Mount admin sub-routes
 adminRoutes.route("/stats", adminStatsRoutes);
 adminRoutes.route("/settings", adminSettingsRoutes);
+adminRoutes.route("/site-domain", adminSiteDomainRoutes);
 adminRoutes.route("/system-update", adminSystemUpdateRoutes);
 adminRoutes.route(
   "/competitor-video-pricing",

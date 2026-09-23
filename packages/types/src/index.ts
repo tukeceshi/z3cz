@@ -100,6 +100,7 @@ export * from "./scheduled";
 export * from "./schema";
 export * from "./secret";
 export * from "./legal-documents";
+export * from "./site-domain";
 export * from "./site-settings";
 export * from "./system-update";
 export * from "./slack";

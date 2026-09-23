@@ -2,16 +2,34 @@
 # Formal-release updater. Preparation happens while the current release remains live.
 set -euo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"; source "$HERE/common.sh"; need_root
-REPOSITORY="${Z3CZ_REPOSITORY:-tukeceshi/z3cz}"; VERSION="${1:-}"
+REPOSITORY="${Z3CZ_REPOSITORY:-tukeceshi/z3cz}"; PREPARED_ARCHIVE=""; PREPARED_CHECKSUM=""
+if [[ "${1:-}" == "--prepared" ]]; then
+  PREPARED_ARCHIVE="${2:-}"; PREPARED_CHECKSUM="${3:-}"; VERSION="${4:-}"
+else
+  VERSION="${1:-}"
+fi
 [[ "$VERSION" =~ ^v[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z.-]+)?$ ]] || die "更新必须显式指定正式版本，例如 v1.0.9"
 ASSET="z3cz-${VERSION}-deploy.tar.gz"; BASE="https://github.com/$REPOSITORY/releases/download/$VERSION"
 TMP="$(mktemp -d)"; trap 'rm -rf "$TMP"' EXIT
-log "下载并校验 $VERSION"
-curl -fL --retry 3 "$BASE/$ASSET" -o "$TMP/$ASSET"; curl -fL --retry 3 "$BASE/SHA256SUMS" -o "$TMP/SHA256SUMS"
-(cd "$TMP" && sha256sum -c SHA256SUMS --ignore-missing) || die "Release SHA-256 校验失败"
+if [[ -n "$PREPARED_ARCHIVE" ]]; then
+  UPDATE_ROOT="${Z3CZ_UPDATE_DIR:-/var/lib/z3cz/update}/downloads"
+  case "$(readlink -f "$PREPARED_ARCHIVE")" in "$UPDATE_ROOT"/*) ;; *) die "预备更新包不在允许目录" ;; esac
+  [[ -f "$PREPARED_ARCHIVE" && "$PREPARED_CHECKSUM" =~ ^[a-f0-9]{64}$ ]] || die "预备更新包参数无效"
+  log "复核后台已下载的 $VERSION"
+  [[ "$(sha256sum "$PREPARED_ARCHIVE" | awk '{print $1}')" == "$PREPARED_CHECKSUM" ]] || die "预备更新包 SHA-256 不匹配"
+  cp "$PREPARED_ARCHIVE" "$TMP/$ASSET"
+else
+  log "下载并校验 $VERSION"
+  curl -fL --retry 3 "$BASE/$ASSET" -o "$TMP/$ASSET"; curl -fL --retry 3 "$BASE/SHA256SUMS" -o "$TMP/SHA256SUMS"
+  (cd "$TMP" && sha256sum -c SHA256SUMS --ignore-missing) || die "Release SHA-256 校验失败"
+fi
 TARGET="$INSTALL_DIR/releases/${VERSION#v}"; [[ ! -e "$TARGET" ]] || die "目标版本目录已存在：$TARGET"
 mkdir -p "$TARGET"; tar -xzf "$TMP/$ASSET" -C "$TARGET"
 [[ "$(tr -d '\r\n' < "$TARGET/VERSION")" == "$VERSION" ]] || die "包内 VERSION 不匹配"
+case "$(uname -m)" in x86_64|amd64) UPDATER_ARCH=amd64 ;; aarch64|arm64) UPDATER_ARCH=arm64 ;; *) UPDATER_ARCH="" ;; esac
+if [[ -n "$UPDATER_ARCH" && -f "$TARGET/dist/z3cz-host-updater-linux-$UPDATER_ARCH" ]]; then
+  install -m 0755 "$TARGET/dist/z3cz-host-updater-linux-$UPDATER_ARCH" /usr/local/bin/z3cz-update-runner
+fi
 install_prod_dependencies "$TARGET"
 
 CURRENT="$(readlink -f "$INSTALL_DIR/current")"; BACKUP="$STATE_DIR/backups/z3cz-before-${VERSION#v}-$(date +%Y%m%d%H%M%S).dump"
@@ -19,6 +37,7 @@ log "进入维护模式并备份数据库"; touch "$STATE_DIR/maintenance/enable
 "$CURRENT/scripts/backup.sh" "$BACKUP" || { rm -f "$STATE_DIR/maintenance/enabled"; die "备份失败"; }
 log "运行新版本迁移"
 prepare_docker_env "$TARGET/compose.yml"
+ensure_site_address_access
 if ! compose "$TARGET" run --rm --no-deps api node dist/migrate.mjs; then
   die "迁移失败；旧应用仍在运行，维护模式已保留。请检查日志并显式恢复 $BACKUP"
 fi

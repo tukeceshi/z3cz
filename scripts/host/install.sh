@@ -8,7 +8,7 @@ if [[ "$RELEASE" != "$TARGET" ]]; then [[ ! -e "$TARGET" ]] || die "版本目录
 if [[ ! -f "$CONFIG_DIR/postgres.password" ]]; then umask 077; openssl rand -hex 32 > "$CONFIG_DIR/postgres.password"; fi
 if [[ ! -f "$ENV_FILE" ]]; then
   DB_PASSWORD="$(cat "$CONFIG_DIR/postgres.password")"; JWT_SECRET="$(openssl rand -hex 32)"; MASTER_KEY="$(openssl rand -hex 32)"
-  SITE_ADDRESS="$(resolve_site_address)"; umask 077
+  SITE_ADDRESS="$(resolve_site_address)"; SITE_TOKEN="$(openssl rand -hex 32)"; umask 077
   if [[ "$SITE_ADDRESS" == ":80" ]]; then
     log "未配置域名，Caddy 监听 HTTP 80"
   else
@@ -30,6 +30,8 @@ BOOTSTRAP_ASSETS_DIR=${assets_dest}
 Z3CZ_MAINTENANCE_FILE=/var/lib/z3cz/maintenance/enabled
 RUN_DB_MIGRATE=false
 Z3CZ_SITE_ADDRESS=${SITE_ADDRESS}
+Z3CZ_SITE_ADDRESS_TOKEN=${SITE_TOKEN}
+Z3CZ_SITE_ADDRESS_SOCKET=${SITE_SOCKET}
 JWT_SECRET=${JWT_SECRET}
 SECRET_MASTER_KEY=${MASTER_KEY}
 EOF
@@ -41,8 +43,13 @@ EOF
 fi
 chmod 600 "$ENV_FILE" "$CONFIG_DIR/postgres.password"
 prepare_docker_env "$TARGET/compose.yml"
+ensure_site_address_access
 install_prod_dependencies "$TARGET"; switch_link current "$TARGET"
 compose "$TARGET" up -d postgres --wait
 compose "$TARGET" run --rm --no-deps api node dist/migrate.mjs
 compose "$TARGET" up -d --force-recreate --wait
+if command -v systemctl >/dev/null 2>&1; then
+  bash "$TARGET/scripts/install-update-runner.sh"
+  compose "$TARGET" up -d --force-recreate --wait api
+fi
 log "已安装 v$VERSION"

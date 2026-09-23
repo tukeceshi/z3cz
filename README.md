@@ -60,7 +60,9 @@ sudo Z3CZ_SITE_ADDRESS=example.com Z3CZ_PUBLIC_URL=https://example.com bash "$in
 
 #### 更新
 
-当前使用宿主机更新命令升级正式版本：
+推荐在管理后台「系统设置 → 系统更新」选择 GitHub 或 Gitee 渠道并升级。后台负责版本检查、下载、SHA-256 校验和进度留痕；宿主机执行器只负责备份、迁移、原子切换、健康检查和失败回退。
+
+也可以使用宿主机命令升级正式版本：
 
 ```bash
 sudo bash /opt/z3cz/current/scripts/update.sh v1.0.12

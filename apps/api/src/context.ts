@@ -38,6 +38,9 @@ export interface Bindings {
   APP_VERSION?: string;
   UPDATER_SOCKET?: string;
   UPDATER_TOKEN?: string;
+  UPDATE_STATE_DIR?: string;
+  SITE_ADDRESS_SOCKET?: string;
+  SITE_ADDRESS_TOKEN?: string;
   CLOUDFLARE_ACCOUNT_ID: string;
   CLOUDFLARE_API_TOKEN: string;
   CLOUDFLARE_AI_GATEWAY_ID?: string;

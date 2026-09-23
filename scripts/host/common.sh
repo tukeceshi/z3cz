@@ -140,3 +140,24 @@ prepare_docker_env() {
   fi
   rm -f "$tmp"
 }
+
+# 后台改域名走 site-address 容器。它和安装写同一份 env，再重建 api 与 caddy。
+SITE_SOCKET_DIR="${Z3CZ_SITE_SOCKET_DIR:-/run/z3cz-site}"
+SITE_SOCKET="${SITE_SOCKET_DIR}/site.sock"
+
+ensure_site_address_access() {
+  [[ -f "$ENV_FILE" ]] || return 0
+  local changed=0
+  if ! grep -q '^Z3CZ_SITE_ADDRESS_TOKEN=.' "$ENV_FILE"; then
+    printf 'Z3CZ_SITE_ADDRESS_TOKEN=%s\n' "$(openssl rand -hex 32)" >>"$ENV_FILE"
+    changed=1
+  fi
+  if ! grep -q '^Z3CZ_SITE_ADDRESS_SOCKET=.' "$ENV_FILE"; then
+    printf 'Z3CZ_SITE_ADDRESS_SOCKET=%s\n' "$SITE_SOCKET" >>"$ENV_FILE"
+    changed=1
+  fi
+  if [[ "$changed" == 1 ]]; then
+    chmod 600 "$ENV_FILE"
+    log "已写入域名服务访问信息"
+  fi
+}

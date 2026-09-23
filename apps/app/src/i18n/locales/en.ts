@@ -314,6 +314,7 @@ export const en = {
     apiForwarding: "Format Transform Templates",
     persistWorkers: "Platform acceleration servers",
     systemUpdate: "System update",
+    siteDomain: "Site domain",
     aiInterfaceTemplates: "AI Interface Templates",
     aiModels: "AI Models",
     modelInvocations: "Model Invocations",
@@ -681,6 +682,7 @@ export const en = {
       adminDatasets: "Datasets - Admin - {{siteName}}",
       adminSettings: "Site Settings - Admin - {{siteName}}",
       adminSystemUpdate: "System Update - Admin - {{siteName}}",
+      adminSiteDomain: "Site Domain - Admin - {{siteName}}",
       adminCompetitorPricing: "Competitor Pricing - Admin - {{siteName}}",
       adminLoginMethods: "Login Methods - Admin - {{siteName}}",
       adminBootstrap: "Bootstrap - Admin - {{siteName}}",
@@ -939,6 +941,31 @@ export const en = {
       lastMessage: "Last message",
       open: "Open",
     },
+    siteDomain: {
+      title: "Site domain",
+      description:
+        "The domain must already point at this machine, with ports 80 and 443 open. Saving briefly interrupts the site; reopen it at the new address. Leave the field empty to remove the domain and use HTTP.",
+      currentHttp: "No domain is bound. The site is using HTTP.",
+      currentDomain: "Current domain: {{domain}}",
+      fieldLabel: "Public domain",
+      placeholder: "example.com",
+      fieldHelp:
+        "Do not include a port, path, or IP. Leave empty to remove the domain.",
+      restarting:
+        "Saved. The site will restart. Reopen it at the new address.",
+      unchanged: "The domain is unchanged.",
+      saveFailed: "Could not save the domain",
+      loadFailed: "Could not load the domain",
+      unavailable: "This environment cannot change the domain from the admin.",
+      unreachable:
+        "The local domain service is unreachable. Nothing was saved.",
+      errorInvalidChars:
+        "The domain cannot include a port, path, account, or spaces",
+      errorLocalName: "An IP address or local name cannot be the site domain",
+      errorInvalidDomain: "This is not a public domain",
+      errorApplying: "The previous change is still being applied",
+      errorUnavailable: "The domain cannot be changed right now",
+    },
     systemUpdate: {
       settings: "Update settings",
       details: "Checks, logs and recovery",
@@ -955,11 +982,11 @@ export const en = {
       description:
         "Prepare the official release while the site runs, then briefly pause access to switch versions.",
       check: "Check for updates",
-      sourceChannel: "Source channel",
+      sourceChannel: "Download channel",
       sourceChannelHint:
-        "Only used to pull source code. Version checks still use GitHub.",
+        "Download release packages from GitHub or Gitee. Version checks still use official GitHub releases.",
       sourceChannelSaved: "Switched to {{channel}}",
-      sourceChannelFailed: "Could not save the source channel",
+      sourceChannelFailed: "Could not save the download channel",
       sourceChannels: {
         github: "GitHub",
         gitee: "Gitee",
@@ -1021,17 +1048,21 @@ export const en = {
       rollbackFailed: "Could not start rollback",
       confirmTitle: "Update to {{version}}?",
       confirmDetail:
-        "The site stays available while source and images are prepared. Switching briefly interrupts access. Backups and database changes follow the release policy. Closing this page does not stop the update.",
+        "The site stays available during download and verification. Switching briefly interrupts access. Backups and database changes follow the release policy. Closing this page does not stop the update.",
       confirm: "Confirm and start update",
       cancel: "Cancel",
       phases: {
         idle: "Waiting",
         checking: "Checking",
+        downloading: "Downloading",
+        verifying_download: "Verifying download",
+        extracting: "Extracting",
+        preparing: "Preparing switch",
         ready: "Ready",
         no_update: "Up to date",
         preflight: "Preflight",
         backing_up: "Backing up",
-        pulling: "Fetching source and building",
+        pulling: "Preparing release",
         draining: "Stopping old services",
         migrating: "Migrating database",
         switching: "Switching version",

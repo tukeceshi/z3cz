@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
+import { spawn } from "node:child_process";
 import { createBackup, restoreBackup, reusableBackup } from "./backup.mjs";
 import { createComposeRunner, runCommand } from "./docker.mjs";
 import { fetchLatestRelease } from "./github.mjs";
@@ -189,8 +190,100 @@ export class UpdateManager {
   }
 
   currentVersion() {
+    const releaseVersion = path.join(this.installDir, "current", "VERSION");
+    if (fs.existsSync(releaseVersion)) {
+      return fs.readFileSync(releaseVersion, "utf8").trim();
+    }
     const config = parseAppYml(fs.readFileSync(this.appYmlPath, "utf8"));
     return displayVersion(config.image_tag || "latest") || "latest";
+  }
+
+  startPreparedUpdate({ targetVersion, archivePath, checksum }) {
+    if (!isReleaseVersion(targetVersion)) throw new Error("目标版本无效");
+    const updateRoot = path.resolve(
+      process.env.Z3CZ_UPDATE_DIR || "/var/lib/z3cz/update",
+      "downloads"
+    );
+    const archive = path.resolve(archivePath);
+    if (
+      !archive.startsWith(`${updateRoot}${path.sep}`) ||
+      !fs.existsSync(archive)
+    ) {
+      throw new Error("预备更新包不在允许目录");
+    }
+    if (!/^[a-f0-9]{64}$/.test(checksum)) throw new Error("更新包校验值无效");
+    if (ACTIVE.has(this.state.operation.phase))
+      throw new Error("已有更新正在执行");
+    const fromVersion = this.currentVersion();
+    this.state.operation = {
+      id: randomUUID(),
+      phase: "preflight",
+      fromVersion,
+      targetVersion,
+      startedAt: new Date().toISOString(),
+      automaticRollback: false,
+      packageChecksum: checksum,
+      logs: [],
+    };
+    this.appendLog("preflight", "宿主机正在复核后台准备的更新包");
+    this.saveState();
+    const script = path.join(
+      this.installDir,
+      "current",
+      "scripts",
+      "update.sh"
+    );
+    const child = spawn(
+      "bash",
+      [script, "--prepared", archive, checksum, targetVersion],
+      {
+        env: { ...process.env, Z3CZ_INSTALL_DIR: this.installDir },
+        stdio: ["ignore", "pipe", "pipe"],
+      }
+    );
+    const record = (chunk) => {
+      for (const line of String(chunk).split(/\r?\n/).filter(Boolean)) {
+        const lower = line.toLowerCase();
+        const phase = lower.includes("自动回退")
+          ? "rolled_back"
+          : lower.includes("人工") || lower.includes("维护模式已保留")
+            ? "manual_intervention"
+            : lower.includes("备份")
+              ? "backing_up"
+              : lower.includes("迁移")
+                ? "migrating"
+                : lower.includes("切换")
+                  ? "switching"
+                  : lower.includes("验证")
+                    ? "verifying"
+                    : this.state.operation.phase;
+        this.state.operation.phase = phase;
+        this.appendLog(phase, line.slice(0, 1000));
+      }
+      this.saveState();
+    };
+    child.stdout.on("data", record);
+    child.stderr.on("data", record);
+    child.on("error", (error) => this.failWithoutRollback(error));
+    child.on("exit", (code) => {
+      if (code === 0) {
+        this.state.operation.phase = "succeeded";
+        this.state.operation.finishedAt = new Date().toISOString();
+        this.appendLog("succeeded", `已更新到 ${targetVersion}`);
+        this.saveState();
+      } else if (
+        this.state.operation.phase !== "rolled_back" &&
+        this.state.operation.phase !== "manual_intervention"
+      ) {
+        this.failWithoutRollback(
+          new Error(`宿主机更新进程退出，代码 ${code ?? "unknown"}`)
+        );
+      } else {
+        this.state.operation.finishedAt = new Date().toISOString();
+        this.saveState();
+      }
+    });
+    return this.snapshot();
   }
 
   writeImageTag(version) {

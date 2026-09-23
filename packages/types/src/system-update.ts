@@ -1,6 +1,10 @@
 export const SYSTEM_UPDATE_PHASES = [
   "idle",
   "checking",
+  "downloading",
+  "verifying_download",
+  "extracting",
+  "preparing",
   "ready",
   "no_update",
   "preflight",
@@ -62,6 +66,10 @@ export interface SystemUpdateOperation {
   readonly error?: string;
   readonly rollbackError?: string;
   readonly automaticRollback: boolean;
+  readonly progress?: number;
+  readonly downloadedBytes?: number;
+  readonly totalBytes?: number;
+  readonly packageChecksum?: string;
   readonly logs: readonly SystemUpdateLog[];
 }
 
