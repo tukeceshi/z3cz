@@ -54,11 +54,15 @@ jobs:
           [[ "$RELEASE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z.-]+)?$ ]]
           git rev-parse --verify "refs/tags/$RELEASE_TAG^{commit}" >/dev/null
           mkdir -p dist/recovery
-          gh release view "$RELEASE_TAG" --json body --jq .body > dist/recovery/RELEASE_NOTES.md
-          gh release download "$RELEASE_TAG" \
-            --pattern "z3cz-${RELEASE_TAG}-deploy.tar.gz" \
-            --pattern SHA256SUMS \
-            --dir dist/recovery
+          gh api "repos/$GITHUB_REPOSITORY/releases/tags/$RELEASE_TAG" > dist/recovery/release.json
+          jq -r '.body // ""' dist/recovery/release.json > dist/recovery/RELEASE_NOTES.md
+          for asset_name in "z3cz-${RELEASE_TAG}-deploy.tar.gz" SHA256SUMS; do
+            asset_url="$(jq -er --arg name "$asset_name" '.assets[] | select(.name == $name) | .url' dist/recovery/release.json)"
+            gh api \
+              -H 'Accept: application/octet-stream' \
+              "$asset_url" > "dist/recovery/$asset_name"
+            test -s "dist/recovery/$asset_name"
+          done
           bash scripts/release/sync-gitee-git.sh "$GITHUB_SHA" "$RELEASE_TAG"
           bash scripts/release/sync-gitee-release.sh \
             "$RELEASE_TAG" \
