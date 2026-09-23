@@ -57,7 +57,7 @@ installer="$(mktemp)" && curl -fL --connect-timeout 20 --max-time 120 "https://r
 当前使用宿主机更新命令升级正式版本：
 
 ```bash
-sudo bash /opt/z3cz/current/scripts/update.sh v1.0.9
+sudo bash /opt/z3cz/current/scripts/update.sh v1.0.10
 ```
 
 更新只接受显式 `v*` 正式版本。下载、校验、解压和依赖安装在旧服务运行期间完成；随后进入维护、备份 PostgreSQL、以新版本 `dist/migrate.mjs` 迁移、原子切换并健康检查。应用失败会自动切回；不兼容迁移会保持维护状态并要求显式恢复备份。

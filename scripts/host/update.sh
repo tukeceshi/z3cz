@@ -18,6 +18,7 @@ CURRENT="$(readlink -f "$INSTALL_DIR/current")"; BACKUP="$STATE_DIR/backups/z3cz
 log "进入维护模式并备份数据库"; touch "$STATE_DIR/maintenance/enabled"
 "$CURRENT/scripts/backup.sh" "$BACKUP" || { rm -f "$STATE_DIR/maintenance/enabled"; die "备份失败"; }
 log "运行新版本迁移"
+prepare_docker_env "$TARGET/compose.yml"
 if ! compose "$TARGET" run --rm --no-deps api node dist/migrate.mjs; then
   die "迁移失败；旧应用仍在运行，维护模式已保留。请检查日志并显式恢复 $BACKUP"
 fi

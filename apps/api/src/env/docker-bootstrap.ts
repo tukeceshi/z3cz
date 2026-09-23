@@ -23,7 +23,10 @@ function readDevVarsFile(filePath: string): Record<string, string> {
   return parseDevVars(fs.readFileSync(filePath, "utf8"));
 }
 
-function secretsNeedGeneration(secrets: Record<string, string>): boolean {
+function secretsNeedGeneration(secrets: {
+  JWT_SECRET?: string;
+  SECRET_MASTER_KEY?: string;
+}): boolean {
   return (
     isInsecureSecret(secrets.JWT_SECRET) ||
     isInsecureSecret(secrets.SECRET_MASTER_KEY)
@@ -34,6 +37,17 @@ export function ensureDockerSecretsFile(
   secretsFile = process.env.SECRETS_FILE ?? DEFAULT_SECRETS_FILE
 ): void {
   if (!isRunningInDocker()) {
+    return;
+  }
+
+  // Production injects JWT_SECRET and SECRET_MASTER_KEY through the env file.
+  // The dev secrets volume (/data/secrets/.dev.vars) is not mounted there.
+  if (
+    !secretsNeedGeneration({
+      JWT_SECRET: process.env.JWT_SECRET,
+      SECRET_MASTER_KEY: process.env.SECRET_MASTER_KEY,
+    })
+  ) {
     return;
   }
 

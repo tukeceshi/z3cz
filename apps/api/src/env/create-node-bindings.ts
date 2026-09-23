@@ -113,8 +113,11 @@ export async function createNodeBindings(
     AI: createStubAi(),
     AI_OPTIONS: {} as AiOptions,
     EXECUTIONS: createStubAnalytics(),
-    WEB_HOST: env.WEB_HOST ?? "http://localhost:3101",
-    WEBSITE_URL: env.WEBSITE_URL ?? "http://localhost:3101",
+    WEB_HOST:
+      env.WEB_HOST ?? (env.RUNTIME === "docker" ? "" : "http://localhost:3101"),
+    WEBSITE_URL:
+      env.WEBSITE_URL ??
+      (env.RUNTIME === "docker" ? "" : "http://localhost:3101"),
     EMAIL_DOMAIN: env.EMAIL_DOMAIN ?? "mail.localhost",
     JWT_SECRET: resolveSecret(env, "JWT_SECRET", "dev-insecure-jwt-secret"),
     CLOUDFLARE_ENV: env.CLOUDFLARE_ENV ?? "development",

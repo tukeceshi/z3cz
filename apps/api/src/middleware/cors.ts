@@ -1,7 +1,24 @@
 import type { Context } from "hono";
 import { cors } from "hono/cors";
 
+import { configuredPublicOrigin } from "../auth/auth-cookie";
 import { ApiContext } from "../context";
+
+const requestOriginAllowed = (
+  c: Context<ApiContext>,
+  origin: string
+): string | null => {
+  const host = c.req.header("x-forwarded-host") ?? c.req.header("host");
+  const requestHost = host?.split(",")[0]?.trim();
+  try {
+    if (requestHost && new URL(origin).host === requestHost) {
+      return origin;
+    }
+  } catch {
+    return null;
+  }
+  return null;
+};
 
 export const corsMiddleware = (
   c: Context<ApiContext>,
@@ -11,12 +28,12 @@ export const corsMiddleware = (
     return next();
   }
 
-  const webHost = c.env?.WEB_HOST ?? "http://localhost:3101";
+  const configured = configuredPublicOrigin(c.env?.WEB_HOST);
   const isDevelopment =
     (c.env?.CLOUDFLARE_ENV ?? "development") !== "production";
 
   return cors({
-    origin: webHost,
+    origin: (origin) => configured ?? requestOriginAllowed(c, origin),
     allowHeaders: [
       "X-Custom-Header",
       "Authorization",

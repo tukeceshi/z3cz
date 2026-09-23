@@ -9,24 +9,30 @@ if [[ ! -f "$CONFIG_DIR/postgres.password" ]]; then umask 077; openssl rand -hex
 if [[ ! -f "$ENV_FILE" ]]; then
   DB_PASSWORD="$(cat "$CONFIG_DIR/postgres.password")"; JWT_SECRET="$(openssl rand -hex 32)"; MASTER_KEY="$(openssl rand -hex 32)"
   SITE_ADDRESS="${Z3CZ_SITE_ADDRESS:-:80}"; umask 077
+  db_svc="$(compose_database_service "$TARGET/compose.yml")"
+  uploads_dest="$(compose_api_mount_dest "$TARGET/compose.yml" "/uploads:")"
+  assets_dest="$(compose_api_mount_dest "$TARGET/compose.yml" "/app:/")"
+  [[ -n "$db_svc" && -n "$uploads_dest" && -n "$assets_dest" ]] || die "无法从 compose 读取数据库服务或挂载路径"
   cat > "$ENV_FILE" <<EOF
 NODE_ENV=production
 RUNTIME=docker
 HOST=0.0.0.0
 PORT=3001
-DATABASE_URL=postgresql://z3cz:${DB_PASSWORD}@postgres:5432/z3cz
-LOCAL_STORAGE_PATH=/var/lib/z3cz/uploads
-BOOTSTRAP_ASSETS_DIR=/srv/app
+DATABASE_URL=postgresql://z3cz:${DB_PASSWORD}@${db_svc}:5432/z3cz
+LOCAL_STORAGE_PATH=${uploads_dest}
+BOOTSTRAP_ASSETS_DIR=${assets_dest}
 Z3CZ_MAINTENANCE_FILE=/var/lib/z3cz/maintenance/enabled
 RUN_DB_MIGRATE=false
 Z3CZ_SITE_ADDRESS=${SITE_ADDRESS}
-WEB_HOST=${Z3CZ_PUBLIC_URL:-http://localhost}
-WEBSITE_URL=${Z3CZ_PUBLIC_URL:-http://localhost}
 JWT_SECRET=${JWT_SECRET}
 SECRET_MASTER_KEY=${MASTER_KEY}
 EOF
+  if [[ -n "${Z3CZ_PUBLIC_URL:-}" ]]; then
+    printf 'WEB_HOST=%s\nWEBSITE_URL=%s\n' "$Z3CZ_PUBLIC_URL" "$Z3CZ_PUBLIC_URL" >>"$ENV_FILE"
+  fi
 fi
 chmod 600 "$ENV_FILE" "$CONFIG_DIR/postgres.password"
+prepare_docker_env "$TARGET/compose.yml"
 install_prod_dependencies "$TARGET"; switch_link current "$TARGET"
 compose "$TARGET" up -d postgres --wait
 compose "$TARGET" run --rm --no-deps api node dist/migrate.mjs

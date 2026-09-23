@@ -15,6 +15,10 @@ import { deleteCookie, getCookie, setCookie } from "hono/cookie";
 import { jwtVerify, SignJWT } from "jose";
 import { z } from "zod";
 
+import {
+  configuredPublicOrigin,
+  resolveAuthCookieScope,
+} from "./auth/auth-cookie";
 import { ApiContext } from "./context";
 import { LAZY_ROUTE_ORG_HEADER } from "./lazy-route";
 import {
@@ -191,32 +195,6 @@ export const verifyTokenForRateLimit = async (
   }
 };
 
-const urlToTopLevelDomain = (url: string): string => {
-  try {
-    const parsedUrl = new URL(url);
-    const parts = parsedUrl.hostname.split(".");
-
-    // For localhost development
-    if (
-      parsedUrl.hostname === "localhost" ||
-      parsedUrl.hostname === "127.0.0.1"
-    ) {
-      return parsedUrl.hostname;
-    }
-
-    // Validate hostname format
-    if (parts.length < 2) {
-      throw new Error("Invalid hostname format");
-    }
-
-    // Extract top-level domain (last two parts)
-    return parts.slice(-2).join(".");
-  } catch (error) {
-    console.error("Invalid URL for domain extraction:", url, error);
-    throw new Error("Invalid web host URL");
-  }
-};
-
 // Input validation helpers
 const validateUserData = (user: any, provider: string) => {
   const requiredFields = ["id", "name"];
@@ -244,25 +222,59 @@ const validateUserData = (user: any, provider: string) => {
 
 const getAuthCookiePath = (): string => "/";
 
+const forwardedHeader = (
+  c: Context<ApiContext>,
+  name: string
+): string | undefined => {
+  const value = c.req.header(name)?.split(",")[0]?.trim();
+  return value || undefined;
+};
+
+const requestIsHttps = (c: Context<ApiContext>): boolean => {
+  const forwarded = forwardedHeader(c, "x-forwarded-proto");
+  if (forwarded === "https") {
+    return true;
+  }
+  if (forwarded === "http") {
+    return false;
+  }
+  return new URL(c.req.url).protocol === "https:";
+};
+
+const requestOrigin = (c: Context<ApiContext>): string => {
+  const host =
+    forwardedHeader(c, "x-forwarded-host") ??
+    forwardedHeader(c, "host") ??
+    new URL(c.req.url).host;
+  return `${requestIsHttps(c) ? "https" : "http"}://${host}`;
+};
+
+const publicOrigin = (c: Context<ApiContext>): string =>
+  configuredPublicOrigin(c.env.WEB_HOST) ?? requestOrigin(c);
+
+const authCookieScope = (c: Context<ApiContext>) =>
+  resolveAuthCookieScope({
+    configuredWebHost: c.env.WEB_HOST,
+    requestHttps: requestIsHttps(c),
+  });
+
 const deleteCookieOptions = (c: Context<ApiContext>) => {
-  const hostname = new URL(c.env.WEB_HOST).hostname;
-  const isLocalhost = hostname === "localhost" || hostname === "127.0.0.1";
+  const scope = authCookieScope(c);
 
   return {
     path: getAuthCookiePath(),
-    ...(isLocalhost ? {} : { domain: urlToTopLevelDomain(c.env.WEB_HOST) }),
+    ...(scope.domain ? { domain: scope.domain } : {}),
   };
 };
 
 const setCookieOptions = (c: Context<ApiContext>, maxAge: number) => {
-  const hostname = new URL(c.env.WEB_HOST).hostname;
-  const isLocalhost = hostname === "localhost" || hostname === "127.0.0.1";
+  const scope = authCookieScope(c);
 
   return {
     httpOnly: true,
-    secure: isLocalhost ? false : c.env.CLOUDFLARE_ENV !== "development",
+    secure: scope.secure,
     sameSite: "Lax" as const,
-    ...(isLocalhost ? {} : { domain: urlToTopLevelDomain(c.env.WEB_HOST) }),
+    ...(scope.domain ? { domain: scope.domain } : {}),
     maxAge,
     path: getAuthCookiePath(),
   };
@@ -287,13 +299,12 @@ const isValidReturnTo = (returnTo: string): boolean => {
 const storeReturnTo = (c: Context<ApiContext>) => {
   const returnTo = c.req.query("returnTo");
   if (returnTo && isValidReturnTo(returnTo)) {
-    setCookie(c, OAUTH_RETURN_TO_COOKIE, returnTo, {
-      httpOnly: true,
-      secure: c.env.CLOUDFLARE_ENV !== "development",
-      sameSite: "Lax",
-      maxAge: OAUTH_RETURN_TO_MAX_AGE,
-      path: "/",
-    });
+    setCookie(
+      c,
+      OAUTH_RETURN_TO_COOKIE,
+      returnTo,
+      setCookieOptions(c, OAUTH_RETURN_TO_MAX_AGE)
+    );
   }
 };
 
@@ -303,10 +314,10 @@ const consumeReturnTo = (c: Context<ApiContext>): string => {
   if (returnTo) {
     deleteCookie(c, OAUTH_RETURN_TO_COOKIE, { path: "/" });
     if (isValidReturnTo(returnTo)) {
-      return c.env.WEB_HOST + returnTo;
+      return publicOrigin(c) + returnTo;
     }
   }
-  return c.env.WEB_HOST;
+  return publicOrigin(c);
 };
 
 // Auth middleware
@@ -647,7 +658,7 @@ auth.post("/refresh", async (c) => {
 
 auth.post("/logout", (c) => {
   clearAuthCookies(c);
-  return c.redirect(c.env.WEB_HOST);
+  return c.redirect(publicOrigin(c));
 });
 
 auth.post("/clear-session", (c) => {
