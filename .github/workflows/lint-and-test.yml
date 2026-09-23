@@ -58,5 +58,8 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_HYPERDRIVE: postgresql://postgres:postgres@localhost:5432/postgres
 
-      - name: Host updater tests
+      - name: Validate deployment policy
         run: pnpm run test:host
+
+      - name: Build and inspect deployment release
+        run: bash scripts/host/pack-deploy.sh

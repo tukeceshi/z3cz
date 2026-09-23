@@ -1,11 +1,13 @@
-:80 {
+{$Z3CZ_SITE_ADDRESS::80} {
 	encode gzip zstd
+	@maintenance file /srv/maintenance/enabled
+	respond @maintenance "系统正在更新，请稍后刷新。" 503
 	handle_path /api/* {
 		reverse_proxy api:3001
 	}
 	handle {
-		reverse_proxy app:80 {
-			flush_interval -1
-		}
+		root * /srv/app
+		try_files {path} /index.html
+		file_server
 	}
 }

@@ -28,6 +28,10 @@ jobs:
             echo "CHANGELOG.md is missing ## $version" >&2
             exit 1
           }
+          [[ "$version" =~ ^v[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z.-]+)?$ ]] || {
+            echo "VERSION is not a release version: $version" >&2
+            exit 1
+          }
 
       - uses: pnpm/action-setup@v4
         with:
@@ -43,7 +47,7 @@ jobs:
       - name: Verify update policy
         run: node scripts/host/validate-update-policy.mjs
 
-      - name: Build native server archives
+      - name: Build immutable deployment package
         run: bash scripts/host/pack-deploy.sh
 
       - name: Prepare release notes
@@ -67,9 +71,8 @@ jobs:
             prerelease_args+=(--prerelease)
           fi
           gh release create "$GITHUB_REF_NAME" \
-            dist/native/z3cz-server-linux-amd64.tar.gz \
-            dist/native/z3cz-server-linux-arm64.tar.gz \
-            dist/native/SHA256SUMS \
+            dist/deploy/z3cz-${GITHUB_REF_NAME}-deploy.tar.gz \
+            dist/deploy/SHA256SUMS \
             --verify-tag \
             --title "$GITHUB_REF_NAME" \
             --notes-file RELEASE_NOTES.md \

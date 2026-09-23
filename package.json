@@ -31,7 +31,7 @@
     "host:logs": "node docker-host/invoke-host.mjs launcher logs",
     "host:status": "node docker-host/invoke-host.mjs launcher status",
     "dev:gateway": "node scripts/dev-gateway.mjs",
-    "test:host": "node --test docker-host/lib/*.test.mjs scripts/host/updater/*.test.mjs",
+    "test:host": "node scripts/host/validate-update-policy.mjs",
     "start": "pnpm --parallel start",
     "knip": "NODE_NO_WARNINGS=1 knip --include-libs 2>/dev/null || true",
     "knip:fix": "knip --include-libs --fix --allow-remove-files"

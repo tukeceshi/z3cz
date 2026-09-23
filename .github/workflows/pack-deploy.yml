@@ -27,7 +27,7 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
-      - name: Build native server archives
+      - name: Build self-host test deployment package
         run: bash scripts/host/pack-deploy.sh
 
       - name: Publish
@@ -37,9 +37,8 @@ jobs:
           name: Self-host
           body: Deploy pack from ${{ github.sha }}
           files: |
-            dist/native/z3cz-server-linux-amd64.tar.gz
-            dist/native/z3cz-server-linux-arm64.tar.gz
-            dist/native/SHA256SUMS
+            dist/deploy/z3cz-*-deploy.tar.gz
+            dist/deploy/SHA256SUMS
           fail_on_unmatched_files: true
           make_latest: false
           target_commitish: ${{ github.sha }}

@@ -1,0 +1,32 @@
+{
+  "name": "z3cz-production-api",
+  "version": "1.0.8",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@10.3.0",
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.71.2",
+    "@google/genai": "^1.52.0",
+    "@hono/node-server": "^1.19.9",
+    "@hono/node-ws": "^1.2.0",
+    "@hono/oauth-providers": "^0.8.5",
+    "@hono/zod-validator": "^0.7.6",
+    "@volcengine/tos-sdk": "^2.9.1",
+    "aws4fetch": "^1.0.20",
+    "cron-parser": "^5.5.0",
+    "drizzle-orm": "0.45.2",
+    "hono": "^4.12.26",
+    "hono-rate-limiter": "^0.4.2",
+    "jose": "^6.2.3",
+    "nanoid": "^5.1.11",
+    "nodemailer": "^6.10.1",
+    "openai": "^6.37.0",
+    "postal-mime": "^2.7.4",
+    "postgres": "^3.4.7",
+    "ssh2": "^1.16.0",
+    "stripe": "^20.4.1",
+    "uuid": "^13.0.2",
+    "ws": ">=8.20.1",
+    "zod": "^4.4.3"
+  }
+}

@@ -1,61 +1,38 @@
 #!/usr/bin/env bash
-# Native release updater with database backup and application rollback.
+# Formal-release updater. Preparation happens while the current release remains live.
 set -euo pipefail
-INSTALL_DIR="${DAFTHUNK_INSTALL_DIR:-/opt/z3cz}"
-STATE_DIR="${DAFTHUNK_STATE_DIR:-/var/lib/z3cz}"
-CONFIG_DIR="${DAFTHUNK_CONFIG_DIR:-/etc/z3cz}"
-REPOSITORY="${Z3CZ_UPDATER_REPOSITORY:-tukeceshi/z3cz}"
-TARGET="${1:-}"
-log() { printf '==> %s\n' "$*"; }
-info() { printf ' -> %s\n' "$*"; }
-die() { printf 'ERROR: %s\n' "$*" >&2; exit 1; }
-[[ "${EUID:-$(id -u)}" -eq 0 ]] || die "请使用 sudo 运行"
-case "$(uname -m)" in x86_64|amd64) ARCH=amd64;; aarch64|arm64) ARCH=arm64;; *) die "不支持的架构";; esac
-if [[ -z "$TARGET" ]]; then
-  TARGET="$(curl -fsSL "https://api.github.com/repos/${REPOSITORY}/releases/latest" | sed -n 's/.*"tag_name"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -1)"
+HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"; source "$HERE/common.sh"; need_root
+REPOSITORY="${Z3CZ_REPOSITORY:-tukeceshi/z3cz}"; VERSION="${1:-}"
+[[ "$VERSION" =~ ^v[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z.-]+)?$ ]] || die "更新必须显式指定正式版本，例如 v1.0.9"
+ASSET="z3cz-${VERSION}-deploy.tar.gz"; BASE="https://github.com/$REPOSITORY/releases/download/$VERSION"
+TMP="$(mktemp -d)"; trap 'rm -rf "$TMP"' EXIT
+log "下载并校验 $VERSION"
+curl -fL --retry 3 "$BASE/$ASSET" -o "$TMP/$ASSET"; curl -fL --retry 3 "$BASE/SHA256SUMS" -o "$TMP/SHA256SUMS"
+(cd "$TMP" && sha256sum -c SHA256SUMS --ignore-missing) || die "Release SHA-256 校验失败"
+TARGET="$INSTALL_DIR/releases/${VERSION#v}"; [[ ! -e "$TARGET" ]] || die "目标版本目录已存在：$TARGET"
+mkdir -p "$TARGET"; tar -xzf "$TMP/$ASSET" -C "$TARGET"
+[[ "$(tr -d '\r\n' < "$TARGET/VERSION")" == "$VERSION" ]] || die "包内 VERSION 不匹配"
+install_prod_dependencies "$TARGET"
+
+CURRENT="$(readlink -f "$INSTALL_DIR/current")"; BACKUP="$STATE_DIR/backups/z3cz-before-${VERSION#v}-$(date +%Y%m%d%H%M%S).dump"
+log "进入维护模式并备份数据库"; touch "$STATE_DIR/maintenance/enabled"
+"$CURRENT/scripts/backup.sh" "$BACKUP" || { rm -f "$STATE_DIR/maintenance/enabled"; die "备份失败"; }
+log "运行新版本迁移"
+if ! compose "$TARGET" run --rm --no-deps api node dist/migrate.mjs; then
+  die "迁移失败；旧应用仍在运行，维护模式已保留。请检查日志并显式恢复 $BACKUP"
 fi
-[[ "$TARGET" =~ ^v[0-9]+\.[0-9]+\.[0-9]+ ]] || die "无效版本：$TARGET"
-ASSET="z3cz-server-linux-${ARCH}.tar.gz"
-BASE="https://github.com/${REPOSITORY}/releases/download/${TARGET}"
-TMP="$(mktemp --suffix=.tar.gz)"; SUMS="$(mktemp)"
-trap 'rm -f "${TMP:-}" "${SUMS:-}"' EXIT
-curl -fL --retry 3 "${BASE}/${ASSET}" -o "$TMP"
-curl -fL --retry 3 "${BASE}/SHA256SUMS" -o "$SUMS"
-EXPECTED="$(awk -v name="$ASSET" '$2 == name {print $1; exit}' "$SUMS")"
-ACTUAL="$(sha256sum "$TMP" | awk '{print $1}')"
-[[ -n "$EXPECTED" && "$EXPECTED" == "$ACTUAL" ]] || die "部署包校验失败"
-NEW_DIR="${INSTALL_DIR}/releases/${TARGET#v}"
-OLD_DIR="$(readlink -f "${INSTALL_DIR}/current")"
-[[ "$NEW_DIR" != "$OLD_DIR" ]] || { info "已是目标版本 $TARGET"; exit 0; }
 
-log "备份数据库"
-mkdir -p "$STATE_DIR/backups" "$STATE_DIR/maintenance"
-touch "$STATE_DIR/maintenance/enabled"
-BACKUP="${STATE_DIR}/backups/z3cz-before-${TARGET#v}-$(date +%Y%m%d%H%M%S).dump"
-set -a
-# shellcheck disable=SC1090
-source "${CONFIG_DIR}/z3cz.env"
-set +a
-PGPASSWORD="$(cat "${CONFIG_DIR}/postgres.password")" pg_dump -h 127.0.0.1 -U z3cz --format=custom --file="$BACKUP" z3cz \
-  || { rm -f "$STATE_DIR/maintenance/enabled"; die "数据库备份失败"; }
+switch_link previous "$CURRENT"; switch_link current "$TARGET"
+log "切换并验证新版本"
+if compose "$TARGET" up -d --force-recreate --remove-orphans --wait; then
+  rm -f "$STATE_DIR/maintenance/enabled"; log "已更新到 $VERSION；备份：$BACKUP"; exit 0
+fi
 
-log "安装 $TARGET"
-mkdir -p "$NEW_DIR"
-tar -xzf "$TMP" -C "$NEW_DIR"
-ln -sfn "$NEW_DIR" "${INSTALL_DIR}/current.next"
-mv -Tf "${INSTALL_DIR}/current.next" "${INSTALL_DIR}/current"
-if bash "${INSTALL_DIR}/current/scripts/host/db-migrate.sh" \
-  && systemctl restart z3cz-api.service \
-  && bash "${INSTALL_DIR}/current/scripts/host/render-caddy.sh" \
-  && systemctl reload caddy \
-  && curl --retry 20 --retry-delay 2 --retry-connrefused -fsS http://127.0.0.1:3001/health >/dev/null; then
+ROLLBACK_COMPATIBLE="$(sed -n 's/.*"rollbackCompatible"[[:space:]]*:[[:space:]]*\(true\|false\).*/\1/p' "$TARGET/update-policy.json" | head -1)"
+switch_link current "$CURRENT"
+compose "$CURRENT" up -d --force-recreate --remove-orphans || true
+if [[ "$ROLLBACK_COMPATIBLE" == true ]]; then
   rm -f "$STATE_DIR/maintenance/enabled"
-  info "已更新到 $TARGET；备份：$BACKUP"
-  exit 0
+  die "新应用健康检查失败，已自动回退到旧版本"
 fi
-
-log "应用启动失败，切回上一版本"
-ln -sfn "$OLD_DIR" "${INSTALL_DIR}/current.next"
-mv -Tf "${INSTALL_DIR}/current.next" "${INSTALL_DIR}/current"
-systemctl restart z3cz-api.service || true
-die "更新失败，应用已回退；维护模式仍然开启。数据库如需恢复：pg_restore --clean --if-exists -d z3cz $BACKUP"
+die "新应用健康检查失败，代码已切回旧版本；数据库声明为不兼容，维护模式保留。请显式恢复 $BACKUP 后再解除维护模式"

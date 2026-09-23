@@ -37,7 +37,8 @@
 #### 要求
 
 - Linux（推荐 Ubuntu）
-- 内存 6G + （不足时自动 swap 增加虚拟内存）
+- Docker Engine 24+ 与 Docker Compose v2
+- 建议内存 6G+
 
 #### 安装（一条命令）
 
@@ -45,37 +46,36 @@
 installer="$(mktemp)" && curl -fL --connect-timeout 20 --max-time 120 "https://raw.githubusercontent.com/tukeceshi/z3cz/main/bootstrap-install" -o "$installer" && sudo bash "$installer"
 ```
 
-安装器不使用 Docker 或 Docker 镜像。它会安装宿主机 PostgreSQL、Caddy，下载经过 SHA-256 校验的原生发布包，并通过 systemd 启动 API。当前支持 Ubuntu 22.04/24.04/26.04、Debian 12，以及 amd64/arm64。
+安装器下载 `self-host` 测试渠道的部署包并校验 SHA-256。生产只运行 `api`、`postgres`、`caddy` 三个容器，使用固定版本的通用 Node、PostgreSQL、Caddy 镜像；不会构建、发布或拉取 z3cz 专用镜像，也不会在服务器构建 App 或编译 API。
 
-安装期间可输入域名，也可直接回车跳过。输入域名时，Caddy 自动申请 HTTPS 证书；回车时系统以 `http://服务器公网IP` 进入初始化模式。之后可在 Admin 后台的“域名与 HTTPS”中绑定或更换域名、查看证书状态并重新签发。HTTP 初始化模式仅用于完成管理配置，正式业务建议在 HTTPS 启用后使用。
+安装前可设置 `Z3CZ_SITE_ADDRESS=example.com Z3CZ_PUBLIC_URL=https://example.com`；未设置时监听 HTTP 80。域名模式由容器内 Caddy 自动申请和续期证书。
 
-程序安装到 `/opt/z3cz/releases/<版本>`，`/opt/z3cz/current` 指向当前版本；配置位于 `/etc/z3cz`，数据库备份和上传文件位于 `/var/lib/z3cz`。服务器不会拉取源码或现场执行前端构建。
+程序安装到 `/opt/z3cz/releases/<版本>`，`current`/`previous` 为原子版本指针；配置位于 `/etc/z3cz`，PostgreSQL、上传、Caddy 数据与备份位于 `/var/lib/z3cz`，pnpm store 位于 `/var/cache/z3cz/pnpm`。每个版本的 API 生产依赖由一次性 Node 容器以 `--prod --frozen-lockfile` 安装并复用该缓存。
 
 #### 更新
 
 当前使用宿主机更新命令升级正式版本：
 
 ```bash
-sudo bash /opt/z3cz/current/scripts/host/update.sh
-sudo bash /opt/z3cz/current/scripts/host/update.sh v1.0.8
+sudo bash /opt/z3cz/current/scripts/update.sh v1.0.9
 ```
 
-更新器会下载并校验原生发布包、创建 PostgreSQL 逻辑备份、执行迁移、原子切换版本并做健康检查。应用启动失败会切回旧版本；数据库发生不兼容迁移时保持维护模式并给出明确的恢复命令。
+更新只接受显式 `v*` 正式版本。下载、校验、解压和依赖安装在旧服务运行期间完成；随后进入维护、备份 PostgreSQL、以新版本 `dist/migrate.mjs` 迁移、原子切换并健康检查。应用失败会自动切回；不兼容迁移会保持维护状态并要求显式恢复备份。
 
-更新顺序为：下载与校验发布包 → 创建数据库备份 → 进入维护模式 → 安装并迁移 → 原子切换版本 → 健康检查。应用启动失败时自动切回上一版程序；为避免误伤数据，数据库恢复需要管理员执行脚本输出的 `pg_restore` 命令。
+`main` 分支只更新可变的 `self-host` 首装测试包；`v*` 标签生成不可变正式包。首次安装走上面的安装器，正式更新只走带版本号的 `update.sh`，两个渠道不会混用。
 
-发布流程为 amd64、arm64 分别生成自包含安装包，内含固定版本 Node.js、API 生产依赖和前端静态资源，不再构建或推送 Docker 镜像。
+Release 与 CPU 架构无关，只含 App 静态产物、API 编译后 JS/迁移、独立生产依赖清单与锁文件、Compose/Caddy、运维脚本及版本策略文件；不含源码、Git 历史、`node_modules` 或开发依赖。
 
 发布前维护根目录 `update-policy.json`：`minimumVersion` 限制可直接升级的最低版本；`requiresBackup` 要求本次创建新备份；`databaseChanges` 强制执行迁移；`minimumRollbackVersion` 和 `rollbackCompatible` 共同声明旧代码能否继续使用迁移后的数据。更新器仍会比较新旧数据库文件，历史不明确时按需要新备份、需要人工恢复处理。发布流程会校验该文件和更新协议。
 
-旧 Docker 安装不能直接覆盖升级为原生部署。迁移时应先使用 `pg_dump` 导出数据库，并备份上传目录，再在新原生安装中恢复；确认新服务正常后再停用旧容器。
+旧部署不能直接覆盖升级。迁移时应先用 `pg_dump` 导出数据库并备份上传目录，再导入新布局。
 
 #### HTTPS
 
 自托管生产环境 **必须 HTTPS**：Cookie 与浏览器 API（如 `crypto.randomUUID`）仅在安全上下文中可用。请勿使用 HTTP 访问或 `--http` 模式。签发前确认域名已解析到 **正在申请证书的这台机器**（见上方安装步骤）。
 
 
-输入域名后由宿主机 Caddy 自动申请并续期证书。域名必须提前解析到当前服务器，并开放 TCP 80、443 端口。Caddy 配置位于 `/etc/caddy/Caddyfile`。
+输入域名后由 Caddy 容器自动申请并续期证书。域名必须提前解析到当前服务器，并开放 TCP/UDP 80、443 端口。
 
 ---
 
@@ -155,7 +155,7 @@ docker compose up -d --build --wait
 
 ## Docker 命令总览
 
-开发与部署可同时运行：开发入口为 `http://localhost:3000`，命令部署入口为 `http://localhost:8080`。命令部署与一键部署均由 Caddy 转发 `/api` 到内部的 `api:3001`。
+下表仅列本地开发命令。生产 Compose 属于 Release，必须通过安装/更新脚本使用，不能从源码目录直接 `up --build`。
 
 | 场景 | 命令 |
 | --- | --- |
@@ -166,14 +166,6 @@ docker compose up -d --build --wait
 | 开发：查看 API / App 日志 | `docker compose logs -f api app` |
 | 开发：停止 | `docker compose down` |
 | 开发：完全重置数据 | `docker compose down -v` |
-| 部署：构建并启动 | `docker compose -f docker-compose.prod.yml up -d --build --wait` |
-| 部署：查看状态 | `docker compose -f docker-compose.prod.yml ps` |
-| 部署：查看日志 | `docker compose -f docker-compose.prod.yml logs -f` |
-| 部署：停止 | `docker compose -f docker-compose.prod.yml down` |
-
-部署首次启动时，API 会在持久 Docker 卷 `z3cz-prod_dafthunk_prod_secrets` 中自动生成密钥；后续启动会复用。部署环境也不要使用 `down -v`，否则密钥、数据库和上传文件都会被删除。
-
-更新代码后，Docker 本地开发或命令部署重新执行对应的“构建并启动”命令即可；公开的一键自托管使用上文的原生发布包流程。
 
 ---
 

@@ -1,8 +1,8 @@
 {
   "format": 2,
   "minimumVersion": "v0.0.0",
-  "minimumRollbackVersion": "v0.0.0",
-  "requiresBackup": false,
-  "databaseChanges": false,
+  "minimumRollbackVersion": "v1.0.8",
+  "requiresBackup": true,
+  "databaseChanges": true,
   "rollbackCompatible": true
 }
