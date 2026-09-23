@@ -195,6 +195,19 @@ read_env_value() {
   printf '%s' "$value"
 }
 
+packaged_image_tag() {
+  local file="$HOST_DIR/packaged-images.env"
+  [[ -f "$file" ]] || { printf 'latest'; return; }
+  local image
+  image="$(grep -E '^API_IMAGE=' "$file" | head -n1 || true)"
+  image="${image#API_IMAGE=}"
+  if [[ "${image##*/}" == *:* ]]; then
+    printf '%s' "${image##*:}"
+  else
+    printf 'latest'
+  fi
+}
+
 ASK_TIMEOUT_SEC="${DAFTHUNK_ASK_TIMEOUT:-900}"
 NON_INTERACTIVE="${DAFTHUNK_NON_INTERACTIVE:-0}"
 
@@ -229,8 +242,10 @@ ensure_stdin_tty() {
   # SIGTTIN when this process reads from it.
   if [[ -t 1 ]]; then
     exec </proc/self/fd/1
+    return 0
   elif [[ -t 2 ]]; then
     exec </proc/self/fd/2
+    return 0
   fi
   if has_tty; then
     exec </dev/tty
@@ -407,6 +422,7 @@ if is_placeholder "$master"; then
 fi
 
 web_host="$(public_origin "$site_hostname" "$https" "$http_port" "$https_port")"
+image_tag="$(packaged_image_tag)"
 setup_log "web_host: $web_host"
 setup_log "secrets: generated (not logged)"
 
@@ -420,6 +436,7 @@ setup_log "secrets: generated (not logged)"
   fi
   echo "http_port: $http_port"
   echo "https_port: $https_port"
+  echo "image_tag: $(yml_escape "$image_tag")"
   echo "env:"
   echo "  JWT_SECRET: $(yml_escape "$jwt")"
   echo "  SECRET_MASTER_KEY: $(yml_escape "$master")"

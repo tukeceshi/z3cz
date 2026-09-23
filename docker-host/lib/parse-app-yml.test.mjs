@@ -194,7 +194,7 @@ test("renderCaddyfile http-only listens on :80", () => {
   });
   assert.match(file, /:80 \{/);
   assert.match(file, /handle_path \/api\/\*/);
-  assert.match(file, /reverse_proxy api:3102/);
+  assert.match(file, /reverse_proxy api:3001/);
   assert.match(file, /reverse_proxy app:80/);
 });
 
@@ -223,6 +223,7 @@ test("renderCompose is host project without smtp", () => {
   assert.match(yaml, /WEB_HOST: "http:\/\/localhost:8080"/);
   assert.match(yaml, /app\.static\.conf/);
   assert.match(yaml, /RUN_DB_MIGRATE: "false"/);
+  assert.match(yaml, /EMAIL_DOMAIN: \$\{EMAIL_DOMAIN:-mail\.dafthunk\.com\}/);
   assert.match(yaml, /APP_VERSION: "latest"/);
   assert.match(yaml, /start_period: 90s/);
   assert.match(yaml, /retries: 12/);

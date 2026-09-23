@@ -118,7 +118,7 @@ export function renderCaddyfile(config) {
 	respond @maintenance "系统正在更新，请稍后刷新。" 503
 
 	handle_path /api/* {
-		reverse_proxy api:3102
+		reverse_proxy api:3001
 	}
 	handle {
 		reverse_proxy app:80 {
@@ -270,7 +270,7 @@ services:
       NODE_ENV: production
       RUNTIME: docker
       HOST: 0.0.0.0
-      PORT: "3102"
+      PORT: "3001"
       DATABASE_URL: postgresql://postgres:postgres@postgres:5432/postgres
       LOCAL_STORAGE_PATH: /app/data/storage
       API_BOOT_CACHE_DIR: /app/data/storage/cache
@@ -282,6 +282,9 @@ services:
       WEBSITE_URL: "${origin}"
       JWT_SECRET: \${JWT_SECRET}
       SECRET_MASTER_KEY: \${SECRET_MASTER_KEY}
+      EMAIL_DOMAIN: \${EMAIL_DOMAIN:-mail.dafthunk.com}
+      CLOUDFLARE_ACCOUNT_ID: \${CLOUDFLARE_ACCOUNT_ID:-}
+      CLOUDFLARE_API_TOKEN: \${CLOUDFLARE_API_TOKEN:-}
       CLOUDFLARE_ENV: production${updaterEnv}
     volumes:
       - ./shared/storage:/app/data/storage${updaterVolume}${sourceVolume}
@@ -290,7 +293,7 @@ services:
       test:
         [
           "CMD-SHELL",
-          ${JSON.stringify("node -e \"fetch('http://127.0.0.1:3102/health').then((r)=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\"")},
+          ${JSON.stringify("node -e \"fetch('http://127.0.0.1:3001/health').then((r)=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\"")},
         ]
       interval: 10s
       timeout: 5s
@@ -337,6 +340,9 @@ export function renderEnvFile(config) {
     `HTTP_PORT=${config.http_port}`,
     `HTTPS_PORT=${config.https_port}`,
     `IMAGE_TAG=${dockerImageTag(config.image_tag)}`,
+    `EMAIL_DOMAIN=${config.env.EMAIL_DOMAIN || "mail.dafthunk.com"}`,
+    `CLOUDFLARE_ACCOUNT_ID=${config.env.CLOUDFLARE_ACCOUNT_ID || ""}`,
+    `CLOUDFLARE_API_TOKEN=${config.env.CLOUDFLARE_API_TOKEN || ""}`,
   ];
   if (config.env.UPDATER_TOKEN?.trim()) {
     lines.push(`UPDATER_TOKEN=${config.env.UPDATER_TOKEN.trim()}`);

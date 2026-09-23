@@ -16,25 +16,18 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v5
 
-      - name: Set up Bun
-        uses: oven-sh/setup-bun@v2
+      - uses: pnpm/action-setup@v4
         with:
-          bun-version: "1.2.21"
+          run_install: false
 
-      - name: Login to Docker Hub
-        uses: docker/login-action@v4
+      - uses: actions/setup-node@v5
         with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
+          node-version: 22.12.0
+          cache: pnpm
 
-      - uses: docker/setup-qemu-action@v3
-      - uses: docker/setup-buildx-action@v3
+      - run: pnpm install --frozen-lockfile
 
-      - name: Build, push, pack host files
-        env:
-          DAFTHUNK_PUSH_IMAGES: "1"
-          DAFTHUNK_API_IMAGE: tukeceshi/z3cz-api:latest
-          DAFTHUNK_APP_IMAGE: tukeceshi/z3cz-app:latest
+      - name: Build native server archives
         run: bash scripts/host/pack-deploy.sh
 
       - name: Publish
@@ -43,7 +36,10 @@ jobs:
           tag_name: self-host
           name: Self-host
           body: Deploy pack from ${{ github.sha }}
-          files: z3cz-deploy.tar.gz
+          files: |
+            dist/native/z3cz-server-linux-amd64.tar.gz
+            dist/native/z3cz-server-linux-arm64.tar.gz
+            dist/native/SHA256SUMS
           fail_on_unmatched_files: true
-          make_latest: true
+          make_latest: false
           target_commitish: ${{ github.sha }}

@@ -531,7 +531,7 @@ export class UpdateManager {
           "api",
           "node",
           "-e",
-          "fetch('http://127.0.0.1:3102/health').then(async (r)=>{const j=await r.json(); if(!r.ok) process.exit(1); process.stdout.write(JSON.stringify(j));}).catch(()=>process.exit(1))",
+          "fetch('http://127.0.0.1:3001/health').then(async (r)=>{const j=await r.json(); if(!r.ok) process.exit(1); process.stdout.write(JSON.stringify(j));}).catch(()=>process.exit(1))",
         ]);
         const body = JSON.parse(result.stdout || "{}");
         const expected = displayVersion(targetVersion);

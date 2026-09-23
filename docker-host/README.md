@@ -7,10 +7,10 @@
 ## 安装（一条命令）
 
 ```bash
-curl -fsSL "https://raw.githubusercontent.com/tukeceshi/z3cz/main/bootstrap-install" | sudo bash
+installer="$(mktemp)" && curl -fL --connect-timeout 20 --max-time 120 "https://raw.githubusercontent.com/tukeceshi/z3cz/main/bootstrap-install" -o "$installer" && sudo bash "$installer"
 ```
 
-安装器会优先检查 Docker 与 Docker Compose。Linux 上缺失 Docker 时会自动安装；Windows 用户请先安装并启动 Docker Desktop、启用 WSL2 Integration，再在 Ubuntu WSL 中执行同一条命令。请将安装目录放在 WSL Linux 文件系统中，而不是 `/mnt/c`。
+公开的一键安装已经改为原生 Linux 部署，不再安装 Docker、拉取镜像或使用本目录的 Compose launcher。它会安装 PostgreSQL、Caddy 和 systemd API 服务；当前支持 Ubuntu 22.04/24.04/26.04、Debian 12。
 
 ### Windows（WSL2）
 
@@ -32,9 +32,9 @@ curl -fsSL "https://raw.githubusercontent.com/tukeceshi/z3cz/main/bootstrap-inst
 
 安装脚本会验证 Docker Desktop 是否已通过 WSL 可用；检查失败时不会下载部署包或创建半成品容器。
 
-域名为可选输入：填写后由 Caddy 自动申请证书；直接回车会以 HTTP 初始化模式启动。之后通过 Admin 后台的“域名与 HTTPS”绑定、更换域名并管理证书。HTTPS 自动续期由 Caddy 完成。
+域名为可选输入：填写后由宿主机 Caddy 自动申请并续期证书；直接回车会以 HTTP 初始化模式启动。
 
-渲染配置用 Docker 跑 Node 镜像，系统不装 Node。bootstrap 会配 Docker 镜像加速；连不上 Docker Hub 时走加速源。api / app 镜像在 Docker Hub，更新时只拉有变化的层。
+本目录保留给 Docker 本地开发和旧安装迁移，不再参与新的一键部署。原生部署的脚本位于 `scripts/host/`，运行文件位于 `/opt/z3cz`，持久数据位于 `/var/lib/z3cz`。
 
 跳过预申请：`sudo bash .../https-setup.sh --caddy-only`（Caddy 在 deploy 后自行申请，可能遇 LE 限流）。
 

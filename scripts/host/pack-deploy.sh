@@ -1,63 +1,44 @@
 #!/usr/bin/env bash
-# Publish a lightweight deployment pack that references prebuilt API/App images.
-#   DAFTHUNK_PUSH_IMAGES=1 bash scripts/host/pack-deploy.sh [outfile]
+# Build self-contained native Linux release archives. No container images.
 set -euo pipefail
-
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-OUT="${1:-$ROOT/z3cz-deploy.tar.gz}"
-API_IMAGE="${DAFTHUNK_API_IMAGE:-tukeceshi/z3cz-api:latest}"
-APP_IMAGE="${DAFTHUNK_APP_IMAGE:-tukeceshi/z3cz-app:latest}"
-VERSION_TAG=""
-if [[ "${DAFTHUNK_RELEASE:-}" == "1" && -f "$ROOT/VERSION" ]]; then
-  VERSION_TAG="$(tr -d 'v \r\n' < "$ROOT/VERSION")"
-  API_IMAGE="tukeceshi/z3cz-api:${VERSION_TAG}"
-  APP_IMAGE="tukeceshi/z3cz-app:${VERSION_TAG}"
-fi
-
+OUT_DIR="${DAFTHUNK_OUT_DIR:-$ROOT/dist/native}"
+NODE_VERSION="${NODE_VERSION:-22.12.0}"
 log() { printf '==> %s\n' "$*"; }
+die() { printf 'ERROR: %s\n' "$*" >&2; exit 1; }
+command -v pnpm >/dev/null 2>&1 || die "pnpm is required"
+command -v curl >/dev/null 2>&1 || die "curl is required"
 
-copy_host_files() {
-  local stage="$1"
-  mkdir -p \
-    "$stage/scripts/host/updater" \
-    "$stage/docker-host/lib" \
-    "$stage/docker-host/samples" \
-    "$stage/docker/nginx" \
-    "$stage/dist"
+log "Build frontend"
+(cd "$ROOT" && VITE_API_HOST=/api VITE_WS_VIA_PROXY=1 pnpm --filter @dafthunk/app build:docker-prod)
+mkdir -p "$OUT_DIR"
 
-  cp "$ROOT/scripts/host/"*.sh "$stage/scripts/host/"
-  cp "$ROOT/scripts/host/updater/"*.mjs "$stage/scripts/host/updater/"
-  mkdir -p "$stage/packages/utils/src"
-  cp "$ROOT/packages/utils/src/release-version.mjs" "$stage/packages/utils/src/"
-  rm -f "$stage/scripts/host/updater/"*.test.mjs
-  cp "$ROOT/docker-host/launcher" "$stage/docker-host/launcher"
-  cp "$ROOT/docker-host/launcher.mjs" "$stage/docker-host/launcher.mjs"
-  cp "$ROOT/docker-host/dafthunk-setup" "$stage/docker-host/dafthunk-setup"
-  cp "$ROOT/docker-host/dafthunk-setup.mjs" "$stage/docker-host/dafthunk-setup.mjs"
-  cp "$ROOT/docker-host/samples/standalone.yml" "$stage/docker-host/samples/standalone.yml"
-  cp "$ROOT/docker-host/lib/"*.mjs "$stage/docker-host/lib/"
-  rm -f "$stage/docker-host/lib/"*.test.mjs
-  cp "$ROOT/docker/nginx/app.static.conf" "$stage/docker/nginx/app.static.conf"
-  cp "$ROOT/dist/z3cz-host-updater-linux-amd64" "$stage/dist/"
-  cp "$ROOT/dist/z3cz-host-updater-linux-arm64" "$stage/dist/"
-  cp "$ROOT/dist/SHA256SUMS" "$stage/dist/"
-  chmod +x "$stage/scripts/host/"*.sh "$stage/docker-host/launcher" "$stage/docker-host/dafthunk-setup" \
-    "$stage/dist/z3cz-host-updater-linux-amd64" "$stage/dist/z3cz-host-updater-linux-arm64"
-  cp "$ROOT/VERSION" "$stage/VERSION"
-  cp "$ROOT/CHANGELOG.md" "$stage/CHANGELOG.md"
-  if git -C "$ROOT" rev-parse HEAD >/dev/null 2>&1; then
-    git -C "$ROOT" rev-parse HEAD >"$stage/DEPLOY_REVISION"
-  else
-    date -u +"%Y-%m-%dT%H:%M:%SZ" >"$stage/DEPLOY_REVISION"
-  fi
-  printf 'API_IMAGE=%s\nAPP_IMAGE=%s\n' "$API_IMAGE" "$APP_IMAGE" \
-    >"$stage/docker-host/packaged-images.env"
+build_arch() {
+  local arch="$1" node_arch="$2" stage node_tar asset
+  stage="$(mktemp -d)"
+  node_tar="$(mktemp --suffix=.tar.xz)"
+  asset="z3cz-server-linux-${arch}.tar.gz"
+  log "Package ${asset}"
+  mkdir -p "$stage/scripts/host" "$stage/app" "$stage/node" "$stage/api/apps"
+  cp "$ROOT/package.json" "$ROOT/pnpm-lock.yaml" "$ROOT/pnpm-workspace.yaml" "$ROOT/tsconfig.json" "$stage/api/"
+  cp -R "$ROOT/apps/api" "$stage/api/apps/api"
+  cp -R "$ROOT/packages" "$stage/api/packages"
+  (cd "$stage/api" && pnpm install --prod --frozen-lockfile)
+  cp -R "$ROOT/apps/app/dist/." "$stage/app/"
+  cp "$ROOT/scripts/host/bootstrap.sh" "$ROOT/scripts/host/configure.sh" \
+    "$ROOT/scripts/host/deploy.sh" "$ROOT/scripts/host/db-migrate.sh" \
+    "$ROOT/scripts/host/render-caddy.sh" "$ROOT/scripts/host/update.sh" \
+    "$stage/scripts/host/"
+  cp "$ROOT/VERSION" "$ROOT/CHANGELOG.md" "$ROOT/update-policy.json" "$stage/"
+  curl -fL --retry 3 "https://nodejs.org/dist/v${NODE_VERSION}/node-v${NODE_VERSION}-linux-${node_arch}.tar.xz" -o "$node_tar"
+  tar -xJf "$node_tar" --strip-components=1 -C "$stage/node"
+  chmod +x "$stage/scripts/host/"*.sh "$stage/node/bin/node"
+  tar -czf "$OUT_DIR/$asset" -C "$stage" .
+  rm -rf "$stage"
+  rm -f "$node_tar"
 }
 
-bash "${ROOT}/scripts/host/compile-updater.sh"
-STAGE="$(mktemp -d)"
-trap 'rm -rf "$STAGE"' EXIT
-copy_host_files "$STAGE"
-log "Writing ${OUT}"
-tar -czf "$OUT" -C "$STAGE" .
-log "Done"
+build_arch amd64 x64
+build_arch arm64 arm64
+(cd "$OUT_DIR" && sha256sum z3cz-server-linux-amd64.tar.gz z3cz-server-linux-arm64.tar.gz >SHA256SUMS)
+log "Native release archives written to $OUT_DIR"

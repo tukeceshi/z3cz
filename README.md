@@ -42,92 +42,40 @@
 #### 安装（一条命令）
 
 ```bash
-curl -fsSL "https://raw.githubusercontent.com/tukeceshi/z3cz/main/bootstrap-install" | sudo bash
+installer="$(mktemp)" && curl -fL --connect-timeout 20 --max-time 120 "https://raw.githubusercontent.com/tukeceshi/z3cz/main/bootstrap-install" -o "$installer" && sudo bash "$installer"
 ```
 
-安装器首先检查 Docker 与 Docker Compose；普通 Linux 缺失 Docker 时会安装，WSL 中不会安装 Docker，而是要求先在 Windows 安装并启动 Docker Desktop，并启用当前发行版的 WSL Integration。
+安装器不使用 Docker 或 Docker 镜像。它会安装宿主机 PostgreSQL、Caddy，下载经过 SHA-256 校验的原生发布包，并通过 systemd 启动 API。当前支持 Ubuntu 22.04/24.04/26.04、Debian 12，以及 amd64/arm64。
 
 安装期间可输入域名，也可直接回车跳过。输入域名时，Caddy 自动申请 HTTPS 证书；回车时系统以 `http://服务器公网IP` 进入初始化模式。之后可在 Admin 后台的“域名与 HTTPS”中绑定或更换域名、查看证书状态并重新签发。HTTP 初始化模式仅用于完成管理配置，正式业务建议在 HTTPS 启用后使用。
 
-#### Windows（Docker Desktop + WSL2）
-
-Windows 不使用 PowerShell 原生部署。请先自行安装并启动 Docker Desktop，然后在 **Settings → Resources → WSL Integration** 中为 Ubuntu 启用集成；Docker Desktop 必须处于 Linux containers 模式。
-
-在 PowerShell 安装 WSL 与 Ubuntu（已安装可跳过）：
-
-```powershell
-wsl --install -d Ubuntu
-```
-
-重启并打开 Ubuntu 后，在 WSL 的 Linux 文件系统中执行同一条安装命令：
-
-- 在开始菜单搜索并打开 **Ubuntu**；或
-- 打开 PowerShell，执行 `wsl -d Ubuntu`。
-
-```bash
-curl -fsSL "https://raw.githubusercontent.com/tukeceshi/z3cz/main/bootstrap-install" | sudo bash
-```
-
-部署数据默认写入 `/var/dafthunk`。请勿在 `/mnt/c/...` 等 Windows 挂载路径中部署或保存运行数据，以避免 Docker 文件权限和 I/O 问题。若脚本提示 Docker Desktop 不可用，请确认 Docker Desktop 已启动且已为当前 Ubuntu 发行版启用 WSL Integration。
-
-首次安装下载轻量部署包，再拉取发布时已构建好的版本化 API/App 镜像；服务器不构建应用源码。运行中的容器始终使用已完成的镜像。
+程序安装到 `/opt/z3cz/releases/<版本>`，`/opt/z3cz/current` 指向当前版本；配置位于 `/etc/z3cz`，数据库备份和上传文件位于 `/var/lib/z3cz`。服务器不会拉取源码或现场执行前端构建。
 
 #### 更新
 
-管理后台 **系统设置 → 系统更新**：检查正式版本、一键升级、失败回退。
+当前使用宿主机更新命令升级正式版本：
 
-`deploy.sh` 自动安装宿主机更新器。旧版 `SOURCE_REVISION` 源码部署包不能用于新的首装流程；请使用当前发布的镜像部署包。
+```bash
+sudo bash /opt/z3cz/current/scripts/host/update.sh
+sudo bash /opt/z3cz/current/scripts/host/update.sh v1.0.8
+```
 
-普通更新：增量获取源码、复用缓存构建镜像 → 校验近期备份 → 短暂暂停访问、切换应用 → 验证并恢复访问。没有可用的近期备份时会创建一份。数据库文件一致时跳过迁移。准备期间原服务继续运行。
+更新器会下载并校验原生发布包、创建 PostgreSQL 逻辑备份、执行迁移、原子切换版本并做健康检查。应用启动失败会切回旧版本；数据库发生不兼容迁移时保持维护模式并给出明确的恢复命令。
 
-数据库更新或无法确认兼容性的旧部署：准备完成后进入维护模式 → 按版本要求创建或复用备份 → 迁移 → 切换并验证。迁移未完成或新旧数据库不兼容时保持维护状态，由管理员明确执行备份恢复；已声明兼容的迁移可以只回退应用镜像并保留数据。
+更新顺序为：下载与校验发布包 → 创建数据库备份 → 进入维护模式 → 安装并迁移 → 原子切换版本 → 健康检查。应用启动失败时自动切回上一版程序；为避免误伤数据，数据库恢复需要管理员执行脚本输出的 `pg_restore` 命令。
 
-关闭网页不影响更新；短暂断线会自动重连。更新器重启后，准备阶段中断可重试，切换阶段中断会提示使用回退恢复，不会自动重复执行迁移。
-
-基础环境由 `docker/Dockerfile.source` 决定，仅该文件变化时发布新的 `tukeceshi/z3cz-runtime` 镜像。`docker/Dockerfile.update` 把应用代码装入本机镜像。更新器只清理属于当前安装、且不再用于运行或回退的旧镜像；备份与用户文件不自动删除。
+发布流程为 amd64、arm64 分别生成自包含安装包，内含固定版本 Node.js、API 生产依赖和前端静态资源，不再构建或推送 Docker 镜像。
 
 发布前维护根目录 `update-policy.json`：`minimumVersion` 限制可直接升级的最低版本；`requiresBackup` 要求本次创建新备份；`databaseChanges` 强制执行迁移；`minimumRollbackVersion` 和 `rollbackCompatible` 共同声明旧代码能否继续使用迁移后的数据。更新器仍会比较新旧数据库文件，历史不明确时按需要新备份、需要人工恢复处理。发布流程会校验该文件和更新协议。
 
-启用本次优化需先通过新版部署包安装宿主机更新器；仅更新应用代码不会替换已经安装的更新器二进制。
+旧 Docker 安装不能直接覆盖升级为原生部署。迁移时应先使用 `pg_dump` 导出数据库，并备份上传目录，再在新原生安装中恢复；确认新服务正常后再停用旧容器。
 
-命令行备用：
-
-```bash
-sudo bash /var/dafthunk/scripts/host/update.sh
-sudo bash /var/dafthunk/scripts/host/update.sh v1.0.7
-
-# 重置安装：清 DB 与上传，保留域名配置与证书
-sudo bash /var/dafthunk/scripts/host/update.sh --reset
-```
-
-发布需要配置 GitHub Secrets `DOCKERHUB_USERNAME`、`DOCKERHUB_TOKEN`，并允许推送 `tukeceshi/z3cz-runtime`。正常版本发布复用已有基础环境。服务器须能访问 GitHub、依赖仓库和首次安装所需的镜像源。后台系统更新可选择 GitHub 或 Gitee 拉取源码；检查新版本仍使用 GitHub。
-
-#### HTTPS 模式
+#### HTTPS
 
 自托管生产环境 **必须 HTTPS**：Cookie 与浏览器 API（如 `crypto.randomUUID`）仅在安全上下文中可用。请勿使用 HTTP 访问或 `--http` 模式。签发前确认域名已解析到 **正在申请证书的这台机器**（见上方安装步骤）。
 
 
-| 模式  | `tls`      | 说明                                                  |
-| --- | ---------- | --------------------------------------------------- |
-| 自动  | `auto`     | configure 默认；**https-setup** 会预申请并改为 `fallback`（推荐） |
-| 备用  | `fallback` | acme.sh 证书文件；续期重载 Caddy                              |
-| 手动  | `manual`   | 自行上传文件，不自动续期                                        |
-
-
-**文件路径**（`fallback` / `manual` 相同）：
-
-```
-/var/dafthunk/docker-host/shared/caddy/certs/<域名>/fullchain.pem
-/var/dafthunk/docker-host/shared/caddy/certs/<域名>/privkey.pem
-```
-
-#### 手动上传证书（按需，不是必要步骤）
-
-1. 上传上述两个文件（覆盖即可）
-2. 编辑 `docker-host/containers/app.yml`：`tls: manual`
-3. 生效：`sudo bash /var/dafthunk/scripts/host/https-reload.sh`
-
-切回自动：`sudo bash /var/dafthunk/scripts/host/https-try-auto.sh`
+输入域名后由宿主机 Caddy 自动申请并续期证书。域名必须提前解析到当前服务器，并开放 TCP 80、443 端口。Caddy 配置位于 `/etc/caddy/Caddyfile`。
 
 ---
 
@@ -207,7 +155,7 @@ docker compose up -d --build --wait
 
 ## Docker 命令总览
 
-开发与部署可同时运行：开发入口为 `http://localhost:3000`，部署入口为 `http://localhost:8080`。两套 API 都只在各自 Docker 网络内的 `api:3001` 提供服务，不发布宿主机端口。
+开发与部署可同时运行：开发入口为 `http://localhost:3000`，命令部署入口为 `http://localhost:8080`。命令部署与一键部署均由 Caddy 转发 `/api` 到内部的 `api:3001`。
 
 | 场景 | 命令 |
 | --- | --- |
@@ -225,7 +173,7 @@ docker compose up -d --build --wait
 
 部署首次启动时，API 会在持久 Docker 卷 `z3cz-prod_dafthunk_prod_secrets` 中自动生成密钥；后续启动会复用。部署环境也不要使用 `down -v`，否则密钥、数据库和上传文件都会被删除。
 
-更新代码后，开发或部署均重新执行对应的“构建并启动”命令即可。`docker-compose.prod.yml` 仍为旧版过渡方案；新的公开自托管部署请使用上文自托管流程。
+更新代码后，Docker 本地开发或命令部署重新执行对应的“构建并启动”命令即可；公开的一键自托管使用上文的原生发布包流程。
 
 ---
 

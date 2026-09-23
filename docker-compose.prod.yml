@@ -1,9 +1,4 @@
-# DEPRECATED: 请改用 docker-host（单域名 Caddy，无 SMTP）。
-#   node docker-host/dafthunk-setup.mjs
-#   node docker-host/launcher.mjs rebuild
-#
-# 本文件保留作过渡；app 镜像默认为静态-only，故此处挂载旧版 nginx 反代 conf。
-#
+# 源码命令部署：Postgres + API + App + Caddy。
 # 启动：docker compose -f docker-compose.prod.yml up -d --build --wait
 
 name: z3cz-prod
@@ -88,10 +83,18 @@ services:
       api:
         condition: service_healthy
     volumes:
-      # Legacy direct :8080 access — proxy /api inside nginx (host stack uses Caddy instead)
-      - ./docker/nginx/app.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./docker/nginx/app.static.conf:/etc/nginx/conf.d/default.conf:ro
+    restart: unless-stopped
+
+  caddy:
+    image: caddy:2.9-alpine
+    depends_on:
+      - app
+      - api
     ports:
       - "${APP_PORT:-8080}:80"
+    volumes:
+      - ./docker/Caddyfile.prod:/etc/caddy/Caddyfile:ro
     restart: unless-stopped
 
 volumes:
