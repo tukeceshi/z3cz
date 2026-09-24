@@ -61,5 +61,9 @@ jobs:
       - name: Validate deployment policy
         run: pnpm run test:host
 
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.2.23
+
       - name: Build and inspect deployment release
         run: bash scripts/host/pack-deploy.sh
