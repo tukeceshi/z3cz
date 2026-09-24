@@ -45,7 +45,9 @@ rm -f "$WRITE_PROBE"
 mv "$STAGED" "$TARGET"
 TARGET_CREATED=1
 install -m 0755 "$TARGET/dist/z3cz-host-updater-linux-$UPDATER_ARCH" /usr/local/bin/z3cz-update-runner
+log "正在安装生产依赖"
 install_prod_dependencies "$TARGET"
+log "生产依赖已安装"
 
 BACKUP="$STATE_DIR/backups/z3cz-before-${VERSION#v}-$(date +%Y%m%d%H%M%S).dump"
 log "进入维护模式并备份数据库"; touch "$STATE_DIR/maintenance/enabled"
@@ -60,11 +62,36 @@ fi
 
 switch_link previous "$CURRENT"; switch_link current "$TARGET"
 log "切换并验证新版本"
+ROLLBACK_STATE_DIR="${Z3CZ_UPDATER_STATE_DIR:-/var/lib/z3cz/update/runner}"
+write_release_rollback() {
+  mkdir -p "$ROLLBACK_STATE_DIR"
+  local sum bytes tmp
+  sum="$(awk 'NR==1 { print $1; exit }' "$BACKUP.sha256")"
+  [[ "$sum" =~ ^[a-f0-9]{64}$ ]] || die "备份校验文件无效"
+  bytes="$(wc -c < "$BACKUP" | tr -d '[:space:]')"
+  tmp="$ROLLBACK_STATE_DIR/release-rollback.json.tmp"
+  cat >"$tmp" <<EOF
+{
+  "fromVersion": "$CURRENT_VERSION",
+  "previous": "$CURRENT",
+  "backupPath": "$BACKUP",
+  "backupChecksum": "sha256:$sum",
+  "backupBytes": $bytes,
+  "createdAt": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+  "rollbackCompatible": $([[ "$ROLLBACK_COMPATIBLE" == true ]] && printf true || printf false)
+}
+EOF
+  mv "$tmp" "$ROLLBACK_STATE_DIR/release-rollback.json"
+  chmod 600 "$ROLLBACK_STATE_DIR/release-rollback.json"
+}
+
 if compose "$TARGET" up -d --force-recreate --remove-orphans --wait; then
+  write_release_rollback
   rm -f "$STATE_DIR/maintenance/enabled"; log "已更新到 $VERSION；备份：$BACKUP"; exit 0
 fi
 
 switch_link current "$CURRENT"
+rm -f "$ROLLBACK_STATE_DIR/release-rollback.json"
 compose "$CURRENT" up -d --force-recreate --remove-orphans || true
 if [[ "$ROLLBACK_COMPATIBLE" == true ]]; then
   rm -f "$STATE_DIR/maintenance/enabled"

@@ -32,6 +32,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
+import { groupSystemUpdateLogs } from "@/pages/admin/system-update-log-groups";
 import {
   checkSystemUpdate,
   getSystemUpdateStatus,
@@ -643,25 +644,34 @@ export function AdminSystemUpdatePage() {
                   </p>
                 ) : null}
                 {(status?.operation.logs || []).length ? (
-                  <ol className="space-y-3">
-                    {status?.operation.logs.map((entry, index) => (
-                      <li
-                        key={`${entry.at}-${index}`}
-                        className="grid grid-cols-[1fr_auto] gap-3 border-l-2 border-muted pl-3 text-sm"
-                      >
-                        <div>
-                          <p className="font-medium">
-                            {phaseLabel(entry.phase)}
-                          </p>
-                          <p className="text-muted-foreground">
-                            {entry.message}
-                          </p>
-                        </div>
-                        <time className="text-xs text-muted-foreground">
-                          {formatDate(entry.at)}
-                        </time>
-                      </li>
-                    ))}
+                  <ol className="space-y-4">
+                    {groupSystemUpdateLogs(status?.operation.logs ?? []).map(
+                      (group, index) => (
+                        <li
+                          key={`${group.phase}-${index}`}
+                          className="border-l-2 border-muted pl-3 text-sm"
+                        >
+                          <div className="grid grid-cols-[1fr_auto] gap-3">
+                            <p className="font-medium">
+                              {phaseLabel(group.phase)}
+                            </p>
+                            <time className="text-xs text-muted-foreground">
+                              {formatDate(group.at)}
+                            </time>
+                          </div>
+                          <ul className="mt-1 space-y-1">
+                            {group.messages.map((message, messageIndex) => (
+                              <li
+                                key={`${group.at}-${messageIndex}`}
+                                className="text-muted-foreground"
+                              >
+                                {message}
+                              </li>
+                            ))}
+                          </ul>
+                        </li>
+                      )
+                    )}
                   </ol>
                 ) : (
                   <p className="text-sm text-muted-foreground">

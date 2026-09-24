@@ -15,7 +15,7 @@ install_prod_dependencies() {
   docker run --rm \
     -v "$release/api:/app" -v "$CACHE_DIR:/pnpm/store" -w /app \
     node:22.12.0-bookworm-slim@sha256:35531c52ce27b6575d69755c73e65d4468dba93a25644eed56dc12879cae9213 \
-    sh -ec 'npm install --global pnpm@10.3.0; pnpm config set store-dir /pnpm/store; pnpm install --prod --frozen-lockfile --config.auto-install-peers=false'
+    sh -ec 'npm install --global pnpm@10.3.0 --silent; pnpm config set store-dir /pnpm/store; pnpm install --prod --frozen-lockfile --config.auto-install-peers=false --reporter=silent'
 }
 switch_link() { local name="$1" target="$2"; ln -sfn "$target" "$INSTALL_DIR/$name.next"; mv -Tf "$INSTALL_DIR/$name.next" "$INSTALL_DIR/$name"; }
 compose_database_service() {

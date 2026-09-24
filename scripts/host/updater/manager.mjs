@@ -22,6 +22,12 @@ import {
   storageDir,
 } from "./paths.mjs";
 import {
+  clearReleaseRollback,
+  describeReleaseRollback,
+  isReleaseInstall,
+} from "./release-rollback.mjs";
+import { isUpdateLogNoise } from "./update-log.mjs";
+import {
   compareVersions,
   displayVersion,
   dockerImageTag,
@@ -85,6 +91,7 @@ export class UpdateManager {
    */
   constructor(options = {}) {
     this.prepareSource = options.prepareSource || prepareSourceRelease;
+    this.progressLogOpen = false;
     this.createBackup = options.createBackup || createBackup;
     this.restoreBackup = options.restoreBackup || restoreBackup;
     this.reusableBackup = options.reusableBackup || reusableBackup;
@@ -118,6 +125,12 @@ export class UpdateManager {
     this.sleep =
       options.sleep ||
       ((ms) => new Promise((resolve) => setTimeout(resolve, ms)));
+    this.spawn = options.spawn || spawn;
+    this.releaseBackupDir =
+      options.releaseBackupDir ||
+      (process.env.Z3CZ_STATE_DIR
+        ? path.join(process.env.Z3CZ_STATE_DIR, "backups")
+        : "/var/lib/z3cz/backups");
     fs.mkdirSync(this.stateDir, { recursive: true });
     fs.mkdirSync(this.backupDir, { recursive: true });
     this.statePath = path.join(this.stateDir, "state.json");
@@ -177,10 +190,28 @@ export class UpdateManager {
   }
 
   appendLog(phase, message) {
+    this.progressLogOpen = false;
     this.state.operation.logs = [
       ...this.state.operation.logs,
       { at: new Date().toISOString(), phase, message },
     ].slice(-80);
+  }
+
+  replaceProgress(phase, message) {
+    const text = String(message).slice(0, 1000);
+    if (!text) return;
+    const logs = this.state.operation.logs;
+    const last = logs.at(-1);
+    if (this.progressLogOpen && last?.phase === phase) {
+      this.state.operation.logs = [
+        ...logs.slice(0, -1),
+        { at: new Date().toISOString(), phase, message: text },
+      ];
+    } else {
+      this.appendLog(phase, text);
+      this.progressLogOpen = true;
+    }
+    this.saveState();
   }
 
   currentVersion() {
@@ -227,7 +258,7 @@ export class UpdateManager {
       "scripts",
       "update.sh"
     );
-    const child = spawn(
+    const child = this.spawn(
       "bash",
       [script, "--prepared", archive, checksum, targetVersion],
       {
@@ -236,8 +267,11 @@ export class UpdateManager {
       }
     );
     const record = (chunk) => {
-      for (const line of String(chunk).split(/\r?\n/).filter(Boolean)) {
-        const lower = line.toLowerCase();
+      let changed = false;
+      for (const line of String(chunk).split(/\r?\n/)) {
+        const text = line.trim();
+        if (!text || isUpdateLogNoise(text)) continue;
+        const lower = text.toLowerCase();
         const phase = lower.includes("自动回退")
           ? "rolled_back"
           : lower.includes("人工") || lower.includes("维护模式已保留")
@@ -252,9 +286,10 @@ export class UpdateManager {
                     ? "verifying"
                     : this.state.operation.phase;
         this.state.operation.phase = phase;
-        this.appendLog(phase, line.slice(0, 1000));
+        this.appendLog(phase, text.slice(0, 1000));
+        changed = true;
       }
-      this.saveState();
+      if (changed) this.saveState();
     };
     child.stdout.on("data", record);
     child.stderr.on("data", record);
@@ -300,6 +335,7 @@ export class UpdateManager {
     const updateAvailable = Boolean(
       latest && compareVersions(currentVersion, latest.version) < 0
     );
+    const rollback = this.releaseRollbackFields();
     return {
       supported: true,
       connected: true,
@@ -314,28 +350,60 @@ export class UpdateManager {
         !Number.isFinite(Date.parse(this.state.checkedAt)) ||
         Date.now() - Date.parse(this.state.checkedAt) > 24 * 60 * 60_000,
       checks: this.checksFromState(),
-      lastBackup: this.state.lastBackup,
-      rollbackVersion:
-        (this.state.pendingUpdate && !this.state.pendingUpdate.fresh
-          ? this.state.pendingUpdate.version
-          : this.state.rollbackVersion) || undefined,
-      rollbackRequiresRestore: this.state.pendingUpdate
-        ? Boolean(
-            this.state.pendingUpdate.migrationStarted &&
-              (!this.state.pendingUpdate.migrationCompleted ||
-                !this.state.pendingUpdate.rollbackCompatible)
-          )
-        : this.state.rollbackRequiresRestore !== false,
-      rollbackBackup:
-        this.state.pendingUpdate?.backup ||
-        this.state.rollbackBackup ||
-        undefined,
+      lastBackup: rollback.lastBackup,
+      rollbackVersion: rollback.rollbackVersion,
+      rollbackRequiresRestore: rollback.rollbackRequiresRestore,
+      rollbackBackup: rollback.rollbackBackup,
       operation: this.state.operation,
     };
   }
 
   checksFromState() {
     return this.state.checks || [];
+  }
+
+  releaseRollbackFields() {
+    const pendingVersion =
+      this.state.pendingUpdate && !this.state.pendingUpdate.fresh
+        ? this.state.pendingUpdate.version
+        : "";
+    const pendingRestore = this.state.pendingUpdate
+      ? Boolean(
+          this.state.pendingUpdate.migrationStarted &&
+            (!this.state.pendingUpdate.migrationCompleted ||
+              !this.state.pendingUpdate.rollbackCompatible)
+        )
+      : null;
+    if (pendingVersion || pendingRestore !== null) {
+      return {
+        lastBackup: this.state.lastBackup,
+        rollbackVersion: pendingVersion || this.state.rollbackVersion || undefined,
+        rollbackRequiresRestore: pendingRestore === true,
+        rollbackBackup:
+          this.state.pendingUpdate?.backup ||
+          this.state.rollbackBackup ||
+          undefined,
+      };
+    }
+    if (isReleaseInstall(this.installDir)) {
+      const release = describeReleaseRollback(
+        this.installDir,
+        this.stateDir,
+        this.releaseBackupDir
+      );
+      return {
+        lastBackup: release?.backup,
+        rollbackVersion: release?.version,
+        rollbackRequiresRestore: release?.requiresRestore === true,
+        rollbackBackup: release?.requiresRestore ? release.backup : undefined,
+      };
+    }
+    return {
+      lastBackup: this.state.lastBackup,
+      rollbackVersion: this.state.rollbackVersion || undefined,
+      rollbackRequiresRestore: this.state.rollbackRequiresRestore !== false,
+      rollbackBackup: this.state.rollbackBackup || undefined,
+    };
   }
 
   async collectChecks() {
@@ -521,7 +589,25 @@ export class UpdateManager {
         status: this.snapshot(),
       });
     }
-    if (
+    const releaseInstall =
+      !this.state.pendingUpdate && isReleaseInstall(this.installDir);
+    const release = releaseInstall
+      ? describeReleaseRollback(
+          this.installDir,
+          this.stateDir,
+          this.releaseBackupDir
+        )
+      : null;
+    if (releaseInstall) {
+      if (
+        !release?.version ||
+        (release.requiresRestore && !release.backup?.checksum)
+      ) {
+        throw Object.assign(new Error("没有可用的回退版本或已校验备份"), {
+          status: this.snapshot(),
+        });
+      }
+    } else if (
       !this.state.pendingUpdate &&
       (!this.state.rollbackVersion ||
         !this.state.rollbackDeployment ||
@@ -534,8 +620,7 @@ export class UpdateManager {
       });
     }
     const current = this.currentVersion();
-    const target =
-      this.state.pendingUpdate?.version || this.state.rollbackVersion;
+    const target = release?.version || this.state.pendingUpdate?.version || this.state.rollbackVersion;
     this.state.operation = {
       id: randomUUID(),
       phase: "rolling_back",
@@ -552,9 +637,63 @@ export class UpdateManager {
       ],
     };
     this.saveState();
-    const backup = this.state.lastBackup;
-    void this.runRollback(target, backup, false);
+    if (release) void this.runReleaseRollback(release);
+    else void this.runRollback(target, this.state.lastBackup, false);
     return this.snapshot();
+  }
+
+  runReleaseRollback(release) {
+    const script = path.join(this.installDir, "current", "scripts", "rollback.sh");
+    if (!fs.existsSync(script)) {
+      this.state.operation.phase = "manual_intervention";
+      this.state.operation.rollbackError = "当前版本缺少回退脚本";
+      this.appendLog("manual_intervention", "当前版本缺少回退脚本");
+      this.saveState();
+      return;
+    }
+    const args = [script];
+    if (release.requiresRestore) args.push("--restore", release.backup.path);
+    const child = this.spawn("bash", args, {
+      env: { ...process.env, Z3CZ_INSTALL_DIR: this.installDir },
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+    const record = (chunk) => {
+      for (const line of String(chunk).split(/\r?\n/)) {
+        const text = line.trim();
+        if (!text || isUpdateLogNoise(text)) continue;
+        this.appendLog("rolling_back", text.slice(0, 1000));
+      }
+    };
+    child.stdout?.on("data", record);
+    child.stderr?.on("data", record);
+    child.on("error", (error) => {
+      this.state.operation.phase = "manual_intervention";
+      this.state.operation.rollbackError = error.message;
+      this.appendLog("manual_intervention", error.message);
+      this.saveState();
+    });
+    child.on("exit", (code) => {
+      if (code === 0) {
+        clearReleaseRollback(this.stateDir);
+        this.state.rollbackVersion = "";
+        this.state.rollbackDeployment = null;
+        this.state.rollbackBackup = null;
+        this.state.rollbackRequiresRestore = false;
+        this.state.lastBackup = undefined;
+        this.state.operation.phase = "rolled_back";
+        this.state.operation.finishedAt = new Date().toISOString();
+        this.appendLog("rolled_back", `已恢复 ${release.version}`);
+        this.saveState();
+        return;
+      }
+      this.state.operation.phase = "manual_intervention";
+      this.state.operation.rollbackError = `回退进程退出，代码 ${code ?? "unknown"}`;
+      this.appendLog(
+        "manual_intervention",
+        this.state.operation.rollbackError
+      );
+      this.saveState();
+    });
   }
 
   setPhase(phase, message) {

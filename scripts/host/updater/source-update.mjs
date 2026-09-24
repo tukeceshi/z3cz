@@ -169,6 +169,7 @@ export async function runSourceUpdate(
       version: targetVersion,
       run: manager.runCommand,
       log: (message) => manager.setPhase("pulling", message),
+      progress: (message) => manager.replaceProgress("pulling", message),
     });
     await validateCandidate(manager, source, targetVersion);
     plan = planSourceUpdate(manager.hostDir, source, fromVersion);

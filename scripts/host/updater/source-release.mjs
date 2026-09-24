@@ -35,6 +35,7 @@ export async function prepareSourceRelease({
   version,
   run,
   log,
+  progress,
 }) {
   validateSourceRef(ref);
   if (!/^[\w.-]+\/[\w.-]+$/.test(repository))
@@ -184,11 +185,12 @@ export async function prepareSourceRelease({
         timeoutMs: 60 * 60_000,
         env: { DOCKER_BUILDKIT: "1" },
         onOutput: (chunk) => {
+          if (typeof progress !== "function") return;
           const line = chunk
             .trim()
             .split(/[\r\n]+/)
             .at(-1);
-          if (line) log(line.slice(-500));
+          if (line) progress(line.slice(-500));
         },
       }
     );
