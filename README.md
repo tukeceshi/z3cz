@@ -46,7 +46,7 @@
 installer="$(mktemp)" && curl -fL --connect-timeout 20 --max-time 120 "https://raw.githubusercontent.com/tukeceshi/z3cz/main/bootstrap-install" -o "$installer" && sudo bash "$installer"
 ```
 
-安装器下载 `self-host` 测试渠道的部署包并校验 SHA-256。生产只运行 `api`、`postgres`、`caddy` 三个容器，使用固定版本的通用 Node、PostgreSQL、Caddy 镜像；不会构建、发布或拉取 z3cz 专用镜像，也不会在服务器构建 App 或编译 API。
+安装器默认下载 GitHub 最新正式版的部署包，校验 SHA-256 和包内版本。需要安装指定正式版时，可运行 `sudo Z3CZ_INSTALL_VERSION=v1.0.16 bash "$installer"`。生产只运行 `api`、`postgres`、`caddy` 三个容器，使用固定版本的通用 Node、PostgreSQL、Caddy 镜像；不会构建、发布或拉取 z3cz 专用镜像，也不会在服务器构建 App 或编译 API。
 
 安装时会询问公网域名。填写后由容器内 Caddy 自动申请并续期证书；直接回车，或当前没有终端时，监听 HTTP 80，不写站点地址。自动化安装跳过提问：
 
@@ -67,12 +67,12 @@ GitHub 是唯一的版本检查、源码和部署包发布渠道。管理后台�
 也可以使用宿主机命令升级正式版本：
 
 ```bash
-sudo bash /opt/z3cz/current/scripts/update.sh v1.0.17
+sudo bash /opt/z3cz/current/scripts/update.sh v1.0.18
 ```
 
 更新只接受显式 `v*` 正式版本。下载、校验、解压和依赖安装在旧服务运行期间完成；随后进入维护、备份 PostgreSQL、以新版本 `dist/migrate.mjs` 迁移、原子切换并健康检查。应用失败会自动切回；不兼容迁移会保持维护状态并要求显式恢复备份。
 
-`main` 分支只更新可变的 `self-host` 首装测试包；`v*` 标签生成不可变正式包。首次安装走上面的安装器，正式更新只走带版本号的 `update.sh`，两个渠道不会混用。
+普通推送不会改变一键安装使用的版本；发布 `v*` 标签后生成正式部署包，新安装才会使用该版本。已有安装通过管理后台或带版本号的 `update.sh` 更新。
 
 Release 与 CPU 架构无关，只含 App 静态产物、API 编译后 JS/迁移、独立生产依赖清单与锁文件、Compose/Caddy、运维脚本及版本策略文件；不含源码、Git 历史、`node_modules` 或开发依赖。
 
