@@ -47,9 +47,8 @@ ensure_site_address_access
 install_prod_dependencies "$TARGET"; switch_link current "$TARGET"
 compose "$TARGET" up -d postgres --wait
 compose "$TARGET" run --rm --no-deps api node dist/migrate.mjs
-compose "$TARGET" up -d --force-recreate --wait
 if command -v systemctl >/dev/null 2>&1; then
   bash "$TARGET/scripts/install-update-runner.sh"
-  compose "$TARGET" up -d --force-recreate --wait api
 fi
+compose "$TARGET" up -d --force-recreate --wait
 log "已安装 v$VERSION"
