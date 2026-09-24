@@ -35,7 +35,7 @@
     "fonts:prod:seed": "pnpm --filter '@dafthunk/runtime' fonts:fetch && node scripts/seed-fonts.mjs dafthunk-ressources-production --remote"
   },
   "devDependencies": {
-    "@cloudflare/vitest-pool-workers": "^0.13.5",
+    "@cloudflare/vitest-pool-workers": "^0.22.0",
     "@cloudflare/workers-types": "^4.20260511.1",
     "@types/node": "^22.19.19",
     "@types/ws": "^8.18.1",
