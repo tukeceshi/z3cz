@@ -54,7 +54,9 @@ export function AdminSiteDomainPage() {
       setLoadError("");
     } catch (error) {
       setLoadError(
-        error instanceof Error ? error.message : t("admin.siteDomain.loadFailed")
+        error instanceof Error
+          ? error.message
+          : t("admin.siteDomain.loadFailed")
       );
     } finally {
       setLoading(false);
@@ -88,11 +90,15 @@ export function AdminSiteDomainPage() {
       }
     } catch (error) {
       const code =
-        error instanceof ApiRequestError && error.code && isSiteDomainErrorCode(error.code)
+        error instanceof ApiRequestError &&
+        error.code &&
+        isSiteDomainErrorCode(error.code)
           ? error.code
           : null;
       toast.error(
-        code ? t(ERROR_KEYS[code] as "admin.siteDomain.errorInvalidDomain") : t("admin.siteDomain.saveFailed")
+        code
+          ? t(ERROR_KEYS[code] as "admin.siteDomain.errorInvalidDomain")
+          : t("admin.siteDomain.saveFailed")
       );
     } finally {
       setSaving(false);

@@ -35,5 +35,11 @@ export default defineConfig({
   test: {
     setupFiles: ["./test/setup.ts"],
     testTimeout: 30000,
+    // Node fs/os semantics. workerd has no node:os and rename does not replace.
+    exclude: [
+      "**/node_modules/**",
+      "**/.git/**",
+      "src/services/system-update-preparer-node.test.ts",
+    ],
   },
 });

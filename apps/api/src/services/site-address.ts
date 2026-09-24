@@ -38,7 +38,10 @@ export function normalizeSiteAddress(raw: string): string {
   if (value === "" || value === ":80") {
     return ":80";
   }
-  value = value.replace(/^https?:\/\//, "").replace(/\/+$/, "").replace(/\.$/, "");
+  value = value
+    .replace(/^https?:\/\//, "")
+    .replace(/\/+$/, "")
+    .replace(/\.$/, "");
   if (/[:/?#@\s]/.test(value)) {
     throw new SiteAddressValidationError(SITE_ADDRESS_ERROR.invalidChars);
   }

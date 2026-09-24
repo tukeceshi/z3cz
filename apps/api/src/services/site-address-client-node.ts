@@ -54,7 +54,11 @@ export async function requestSiteAddress<T>(
             resolve(parsed);
           } catch {
             reject(
-              new SiteAddressClientError("域名服务返回无效 JSON", 502, undefined)
+              new SiteAddressClientError(
+                "域名服务返回无效 JSON",
+                502,
+                undefined
+              )
             );
           }
         });

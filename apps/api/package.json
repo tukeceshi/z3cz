@@ -19,7 +19,7 @@
     "lint": "biome check",
     "typecheck": "tsc --noEmit",
     "check": "biome check --write",
-    "test": "vitest run",
+    "test": "vitest run && vitest run --config vitest.node.config.mts",
     "test:integration": "vitest run --config vitest.integration.config.mts --passWithNoTests",
     "deploy": "RUNTIME_VERSION=$(git rev-parse HEAD) wrangler deploy --env production --define RUNTIME_VERSION:\"\\\"$RUNTIME_VERSION\\\"\"",
     "format": "biome format --write",

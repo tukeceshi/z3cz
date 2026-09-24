@@ -1,9 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import {
-  configuredPublicOrigin,
-  resolveAuthCookieScope,
-} from "./auth-cookie";
+import { configuredPublicOrigin, resolveAuthCookieScope } from "./auth-cookie";
 
 describe("configuredPublicOrigin", () => {
   it("ignores empty, loopback, and IP site URLs", () => {

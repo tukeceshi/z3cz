@@ -1,7 +1,4 @@
-import type {
-  SiteDomainStatus,
-  UpdateSiteDomainResult,
-} from "@dafthunk/types";
+import type { SiteDomainStatus, UpdateSiteDomainResult } from "@dafthunk/types";
 import { zValidator } from "@hono/zod-validator";
 import { Hono } from "hono";
 import { z } from "zod";
@@ -87,44 +84,37 @@ adminSiteDomainRoutes.get("/", async (c) => {
   }
 });
 
-adminSiteDomainRoutes.post(
-  "/",
-  zValidator("json", updateSchema),
-  async (c) => {
-    if (!hostConfig(c.env)) {
-      return c.json(
-        { error: "unavailable", code: "unavailable" },
-        409
-      );
-    }
-    let siteAddress: string;
-    try {
-      siteAddress = normalizeSiteAddress(c.req.valid("json").siteAddress);
-    } catch (error) {
-      if (error instanceof SiteAddressValidationError) {
-        return c.json({ error: error.code, code: error.code }, 400);
-      }
-      throw error;
-    }
-    try {
-      const result = await callHost<UpdateSiteDomainResult>(c.env, "POST", {
-        siteAddress,
-      });
-      return c.json(result);
-    } catch (error) {
-      if (error instanceof SiteAddressClientError) {
-        const code = error.code || "unavailable";
-        const status =
-          code === "invalid_chars" ||
-          code === "local_name" ||
-          code === "invalid_domain"
-            ? 400
-            : 409;
-        return c.json({ error: code, code }, status);
-      }
-      return c.json({ error: "unavailable", code: "unavailable" }, 409);
-    }
+adminSiteDomainRoutes.post("/", zValidator("json", updateSchema), async (c) => {
+  if (!hostConfig(c.env)) {
+    return c.json({ error: "unavailable", code: "unavailable" }, 409);
   }
-);
+  let siteAddress: string;
+  try {
+    siteAddress = normalizeSiteAddress(c.req.valid("json").siteAddress);
+  } catch (error) {
+    if (error instanceof SiteAddressValidationError) {
+      return c.json({ error: error.code, code: error.code }, 400);
+    }
+    throw error;
+  }
+  try {
+    const result = await callHost<UpdateSiteDomainResult>(c.env, "POST", {
+      siteAddress,
+    });
+    return c.json(result);
+  } catch (error) {
+    if (error instanceof SiteAddressClientError) {
+      const code = error.code || "unavailable";
+      const status =
+        code === "invalid_chars" ||
+        code === "local_name" ||
+        code === "invalid_domain"
+          ? 400
+          : 409;
+      return c.json({ error: code, code }, status);
+    }
+    return c.json({ error: "unavailable", code: "unavailable" }, 409);
+  }
+});
 
 export default adminSiteDomainRoutes;
