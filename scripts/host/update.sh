@@ -10,7 +10,15 @@ else
 fi
 [[ "$VERSION" =~ ^v[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z.-]+)?$ ]] || die "更新必须显式指定正式版本，例如 v1.0.9"
 ASSET="z3cz-${VERSION}-deploy.tar.gz"; BASE="https://github.com/$REPOSITORY/releases/download/$VERSION"
-TMP="$(mktemp -d)"; trap 'rm -rf "$TMP"' EXIT
+TMP="$(mktemp -d)"; TARGET_CREATED=0; MAINTENANCE_STARTED=0
+cleanup() {
+  local status=$?
+  rm -rf "$TMP"
+  if [[ "$status" -ne 0 && "$TARGET_CREATED" == 1 && "$MAINTENANCE_STARTED" == 0 ]]; then
+    rm -rf "$TARGET"
+  fi
+}
+trap cleanup EXIT
 if [[ -n "$PREPARED_ARCHIVE" ]]; then
   UPDATE_ROOT="${Z3CZ_UPDATE_DIR:-/var/lib/z3cz/update}/downloads"
   case "$(readlink -f "$PREPARED_ARCHIVE")" in "$UPDATE_ROOT"/*) ;; *) die "预备更新包不在允许目录" ;; esac
@@ -32,12 +40,16 @@ case "$(uname -m)" in x86_64|amd64) UPDATER_ARCH=amd64 ;; aarch64|arm64) UPDATER
 POLICY_CHECKER="$STAGED/dist/z3cz-host-updater-linux-$UPDATER_ARCH"
 [[ -x "$POLICY_CHECKER" ]] || die "发布包缺少更新执行器"
 ROLLBACK_COMPATIBLE="$("$POLICY_CHECKER" validate-policy "$STAGED" "$CURRENT_VERSION")" || die "更新策略检查失败"
+WRITE_PROBE="$(mktemp /usr/local/bin/.z3cz-update-runner.XXXXXX)" || die "更新执行器无法写入 /usr/local/bin"
+rm -f "$WRITE_PROBE"
 mv "$STAGED" "$TARGET"
+TARGET_CREATED=1
 install -m 0755 "$TARGET/dist/z3cz-host-updater-linux-$UPDATER_ARCH" /usr/local/bin/z3cz-update-runner
 install_prod_dependencies "$TARGET"
 
 BACKUP="$STATE_DIR/backups/z3cz-before-${VERSION#v}-$(date +%Y%m%d%H%M%S).dump"
 log "进入维护模式并备份数据库"; touch "$STATE_DIR/maintenance/enabled"
+MAINTENANCE_STARTED=1
 "$CURRENT/scripts/backup.sh" "$BACKUP" || { rm -f "$STATE_DIR/maintenance/enabled"; die "备份失败"; }
 log "运行新版本迁移"
 prepare_docker_env "$TARGET/compose.yml"

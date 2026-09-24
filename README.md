@@ -67,7 +67,7 @@ GitHub 是唯一的版本检查、源码和部署包发布渠道。管理后台�
 也可以使用宿主机命令升级正式版本：
 
 ```bash
-sudo bash /opt/z3cz/current/scripts/update.sh v1.0.18
+sudo bash /opt/z3cz/current/scripts/update.sh v1.0.19
 ```
 
 更新只接受显式 `v*` 正式版本。下载、校验、解压和依赖安装在旧服务运行期间完成；随后进入维护、备份 PostgreSQL、以新版本 `dist/migrate.mjs` 迁移、原子切换并健康检查。应用失败会自动切回；不兼容迁移会保持维护状态并要求显式恢复备份。
