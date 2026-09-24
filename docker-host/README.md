@@ -40,20 +40,9 @@ installer="$(mktemp)" && curl -fL --connect-timeout 20 --max-time 120 "https://r
 
 ## 更新
 
-管理后台 **系统设置 → 系统更新**。`deploy.sh` 会自动安装宿主机更新器。
-
-```bash
-sudo bash /var/dafthunk/scripts/host/deploy.sh
-```
-
-命令行：
-
-```bash
-sudo bash /var/dafthunk/scripts/host/update.sh
-
-# 重置安装（清 DB / 上传，保留 app.yml 与证书）
-sudo bash /var/dafthunk/scripts/host/update.sh --reset
-```
+正式发布包通过管理后台 **系统设置 → 系统更新** 或
+`sudo bash /opt/z3cz/current/scripts/update.sh vX.Y.Z` 更新。
+本目录的 Compose launcher 仅用于本地开发和旧安装迁移，不属于正式发布包更新链路。
 
 ## 应急
 

@@ -7,10 +7,7 @@ import { compareVersions } from "../../../../../packages/utils/src/release-versi
 import { ApiContext } from "../../context";
 import { fetchLatestGithubRelease } from "../../services/github-latest-release";
 import { disconnectedUpdateStatus } from "../../services/system-update-status";
-import type {
-  SystemUpdateSourceChannel,
-  SystemUpdateOperation,
-} from "@dafthunk/types";
+import type { SystemUpdateOperation } from "@dafthunk/types";
 
 const adminSystemUpdateRoutes = new Hono<ApiContext>();
 const DEFAULT_UPDATE_ROOT = "/var/lib/z3cz/update";
@@ -24,36 +21,6 @@ async function preparation(env: ApiContext["Bindings"]) {
   return { root, store: createPreparationStore(root) };
 }
 
-async function readAdminSource(
-  env: ApiContext["Bindings"]
-): Promise<SystemUpdateSourceChannel> {
-  if (env.RUNTIME !== "node") return "github";
-  const fs = await import("node:fs");
-  const path = await import("node:path");
-  const { root } = await preparation(env);
-  try {
-    const value = fs
-      .readFileSync(path.join(root, "source-channel"), "utf8")
-      .trim();
-    return value === "gitee" ? "gitee" : "github";
-  } catch {
-    return "github";
-  }
-}
-
-async function writeAdminSource(
-  env: ApiContext["Bindings"],
-  value: SystemUpdateSourceChannel
-) {
-  const fs = await import("node:fs");
-  const path = await import("node:path");
-  const { root } = await preparation(env);
-  fs.mkdirSync(root, { recursive: true });
-  fs.writeFileSync(path.join(root, "source-channel"), `${value}\n`, {
-    mode: 0o600,
-  });
-}
-
 function preparationIsActive(operation?: SystemUpdateOperation) {
   return Boolean(
     operation &&
@@ -61,6 +28,30 @@ function preparationIsActive(operation?: SystemUpdateOperation) {
         operation.phase
       )
   );
+}
+
+async function failBrowserUpload(env: ApiContext["Bindings"], message: string) {
+  try {
+    const { store } = await preparation(env);
+    const current = store.read();
+    if (
+      current?.downloadMethod === "browser" &&
+      current.phase !== "preflight"
+    ) {
+      store.write({
+        ...current,
+        phase: "failed",
+        error: message,
+        finishedAt: new Date().toISOString(),
+        logs: [
+          ...current.logs,
+          { at: new Date().toISOString(), phase: "failed" as const, message },
+        ].slice(-120),
+      });
+    }
+  } catch {
+    // Preserve the original upload error.
+  }
 }
 
 function visibleOperation(
@@ -80,10 +71,6 @@ function visibleOperation(
 
 const startSchema = z.object({
   targetVersion: z.string().trim().min(1).max(64),
-});
-
-const sourceChannelSchema = z.object({
-  sourceChannel: z.enum(["github", "gitee"]),
 });
 
 const rollbackSchema = z.object({
@@ -109,13 +96,17 @@ async function callUpdater(
 
 adminSystemUpdateRoutes.get("/", async (c) => {
   try {
-    const [status, source, prepared] = await Promise.all([
+    const [status, prepared] = await Promise.all([
       callUpdater(c.env, "GET", "/v1/status"),
-      readAdminSource(c.env),
       preparation(c.env).then(({ store }) => store.read()),
     ]);
     let recovered = prepared;
-    if (prepared && preparationIsActive(prepared) && !preparationRunning) {
+    if (
+      prepared &&
+      prepared.downloadMethod !== "browser" &&
+      preparationIsActive(prepared) &&
+      !preparationRunning
+    ) {
       recovered = {
         ...prepared,
         phase: "failed",
@@ -135,7 +126,6 @@ adminSystemUpdateRoutes.get("/", async (c) => {
     }
     return c.json({
       ...status,
-      sourceChannel: source,
       operation: visibleOperation(recovered, status.operation),
     });
   } catch (error) {
@@ -148,16 +138,17 @@ adminSystemUpdateRoutes.get("/", async (c) => {
 
 adminSystemUpdateRoutes.post("/check", async (c) => {
   try {
-    const [status, latestRelease, sourceChannel] = await Promise.all([
-      callUpdater(c.env, "GET", "/v1/status"),
-      fetchLatestGithubRelease(),
-      readAdminSource(c.env),
-    ]);
+    const latestRelease = await fetchLatestGithubRelease();
+    let status: SystemUpdateStatus;
+    try {
+      status = await callUpdater(c.env, "GET", "/v1/status");
+    } catch {
+      status = disconnectedUpdateStatus(c.env);
+    }
     const updateAvailable =
       compareVersions(status.currentVersion, latestRelease.version) < 0;
     return c.json({
       ...status,
-      sourceChannel,
       latestRelease,
       updateAvailable,
       checkedAt: new Date().toISOString(),
@@ -168,68 +159,12 @@ adminSystemUpdateRoutes.post("/check", async (c) => {
       },
     });
   } catch (error) {
-    if (error instanceof Error && error.message !== "unsupported") {
-      return c.json({ error: error.message }, 502);
-    }
-    try {
-      const latestRelease = await fetchLatestGithubRelease();
-      const currentVersion = c.env.APP_VERSION || "unknown";
-      const updateAvailable =
-        compareVersions(currentVersion, latestRelease.version) < 0;
-      return c.json(
-        disconnectedUpdateStatus(c.env, {
-          latestRelease,
-          updateAvailable,
-          checkedAt: new Date().toISOString(),
-          stale: false,
-          operation: {
-            phase: updateAvailable ? "ready" : "no_update",
-            automaticRollback: false,
-            logs: [],
-          },
-        })
-      );
-    } catch (checkError) {
-      return c.json(
-        {
-          error:
-            checkError instanceof Error ? checkError.message : "检查更新失败",
-        },
-        502
-      );
-    }
+    return c.json(
+      { error: error instanceof Error ? error.message : "检查更新失败" },
+      502
+    );
   }
 });
-
-adminSystemUpdateRoutes.post(
-  "/source-channel",
-  zValidator("json", sourceChannelSchema),
-  async (c) => {
-    const body = c.req.valid("json");
-    try {
-      await writeAdminSource(c.env, body.sourceChannel);
-      const status = await callUpdater(c.env, "GET", "/v1/status");
-      return c.json({ ...status, sourceChannel: body.sourceChannel });
-    } catch (error) {
-      if (error instanceof Error && error.message === "unsupported") {
-        return c.json(
-          {
-            error: "当前部署不支持后台在线更新，请先完成自托管部署以安装更新器",
-          },
-          409
-        );
-      }
-      const status = (error as Error & { status?: SystemUpdateStatus }).status;
-      return c.json(
-        {
-          error: error instanceof Error ? error.message : "无法保存下载渠道",
-          data: status,
-        },
-        409
-      );
-    }
-  }
-);
 
 adminSystemUpdateRoutes.post(
   "/start",
@@ -251,7 +186,6 @@ adminSystemUpdateRoutes.post(
       ) {
         return c.json({ error: "已有宿主机更新事务正在执行" }, 409);
       }
-      const source = await readAdminSource(c.env);
       const { root, store } = await preparation(c.env);
       if (preparationIsActive(store.read()))
         return c.json({ error: "更新包正在准备中" }, 409);
@@ -260,8 +194,7 @@ adminSystemUpdateRoutes.post(
       );
       preparationRunning = true;
       void prepareSystemUpdate({
-        repository: source === "gitee" ? "daotuke/z3cz" : "tukeceshi/z3cz",
-        source,
+        repository: "tukeceshi/z3cz",
         version: body.targetVersion,
         root,
         store,
@@ -313,7 +246,6 @@ adminSystemUpdateRoutes.post(
         });
       return c.json({
         ...status,
-        sourceChannel: source,
         operation: {
           phase: "downloading",
           targetVersion: body.targetVersion,
@@ -343,6 +275,137 @@ adminSystemUpdateRoutes.post(
     }
   }
 );
+
+adminSystemUpdateRoutes.post(
+  "/upload/start",
+  zValidator("json", startSchema),
+  async (c) => {
+    try {
+      const status = await callUpdater(c.env, "GET", "/v1/status");
+      if (preparationRunning || preparationIsActive(status.operation))
+        return c.json({ error: "已有更新正在执行" }, 409);
+      const version = c.req.valid("json").targetVersion;
+      const latest = await fetchLatestGithubRelease();
+      if (version !== latest.version)
+        return c.json({ error: "目标版本不是最新 GitHub 正式版本" }, 409);
+      const { store } = await preparation(c.env);
+      const operation: SystemUpdateOperation = {
+        phase: "downloading",
+        downloadMethod: "browser",
+        targetVersion: version,
+        startedAt: new Date().toISOString(),
+        automaticRollback: false,
+        files: [
+          { name: "SHA256SUMS", downloadedBytes: 0, status: "pending" },
+          {
+            name: `z3cz-${version}-deploy.tar.gz`,
+            downloadedBytes: 0,
+            status: "pending",
+          },
+        ],
+        logs: [],
+      };
+      store.write(operation);
+      return c.json({ ...status, operation });
+    } catch (error) {
+      return c.json(
+        { error: error instanceof Error ? error.message : "无法开始上传" },
+        409
+      );
+    }
+  }
+);
+
+adminSystemUpdateRoutes.put("/upload/:name", async (c) => {
+  try {
+    await callUpdater(c.env, "GET", "/v1/status");
+    const { root, store } = await preparation(c.env);
+    const operation = store.read();
+    const version = operation?.targetVersion;
+    if (!version || operation?.phase !== "downloading" || !c.req.raw.body)
+      return c.json({ error: "请先开始浏览器上传" }, 409);
+    const name = c.req.param("name");
+    if (!operation.files?.some((file) => file.name === name))
+      return c.json({ error: "文件名与目标版本不匹配" }, 400);
+    const { receiveUploadedAsset } = await import(
+      "../../services/system-update-preparer-node"
+    );
+    await receiveUploadedAsset({
+      version,
+      name,
+      root,
+      store,
+      body: c.req.raw.body,
+    });
+    return c.json({ ok: true });
+  } catch (error) {
+    await failBrowserUpload(
+      c.env,
+      error instanceof Error ? error.message : "上传失败"
+    );
+    return c.json(
+      { error: error instanceof Error ? error.message : "上传失败" },
+      400
+    );
+  }
+});
+
+adminSystemUpdateRoutes.post("/upload/finish", async (c) => {
+  try {
+    const status = await callUpdater(c.env, "GET", "/v1/status");
+    if (preparationIsActive(status.operation))
+      return c.json({ error: "已有更新正在执行" }, 409);
+    const { root, store } = await preparation(c.env);
+    const operation = store.read();
+    if (
+      !operation?.targetVersion ||
+      operation.phase !== "downloading" ||
+      operation.downloadMethod !== "browser" ||
+      operation.files?.some((file) => file.status !== "complete")
+    )
+      return c.json({ error: "没有待验证的上传" }, 409);
+    preparationRunning = true;
+    const { prepareUploadedUpdate } = await import(
+      "../../services/system-update-preparer-node"
+    );
+    const prepared = await prepareUploadedUpdate({
+      version: operation.targetVersion,
+      root,
+      store,
+    });
+    const next = await callUpdater(c.env, "POST", "/v1/prepared-update", {
+      targetVersion: prepared.version,
+      archivePath: prepared.archivePath,
+      checksum: prepared.checksum,
+    });
+    const current = store.read();
+    if (current)
+      store.write({
+        ...current,
+        phase: "preflight",
+        logs: [
+          ...current.logs,
+          {
+            at: new Date().toISOString(),
+            phase: "preflight" as const,
+            message: "更新包已移交宿主机执行器",
+          },
+        ].slice(-120),
+      });
+    return c.json(next);
+  } catch (error) {
+    await failBrowserUpload(
+      c.env,
+      error instanceof Error ? error.message : "无法验证更新包"
+    );
+    return c.json(
+      { error: error instanceof Error ? error.message : "无法验证更新包" },
+      409
+    );
+  } finally {
+    preparationRunning = false;
+  }
+});
 
 adminSystemUpdateRoutes.post(
   "/rollback",

@@ -3,10 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { Readable } from "node:stream";
 import { pipeline } from "node:stream/promises";
-import type {
-  SystemUpdateOperation,
-  SystemUpdateSourceChannel,
-} from "@dafthunk/types";
+import type { SystemUpdateOperation } from "@dafthunk/types";
 
 const MAX_PACKAGE_BYTES = 512 * 1024 * 1024;
 const VERSION_RE = /^v\d+\.\d+\.\d+(?:[.-][0-9A-Za-z.-]+)?$/;
@@ -45,71 +42,18 @@ export function createPreparationStore(root: string): PreparationStore {
 
 export function releaseAssetUrls(
   repository: string,
-  source: SystemUpdateSourceChannel,
   version: string,
   asset: string
 ): string[] {
   if (
+    !/^[\w.-]+\/[\w.-]+$/.test(repository) ||
     !VERSION_RE.test(version) ||
     !/^z3cz-v[0-9A-Za-z.-]+-deploy\.tar\.gz$|^SHA256SUMS$/.test(asset)
   ) {
     throw new Error("更新版本或资产名称无效");
   }
   const github = `https://github.com/${repository}/releases/download/${version}/${asset}`;
-  if (source === "gitee") {
-    throw new Error("Gitee 附件地址必须通过 Release API 解析");
-  }
-  const mirror = String(
-    process.env.Z3CZ_GITHUB_MIRROR || "https://ghfast.top"
-  ).replace(/\/$/, "");
-  return [github, `${mirror}/${github}`];
-}
-
-export async function resolveReleaseAssetUrls(
-  repository: string,
-  source: SystemUpdateSourceChannel,
-  version: string,
-  asset: string,
-  fetchImpl: typeof fetch = fetch
-): Promise<string[]> {
-  if (source === "github") {
-    return releaseAssetUrls(repository, source, version, asset);
-  }
-  if (
-    !VERSION_RE.test(version) ||
-    !/^z3cz-v[0-9A-Za-z.-]+-deploy\.tar\.gz$|^SHA256SUMS$/.test(asset)
-  ) {
-    throw new Error("更新版本或资产名称无效");
-  }
-  const api = `https://gitee.com/api/v5/repos/${repository}`;
-  const releaseResponse = await fetchImpl(`${api}/releases/tags/${version}`, {
-    headers: { "User-Agent": "z3cz-admin-updater" },
-  });
-  if (!releaseResponse.ok) {
-    throw new Error(`Gitee Release 返回 HTTP ${releaseResponse.status}`);
-  }
-  const release = (await releaseResponse.json()) as { id?: number };
-  if (!Number.isInteger(release.id)) throw new Error("Gitee Release 缺少 ID");
-  const attachmentsResponse = await fetchImpl(
-    `${api}/releases/${release.id}/attach_files`,
-    { headers: { "User-Agent": "z3cz-admin-updater" } }
-  );
-  if (!attachmentsResponse.ok) {
-    throw new Error(
-      `Gitee Release 附件返回 HTTP ${attachmentsResponse.status}`
-    );
-  }
-  const attachments = (await attachmentsResponse.json()) as Array<{
-    id?: number;
-    name?: string;
-  }>;
-  const attachment = attachments.find((entry) => entry.name === asset);
-  if (!attachment || !Number.isInteger(attachment.id)) {
-    throw new Error(`Gitee Release 缺少附件 ${asset}`);
-  }
-  return [
-    `${api}/releases/${release.id}/attach_files/${attachment.id}/download`,
-  ];
+  return [github];
 }
 
 function appendLog(
@@ -130,7 +74,8 @@ function appendLog(
 async function fetchAsset(
   urls: string[],
   destination: string,
-  onProgress?: (downloaded: number, total?: number) => void
+  onProgress?: (downloaded: number, total?: number) => void,
+  limitBytes = MAX_PACKAGE_BYTES
 ) {
   let failure: Error | undefined;
   for (const url of urls) {
@@ -142,8 +87,7 @@ async function fetchAsset(
         throw new Error(`下载返回 HTTP ${response.status}`);
       const total =
         Number(response.headers.get("content-length") || 0) || undefined;
-      if (total && total > MAX_PACKAGE_BYTES)
-        throw new Error("更新包超过大小限制");
+      if (total && total > limitBytes) throw new Error("更新包超过大小限制");
       let downloaded = 0;
       const digest = crypto.createHash("sha256") as unknown as {
         update(data: Uint8Array): void;
@@ -152,7 +96,7 @@ async function fetchAsset(
       const stream = Readable.fromWeb(response.body as never);
       stream.on("data", (chunk: Buffer) => {
         downloaded += chunk.length;
-        if (downloaded > MAX_PACKAGE_BYTES)
+        if (downloaded > limitBytes)
           stream.destroy(new Error("更新包超过大小限制"));
         digest.update(chunk);
         onProgress?.(downloaded, total);
@@ -171,12 +115,11 @@ async function fetchAsset(
 
 export async function prepareSystemUpdate(options: {
   repository: string;
-  source: SystemUpdateSourceChannel;
   version: string;
   root: string;
   store: PreparationStore;
 }): Promise<PreparedUpdate> {
-  const { repository, source, version, root, store } = options;
+  const { repository, version, root, store } = options;
   if (!VERSION_RE.test(version)) throw new Error("目标版本无效");
   const id = crypto.randomUUID();
   const directory = path.join(root, "downloads", version);
@@ -187,34 +130,49 @@ export async function prepareSystemUpdate(options: {
   let operation: SystemUpdateOperation = {
     id,
     phase: "downloading",
+    downloadMethod: "service",
     fromVersion: process.env.APP_VERSION || "unknown",
     targetVersion: version,
     startedAt: new Date().toISOString(),
     automaticRollback: false,
     progress: 0,
     downloadedBytes: 0,
+    files: [
+      { name: "SHA256SUMS", downloadedBytes: 0, status: "pending" },
+      { name: asset, downloadedBytes: 0, status: "pending" },
+    ],
     logs: [],
   };
-  operation = appendLog(
-    operation,
-    "downloading",
-    `从 ${source === "gitee" ? "Gitee" : "GitHub"} 下载 ${version}`
-  );
+  operation = appendLog(operation, "downloading", `从 GitHub 下载 ${version}`);
   store.write(operation);
-  const sumsUrls = await resolveReleaseAssetUrls(
-    repository,
-    source,
-    version,
-    "SHA256SUMS"
+  const setFile = (
+    name: string,
+    downloadedBytes: number,
+    totalBytes: number | undefined,
+    status: "pending" | "downloading" | "complete" | "failed"
+  ) => {
+    operation = {
+      ...operation,
+      files: operation.files?.map((file) =>
+        file.name === name
+          ? { name, downloadedBytes, totalBytes, status }
+          : file
+      ),
+    };
+    store.write(operation);
+  };
+  setFile("SHA256SUMS", 0, undefined, "downloading");
+  const sumsResult = await fetchAsset(
+    releaseAssetUrls(repository, version, "SHA256SUMS"),
+    sumsPath,
+    (downloaded, total) =>
+      setFile("SHA256SUMS", downloaded, total, "downloading"),
+    1024 * 1024
   );
-  await fetchAsset(sumsUrls, sumsPath);
+  setFile("SHA256SUMS", sumsResult.size, sumsResult.size, "complete");
   let lastPersisted = 0;
-  const assetUrls = await resolveReleaseAssetUrls(
-    repository,
-    source,
-    version,
-    asset
-  );
+  const assetUrls = releaseAssetUrls(repository, version, asset);
+  setFile(asset, 0, undefined, "downloading");
   const result = await fetchAsset(
     assetUrls,
     archivePath,
@@ -230,9 +188,10 @@ export async function prepareSystemUpdate(options: {
           ? Math.min(99, Math.floor((downloaded * 100) / total))
           : undefined,
       };
-      store.write(operation);
+      setFile(asset, downloaded, total, "downloading");
     }
   );
+  setFile(asset, result.size, result.size, "complete");
   operation = appendLog(
     {
       ...operation,
@@ -264,4 +223,93 @@ export async function prepareSystemUpdate(options: {
   );
   store.write(operation);
   return { archivePath, checksum: result.checksum, version };
+}
+
+export async function receiveUploadedAsset(options: {
+  version: string;
+  name: string;
+  root: string;
+  body: ReadableStream<Uint8Array>;
+  store: PreparationStore;
+}): Promise<void> {
+  const { version, name, root, body, store } = options;
+  releaseAssetUrls("tukeceshi/z3cz", version, name);
+  if (name !== "SHA256SUMS" && name !== `z3cz-${version}-deploy.tar.gz`)
+    throw new Error("上传文件名与版本不匹配");
+  const directory = path.join(root, "downloads", version);
+  fs.mkdirSync(directory, { recursive: true });
+  const destination = path.join(directory, name);
+  const partial = `${destination}.partial`;
+  const operation = store.read();
+  let downloadedBytes = 0;
+  try {
+    const stream = Readable.fromWeb(body as never);
+    stream.on("data", (chunk: Buffer) => {
+      downloadedBytes += chunk.length;
+      if (
+        downloadedBytes >
+        (name === "SHA256SUMS" ? 1024 * 1024 : MAX_PACKAGE_BYTES)
+      )
+        stream.destroy(new Error("上传文件超过大小限制"));
+    });
+    await pipeline(stream, fs.createWriteStream(partial, { mode: 0o600 }));
+    if (downloadedBytes === 0) throw new Error("上传文件为空");
+    fs.renameSync(partial, destination);
+    if (operation)
+      store.write({
+        ...operation,
+        files: operation.files?.map((file) =>
+          file.name === name
+            ? {
+                name,
+                downloadedBytes,
+                totalBytes: downloadedBytes,
+                status: "complete",
+              }
+            : file
+        ),
+      });
+  } catch (error) {
+    fs.rmSync(partial, { force: true });
+    throw error;
+  }
+}
+
+export async function prepareUploadedUpdate(options: {
+  version: string;
+  root: string;
+  store: PreparationStore;
+}): Promise<PreparedUpdate> {
+  const { version, root, store } = options;
+  if (!VERSION_RE.test(version)) throw new Error("目标版本无效");
+  const directory = path.join(root, "downloads", version);
+  const asset = `z3cz-${version}-deploy.tar.gz`;
+  const archivePath = path.join(directory, asset);
+  const sumsPath = path.join(directory, "SHA256SUMS");
+  if (!fs.existsSync(archivePath) || !fs.existsSync(sumsPath))
+    throw new Error("请先上传部署包和 SHA256SUMS");
+  const sums = fs.readFileSync(sumsPath, "utf8");
+  if (Buffer.byteLength(sums) > 1024 * 1024)
+    throw new Error("SHA256SUMS 文件过大");
+  const expected = sums
+    .split(/\r?\n/)
+    .map((line) => line.trim().split(/\s+/))
+    .find((fields) => fields[1] === asset)?.[0];
+  if (!expected || !/^[a-f0-9]{64}$/.test(expected))
+    throw new Error("SHA256SUMS 未包含目标部署包");
+  const digest = crypto.createHash("sha256");
+  for await (const chunk of fs.createReadStream(archivePath))
+    digest.update(chunk as Buffer);
+  const checksum = digest.digest("hex");
+  if (checksum !== expected) throw new Error("Release SHA-256 校验失败");
+  const operation = store.read();
+  if (operation)
+    store.write(
+      appendLog(
+        { ...operation, phase: "preparing", packageChecksum: checksum },
+        "preparing",
+        "上传文件已验证，等待宿主机执行切换事务"
+      )
+    );
+  return { archivePath, checksum, version };
 }

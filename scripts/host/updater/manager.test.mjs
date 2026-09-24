@@ -67,7 +67,6 @@ test("check marks unofficial current version as upgradable", async () => {
   assert.equal(status.operation.phase, "ready");
   assert.equal(status.updateAvailable, true);
   assert.equal(status.latestRelease?.version, "v1.0.0");
-  assert.equal(status.sourceChannel, "github");
   fs.rmSync(paths.root, { recursive: true, force: true });
 });
 
@@ -113,25 +112,6 @@ test("startUpdate refuses a version that was not just checked", async () => {
   });
   await manager.check();
   assert.throws(() => manager.startUpdate("v9.9.9"), /不一致/);
-  fs.rmSync(paths.root, { recursive: true, force: true });
-});
-
-test("setSourceChannel persists gitee and refuses during an update", () => {
-  const paths = makeInstall("1.0.0");
-  const manager = new UpdateManager({
-    ...paths,
-    compose: async () => ({ stdout: "", stderr: "" }),
-  });
-  const saved = manager.setSourceChannel("gitee");
-  assert.equal(saved.sourceChannel, "gitee");
-  const reloaded = new UpdateManager({
-    ...paths,
-    compose: async () => ({ stdout: "", stderr: "" }),
-  });
-  assert.equal(reloaded.snapshot().sourceChannel, "gitee");
-  assert.throws(() => manager.setSourceChannel("gitlab"), /源码渠道无效/);
-  manager.state.operation.phase = "pulling";
-  assert.throws(() => manager.setSourceChannel("github"), /源码渠道/);
   fs.rmSync(paths.root, { recursive: true, force: true });
 });
 

@@ -60,14 +60,14 @@ sudo Z3CZ_SITE_ADDRESS=example.com Z3CZ_PUBLIC_URL=https://example.com bash "$in
 
 #### 更新
 
-推荐在管理后台「系统设置 → 系统更新」选择 GitHub 或 Gitee 渠道并升级。后台负责版本检查、下载、SHA-256 校验和进度留痕；宿主机执行器只负责备份、迁移、原子切换、健康检查和失败回退。
+推荐在管理后台「系统设置 → 系统更新」检查 GitHub 正式版本并升级。默认由后台服务下载，也可通过浏览器下载后上传。后台负责版本检查、SHA-256 校验和进度留痕；宿主机执行器负责备份、迁移、原子切换、健康检查和失败回退。
 
-GitHub 是版本检查和源码发布的主站。GitHub Actions 将 `main` 与 `v*` 标签同步到 Gitee；Gitee Go 收到版本标签后在国内独立构建，并用自带的 Release 插件发布部署包。两边各自生成 `SHA256SUMS`，管理后台会按照所选下载源校验对应平台的包，因此不要求两个压缩包的 SHA-256 相同。Gitee 流水线需要在仓库中启用 `.workflow/gitee-release.yml`，不用配置私人令牌。GitHub 同步源码和标签仍使用 `GITEE_ACCESS_TOKEN`。
+GitHub 是唯一的版本检查、源码和部署包发布渠道。管理后台默认由服务下载 GitHub Release 的部署包及 `SHA256SUMS`，也支持在浏览器下载这两个文件并上传。两种方式均在切换版本前校验 SHA-256。
 
 也可以使用宿主机命令升级正式版本：
 
 ```bash
-sudo bash /opt/z3cz/current/scripts/update.sh v1.0.15
+sudo bash /opt/z3cz/current/scripts/update.sh v1.0.16
 ```
 
 更新只接受显式 `v*` 正式版本。下载、校验、解压和依赖安装在旧服务运行期间完成；随后进入维护、备份 PostgreSQL、以新版本 `dist/migrate.mjs` 迁移、原子切换并健康检查。应用失败会自动切回；不兼容迁移会保持维护状态并要求显式恢复备份。
@@ -76,7 +76,7 @@ sudo bash /opt/z3cz/current/scripts/update.sh v1.0.15
 
 Release 与 CPU 架构无关，只含 App 静态产物、API 编译后 JS/迁移、独立生产依赖清单与锁文件、Compose/Caddy、运维脚本及版本策略文件；不含源码、Git 历史、`node_modules` 或开发依赖。
 
-发布前维护根目录 `update-policy.json`：`minimumVersion` 限制可直接升级的最低版本；`requiresBackup` 要求本次创建新备份；`databaseChanges` 强制执行迁移；`minimumRollbackVersion` 和 `rollbackCompatible` 共同声明旧代码能否继续使用迁移后的数据。更新器仍会比较新旧数据库文件，历史不明确时按需要新备份、需要人工恢复处理。发布流程会校验该文件和更新协议。
+发布前维护根目录 `update-policy.json`。正式更新会校验 `minimumVersion`，并结合 `minimumRollbackVersion` 与 `rollbackCompatible` 决定健康检查失败时能否自动解除维护模式。正式更新目前每次都会新建数据库备份并执行迁移；`requiresBackup` 和 `databaseChanges` 不用于跳过这些步骤。发布流程会校验策略文件格式。
 
 旧部署不能直接覆盖升级。迁移时应先用 `pg_dump` 导出数据库并备份上传目录，再导入新布局。
 
@@ -150,7 +150,7 @@ docker compose up -d --build --wait
 `origin` 连不上时：
 
 ```bash
-git pull --progress https://ghfast.top/https://github.com/tukeceshi/z3cz.git main
+git pull --progress https://github.com/tukeceshi/z3cz.git main
 docker compose up -d --build --wait
 ```
 

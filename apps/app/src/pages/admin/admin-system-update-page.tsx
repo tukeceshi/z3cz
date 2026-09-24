@@ -1,7 +1,5 @@
 import {
-  SYSTEM_UPDATE_SOURCE_CHANNELS,
   type SystemUpdatePhase,
-  type SystemUpdateSourceChannel,
   type SystemUpdateStatus,
 } from "@dafthunk/types";
 import { isReleaseVersion } from "@dafthunk/utils/release-version";
@@ -38,7 +36,9 @@ import {
   checkSystemUpdate,
   getSystemUpdateStatus,
   rollbackSystemUpdate,
-  setSystemUpdateSourceChannel,
+  startSystemUpdateUpload,
+  uploadSystemUpdateFile,
+  finishSystemUpdateUpload,
   startSystemUpdate,
 } from "@/services/system-update-service";
 
@@ -110,7 +110,13 @@ export function AdminSystemUpdatePage() {
   const [checking, setChecking] = useState(false);
   const [starting, setStarting] = useState(false);
   const [rollingBack, setRollingBack] = useState(false);
-  const [savingChannel, setSavingChannel] = useState(false);
+  const [downloadMethod, setDownloadMethod] = useState<"service" | "browser">(
+    "service"
+  );
+  const [uploadFiles, setUploadFiles] = useState<File[]>([]);
+  const [uploadProgress, setUploadProgress] = useState<Record<string, number>>(
+    {}
+  );
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [rollbackOpen, setRollbackOpen] = useState(false);
   const [rollbackReason, setRollbackReason] = useState("");
@@ -224,38 +230,39 @@ export function AdminSystemUpdatePage() {
     }
   };
 
-  const handleSourceChannel = async (channel: SystemUpdateSourceChannel) => {
-    const current = status?.sourceChannel === "gitee" ? "gitee" : "github";
-    if (channel === current) {
-      return;
-    }
-    setSavingChannel(true);
-    try {
-      const next = await setSystemUpdateSourceChannel(channel);
-      setStatus(next);
-      toast.success(
-        t("admin.systemUpdate.sourceChannelSaved", {
-          channel: t(`admin.systemUpdate.sourceChannels.${channel}`),
-        })
-      );
-    } catch (error) {
-      toast.error(
-        error instanceof Error
-          ? error.message
-          : t("admin.systemUpdate.sourceChannelFailed")
-      );
-    } finally {
-      setSavingChannel(false);
-    }
-  };
-
   const handleStart = async () => {
     if (!status?.latestRelease) {
       return;
     }
     setStarting(true);
     try {
-      const next = await startSystemUpdate(status.latestRelease.version);
+      const version = status.latestRelease.version;
+      let next: SystemUpdateStatus;
+      if (downloadMethod === "browser") {
+        const archive = `z3cz-${version}-deploy.tar.gz`;
+        const required = ["SHA256SUMS", archive];
+        if (
+          required.some(
+            (name) => !uploadFiles.some((file) => file.name === name)
+          )
+        ) {
+          throw new Error(t("admin.systemUpdate.uploadRequired"));
+        }
+        next = await startSystemUpdateUpload(version);
+        setStatus(next);
+        for (const name of required) {
+          const file = uploadFiles.find((item) => item.name === name)!;
+          await uploadSystemUpdateFile(file, (loaded, total) =>
+            setUploadProgress((previous) => ({
+              ...previous,
+              [name]: Math.floor((loaded * 100) / total),
+            }))
+          );
+        }
+        next = await finishSystemUpdateUpload();
+      } else {
+        next = await startSystemUpdate(version);
+      }
       setStatus(next);
       setConfirmOpen(false);
       toast.success(t("admin.systemUpdate.startSuccess"));
@@ -309,7 +316,10 @@ export function AdminSystemUpdatePage() {
 
   const phase = status?.operation.phase ?? "idle";
   const busy =
-    operationActive || checking || starting || rollingBack || savingChannel;
+    (operationActive && status?.operation.downloadMethod !== "browser") ||
+    checking ||
+    starting ||
+    rollingBack;
   const needsRecovery = phase === "manual_intervention";
   const summaryPhase =
     phase === "preflight" || phase === "pulling"
@@ -463,6 +473,27 @@ export function AdminSystemUpdatePage() {
                   </div>
                 </div>
               ) : null}
+              {status?.operation.files?.map((file) => (
+                <div key={file.name} className="space-y-1">
+                  <div className="flex justify-between text-xs text-muted-foreground">
+                    <span>{file.name}</span>
+                    <span>
+                      {formatBytes(file.downloadedBytes)} /{" "}
+                      {formatBytes(file.totalBytes || 0)} · {file.status}
+                    </span>
+                  </div>
+                  {file.totalBytes ? (
+                    <div className="h-2 overflow-hidden rounded-full bg-muted">
+                      <div
+                        className="h-full bg-primary"
+                        style={{
+                          width: `${Math.min(100, (file.downloadedBytes * 100) / file.totalBytes)}%`,
+                        }}
+                      />
+                    </div>
+                  ) : null}
+                </div>
+              ))}
             </CardContent>
             <CardFooter className="justify-end">
               <Button
@@ -485,42 +516,71 @@ export function AdminSystemUpdatePage() {
           </Card>
         </div>
 
-        <details className="rounded-lg border p-4">
-          <summary className="cursor-pointer text-sm font-medium">
+        <section className="rounded-lg border p-4">
+          <h2 className="text-sm font-medium">
             {t("admin.systemUpdate.details")}
-          </summary>
+          </h2>
           <div className="mt-4 flex flex-col gap-4">
             <Card>
               <CardHeader>
                 <CardTitle>{t("admin.systemUpdate.settings")}</CardTitle>
                 <CardDescription>
-                  {t("admin.systemUpdate.sourceChannelHint")}
+                  {t("admin.systemUpdate.downloadMethodHint")}
                 </CardDescription>
               </CardHeader>
               <CardContent className="flex flex-wrap items-center gap-2">
                 <span className="text-sm text-muted-foreground">
-                  {t("admin.systemUpdate.sourceChannel")}
+                  {t("admin.systemUpdate.downloadMethod")}
                 </span>
                 <div className="inline-flex rounded-md border p-0.5">
-                  {SYSTEM_UPDATE_SOURCE_CHANNELS.map((channel) => {
-                    const selected =
-                      (status?.sourceChannel === "gitee"
-                        ? "gitee"
-                        : "github") === channel;
+                  {(["service", "browser"] as const).map((channel) => {
+                    const selected = downloadMethod === channel;
                     return (
                       <Button
                         key={channel}
                         type="button"
                         size="sm"
                         variant={selected ? "default" : "ghost"}
-                        disabled={!status?.connected || busy || needsRecovery}
-                        onClick={() => void handleSourceChannel(channel)}
+                        disabled={busy || needsRecovery}
+                        onClick={() => setDownloadMethod(channel)}
                       >
-                        {t(`admin.systemUpdate.sourceChannels.${channel}`)}
+                        {t(`admin.systemUpdate.downloadMethods.${channel}`)}
                       </Button>
                     );
                   })}
                 </div>
+                {downloadMethod === "browser" && status?.latestRelease ? (
+                  <div className="w-full space-y-2 text-sm">
+                    {(
+                      [
+                        "SHA256SUMS",
+                        `z3cz-${status.latestRelease.version}-deploy.tar.gz`,
+                      ] as const
+                    ).map((name) => (
+                      <a
+                        key={name}
+                        className="block text-primary underline"
+                        href={`https://github.com/tukeceshi/z3cz/releases/download/${status.latestRelease!.version}/${name}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                      >
+                        {t("admin.systemUpdate.downloadFile")}: {name}
+                      </a>
+                    ))}
+                    <input
+                      type="file"
+                      multiple
+                      onChange={(event) =>
+                        setUploadFiles(Array.from(event.target.files || []))
+                      }
+                    />
+                    {uploadFiles.map((file) => (
+                      <div key={file.name}>
+                        {file.name}: {uploadProgress[file.name] || 0}%
+                      </div>
+                    ))}
+                  </div>
+                ) : null}
               </CardContent>
             </Card>
 
@@ -660,7 +720,7 @@ export function AdminSystemUpdatePage() {
               </CardFooter>
             </Card>
           </div>
-        </details>
+        </section>
       </div>
 
       <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>

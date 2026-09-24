@@ -7,7 +7,6 @@ import { UpdateManager } from "./manager.mjs";
 import { acquireUpdateLock, captureDeployment } from "./source-update.mjs";
 import {
   cleanupReleases,
-  GITEE_SOURCE_REMOTE,
   runtimeImage,
   sourceRemote,
   validateSourceRef,
@@ -320,8 +319,7 @@ test("runtime and source validation remain deterministic", () => {
     assert.throws(() => validateSourceRef(ref));
   }
   assert.equal(
-    sourceRemote("github", "tukeceshi/z3cz"),
+    sourceRemote("tukeceshi/z3cz"),
     "https://github.com/tukeceshi/z3cz.git"
   );
-  assert.equal(sourceRemote("gitee", "tukeceshi/z3cz"), GITEE_SOURCE_REMOTE);
 });

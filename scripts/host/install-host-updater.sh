@@ -10,8 +10,6 @@ UPDATER_BIN="/usr/local/bin/z3cz-host-updater"
 UPDATER_ENV="/etc/z3cz-updater.env"
 UPDATER_SERVICE="/etc/systemd/system/z3cz-updater.service"
 REPOSITORY="${Z3CZ_UPDATER_REPOSITORY:-tukeceshi/z3cz}"
-GITHUB_MIRROR="${DAFTHUNK_GITHUB_MIRROR:-https://ghfast.top/}"
-GITHUB_MIRROR="${GITHUB_MIRROR%/}/"
 RELEASE_TAG=""
 
 fail() { printf 'Host Updater 安装失败：%s\n' "$1" >&2; exit 1; }
@@ -24,22 +22,9 @@ updater_arch() {
   esac
 }
 
-mirror_url() {
-  case "$1" in
-    "${GITHUB_MIRROR}"*) printf '%s' "$1" ;;
-    *) printf '%s%s' "$GITHUB_MIRROR" "$1" ;;
-  esac
-}
-
 download_file() {
   local url="$1" dest="$2"
-  local alt
-  alt="$(mirror_url "$url")"
-  if curl -fsSL --connect-timeout 20 "$url" -o "$dest"; then
-    return 0
-  fi
-  [[ "$alt" != "$url" ]] || return 1
-  curl -fsSL --connect-timeout 20 "$alt" -o "$dest"
+  curl -fsSL --connect-timeout 20 "$url" -o "$dest"
 }
 
 require_root() {

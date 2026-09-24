@@ -3,7 +3,6 @@ import test from "node:test";
 
 import {
   checksumForAsset,
-  mirroredGithubUrl,
   releaseAssetUrl,
   updaterArch,
   updaterAssetName,
@@ -32,30 +31,4 @@ test("releaseAssetUrl uses the GitHub download path", () => {
     releaseAssetUrl("tukeceshi/z3cz", "v1.2.0", "SHA256SUMS"),
     "https://github.com/tukeceshi/z3cz/releases/download/v1.2.0/SHA256SUMS"
   );
-});
-
-test("mirroredGithubUrl prefixes the default mirror", () => {
-  const previousMirror = process.env.DAFTHUNK_GITHUB_MIRROR;
-  const previousAlt = process.env.Z3CZ_GITHUB_MIRROR;
-  try {
-    delete process.env.DAFTHUNK_GITHUB_MIRROR;
-    delete process.env.Z3CZ_GITHUB_MIRROR;
-    assert.equal(
-      mirroredGithubUrl(
-        "https://github.com/tukeceshi/z3cz/releases/download/v1/a"
-      ),
-      "https://ghfast.top/https://github.com/tukeceshi/z3cz/releases/download/v1/a"
-    );
-  } finally {
-    if (previousMirror === undefined) {
-      delete process.env.DAFTHUNK_GITHUB_MIRROR;
-    } else {
-      process.env.DAFTHUNK_GITHUB_MIRROR = previousMirror;
-    }
-    if (previousAlt === undefined) {
-      delete process.env.Z3CZ_GITHUB_MIRROR;
-    } else {
-      process.env.Z3CZ_GITHUB_MIRROR = previousAlt;
-    }
-  }
 });

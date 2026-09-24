@@ -165,7 +165,6 @@ export async function runSourceUpdate(
     source = await manager.prepareSource({
       hostDir: manager.hostDir,
       repository: manager.repository,
-      sourceChannel: manager.sourceChannel(),
       ref,
       version: targetVersion,
       run: manager.runCommand,

@@ -944,14 +944,12 @@ export const zh: TranslationDictionary = {
       description:
         "后台下载并校验正式版本包，全程记录进度；切换期间进入维护模式。",
       check: "检查更新",
-      sourceChannel: "下载渠道",
-      sourceChannelHint: "选择从 GitHub 或 Gitee 下载更新包；版本检查仍以 GitHub 正式发布为准。",
-      sourceChannelSaved: "已切换到 {{channel}}",
-      sourceChannelFailed: "无法保存下载渠道",
-      sourceChannels: {
-        github: "GitHub",
-        gitee: "Gitee",
-      },
+      downloadMethod: "下载方式",
+      downloadMethodHint:
+        "默认由后台服务从 GitHub 下载。也可用浏览器下载两个文件，然后上传以安装。",
+      downloadMethods: { service: "服务下载", browser: "浏览器下载" },
+      downloadFile: "下载文件",
+      uploadRequired: "请先选择部署包和 SHA256SUMS 文件",
       checking: "正在检查…",
       checkFound: "发现新版本 {{version}}",
       checkLatest: "当前已是最新版本",

@@ -3,57 +3,38 @@
 import { UpdateManager } from "./manager.mjs";
 import { defaultSocketPath } from "./paths.mjs";
 import { createUpdaterServer, listenUnix } from "./server.mjs";
-import fs from "node:fs";
-import path from "node:path";
-import { validateSourceRef } from "./source-release.mjs";
+import { readUpdatePolicy } from "./update-policy.mjs";
+import { compareVersions, isReleaseVersion } from "./version.mjs";
 
 const token = String(process.env.Z3CZ_UPDATER_TOKEN || "").trim();
 const command = process.argv[2] || "serve";
 
 async function main() {
+  if (command === "validate-policy") {
+    const [sourceDir, currentVersion] = process.argv.slice(3);
+    if (!sourceDir || !currentVersion) throw new Error("缺少版本策略参数");
+    const policy = readUpdatePolicy(sourceDir);
+    if (!policy || policy.format !== 2)
+      throw new Error("发布包缺少有效的更新策略");
+    if (
+      compareVersions(currentVersion, policy.minimumVersion) < 0 &&
+      policy.minimumVersion !== "v0.0.0"
+    ) {
+      throw new Error(
+        `当前版本 ${currentVersion} 低于最低可升级版本 ${policy.minimumVersion}`
+      );
+    }
+    const rollbackCompatible =
+      policy.rollbackCompatible &&
+      isReleaseVersion(currentVersion) &&
+      compareVersions(currentVersion, policy.minimumRollbackVersion) >= 0;
+    process.stdout.write(rollbackCompatible ? "true\n" : "false\n");
+    return;
+  }
   const manager = new UpdateManager();
   manager.recoverInterruptedOperation();
-  if (command === "install-source") {
-    const ref =
-      process.argv[3] ||
-      fs
-        .readFileSync(path.join(manager.installDir, "SOURCE_REVISION"), "utf8")
-        .trim();
-    validateSourceRef(ref);
-    const version = fs
-      .readFileSync(path.join(manager.installDir, "VERSION"), "utf8")
-      .trim();
-    manager.state.operation = {
-      phase: "preflight",
-      logs: [],
-      automaticRollback: false,
-    };
-    await manager.runUpdate(manager.currentVersion(), version, ref);
-    console.log(JSON.stringify(manager.snapshot(), null, 2));
-    if (manager.state.operation.phase !== "succeeded") process.exitCode = 1;
-    return;
-  }
   if (command === "status") {
     console.log(JSON.stringify(manager.snapshot(), null, 2));
-    return;
-  }
-  if (command === "check") {
-    console.log(JSON.stringify(await manager.check(), null, 2));
-    return;
-  }
-  if (command === "update") {
-    const target = process.argv[3];
-    await manager.check();
-    const status = manager.startUpdate(
-      target || manager.snapshot().latestRelease?.version || ""
-    );
-    console.log(JSON.stringify(status, null, 2));
-    await waitUntilIdle(manager);
-    const finalStatus = manager.snapshot();
-    console.log(JSON.stringify(finalStatus, null, 2));
-    if (finalStatus.operation.phase !== "succeeded") {
-      process.exitCode = 1;
-    }
     return;
   }
   if (command === "rollback") {
@@ -66,7 +47,7 @@ async function main() {
   }
   if (command !== "serve") {
     console.error(
-      "Usage: updater serve|status|check|update [version]|rollback [reason]"
+      "Usage: updater serve|status|rollback [reason]|validate-policy <release-dir> <current-version>"
     );
     process.exitCode = 1;
     return;

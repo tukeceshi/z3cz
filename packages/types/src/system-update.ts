@@ -56,6 +56,7 @@ export interface SystemUpdateLog {
 }
 
 export interface SystemUpdateOperation {
+  readonly downloadMethod?: "service" | "browser";
   readonly mode?: "light" | "full";
   readonly id?: string;
   readonly phase: SystemUpdatePhase;
@@ -69,14 +70,17 @@ export interface SystemUpdateOperation {
   readonly progress?: number;
   readonly downloadedBytes?: number;
   readonly totalBytes?: number;
+  readonly files?: readonly SystemUpdateFileProgress[];
   readonly packageChecksum?: string;
   readonly logs: readonly SystemUpdateLog[];
 }
 
-export const SYSTEM_UPDATE_SOURCE_CHANNELS = ["github", "gitee"] as const;
-
-export type SystemUpdateSourceChannel =
-  (typeof SYSTEM_UPDATE_SOURCE_CHANNELS)[number];
+export interface SystemUpdateFileProgress {
+  readonly name: string;
+  readonly downloadedBytes: number;
+  readonly totalBytes?: number;
+  readonly status: "pending" | "downloading" | "complete" | "failed";
+}
 
 export interface SystemUpdateStatus {
   readonly supported: boolean;
@@ -84,7 +88,6 @@ export interface SystemUpdateStatus {
   readonly repository: string;
   readonly deployment: string;
   readonly currentVersion: string;
-  readonly sourceChannel: SystemUpdateSourceChannel;
   readonly latestRelease?: SystemUpdateRelease;
   readonly updateAvailable: boolean;
   readonly checkedAt?: string;
@@ -100,10 +103,6 @@ export interface SystemUpdateStatus {
 
 export interface StartSystemUpdateRequest {
   readonly targetVersion: string;
-}
-
-export interface SetSystemUpdateSourceChannelRequest {
-  readonly sourceChannel: SystemUpdateSourceChannel;
 }
 
 export interface RollbackSystemUpdateRequest {

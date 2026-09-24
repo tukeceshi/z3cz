@@ -25,7 +25,6 @@ export function disconnectedUpdateStatus(
     repository: SYSTEM_UPDATE_REPOSITORY,
     deployment: runtime,
     currentVersion: env.APP_VERSION || "unknown",
-    sourceChannel: "github",
     updateAvailable: false,
     checks: [],
     operation: {

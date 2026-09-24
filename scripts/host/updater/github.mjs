@@ -6,7 +6,6 @@ import { createWriteStream } from "node:fs";
 import { compareVersions, displayVersion } from "./version.mjs";
 
 const USER_AGENT = "z3cz-host-updater";
-const DEFAULT_MIRROR = "https://ghfast.top";
 
 /**
  * @typedef {{
@@ -102,21 +101,6 @@ export function checksumForAsset(sumsText, assetName) {
 }
 
 /**
- * @param {string} url
- */
-export function mirroredGithubUrl(url) {
-  const mirror = String(
-    process.env.DAFTHUNK_GITHUB_MIRROR ||
-      process.env.Z3CZ_GITHUB_MIRROR ||
-      DEFAULT_MIRROR
-  ).replace(/\/$/, "");
-  if (!mirror || url.startsWith(`${mirror}/`)) {
-    return url;
-  }
-  return `${mirror}/${url}`;
-}
-
-/**
  * @param {string} repository
  * @param {string} version
  * @param {string} assetName
@@ -145,20 +129,13 @@ export async function downloadReleaseAsset(
   options = {}
 ) {
   const fetchImpl = options.fetchImpl ?? fetch;
-  const primary = releaseAssetUrl(repository, version, assetName);
-  const urls = [primary, mirroredGithubUrl(primary)].filter(
-    (url, index, list) => list.indexOf(url) === index
+  await downloadToFile(
+    fetchImpl,
+    releaseAssetUrl(repository, version, assetName),
+    destPath,
+    options
   );
-  let lastError = new Error(`无法下载 ${assetName}`);
-  for (const url of urls) {
-    try {
-      await downloadToFile(fetchImpl, url, destPath, options);
-      return destPath;
-    } catch (error) {
-      lastError = error instanceof Error ? error : new Error(String(error));
-    }
-  }
-  throw lastError;
+  return destPath;
 }
 
 /**

@@ -24,15 +24,19 @@ else
   (cd "$TMP" && sha256sum -c SHA256SUMS --ignore-missing) || die "Release SHA-256 校验失败"
 fi
 TARGET="$INSTALL_DIR/releases/${VERSION#v}"; [[ ! -e "$TARGET" ]] || die "目标版本目录已存在：$TARGET"
-mkdir -p "$TARGET"; tar -xzf "$TMP/$ASSET" -C "$TARGET"
-[[ "$(tr -d '\r\n' < "$TARGET/VERSION")" == "$VERSION" ]] || die "包内 VERSION 不匹配"
-case "$(uname -m)" in x86_64|amd64) UPDATER_ARCH=amd64 ;; aarch64|arm64) UPDATER_ARCH=arm64 ;; *) UPDATER_ARCH="" ;; esac
-if [[ -n "$UPDATER_ARCH" && -f "$TARGET/dist/z3cz-host-updater-linux-$UPDATER_ARCH" ]]; then
-  install -m 0755 "$TARGET/dist/z3cz-host-updater-linux-$UPDATER_ARCH" /usr/local/bin/z3cz-update-runner
-fi
+STAGED="$TMP/release"; mkdir -p "$STAGED"; tar -xzf "$TMP/$ASSET" -C "$STAGED"
+[[ "$(tr -d '\r\n' < "$STAGED/VERSION")" == "$VERSION" ]] || die "包内 VERSION 不匹配"
+CURRENT="$(readlink -f "$INSTALL_DIR/current")"
+CURRENT_VERSION="$(tr -d '\r\n' < "$CURRENT/VERSION")"
+case "$(uname -m)" in x86_64|amd64) UPDATER_ARCH=amd64 ;; aarch64|arm64) UPDATER_ARCH=arm64 ;; *) die "不支持的 CPU 架构" ;; esac
+POLICY_CHECKER="$STAGED/dist/z3cz-host-updater-linux-$UPDATER_ARCH"
+[[ -x "$POLICY_CHECKER" ]] || die "发布包缺少更新执行器"
+ROLLBACK_COMPATIBLE="$("$POLICY_CHECKER" validate-policy "$STAGED" "$CURRENT_VERSION")" || die "更新策略检查失败"
+mv "$STAGED" "$TARGET"
+install -m 0755 "$TARGET/dist/z3cz-host-updater-linux-$UPDATER_ARCH" /usr/local/bin/z3cz-update-runner
 install_prod_dependencies "$TARGET"
 
-CURRENT="$(readlink -f "$INSTALL_DIR/current")"; BACKUP="$STATE_DIR/backups/z3cz-before-${VERSION#v}-$(date +%Y%m%d%H%M%S).dump"
+BACKUP="$STATE_DIR/backups/z3cz-before-${VERSION#v}-$(date +%Y%m%d%H%M%S).dump"
 log "进入维护模式并备份数据库"; touch "$STATE_DIR/maintenance/enabled"
 "$CURRENT/scripts/backup.sh" "$BACKUP" || { rm -f "$STATE_DIR/maintenance/enabled"; die "备份失败"; }
 log "运行新版本迁移"
@@ -48,7 +52,6 @@ if compose "$TARGET" up -d --force-recreate --remove-orphans --wait; then
   rm -f "$STATE_DIR/maintenance/enabled"; log "已更新到 $VERSION；备份：$BACKUP"; exit 0
 fi
 
-ROLLBACK_COMPATIBLE="$(sed -n 's/.*"rollbackCompatible"[[:space:]]*:[[:space:]]*\(true\|false\).*/\1/p' "$TARGET/update-policy.json" | head -1)"
 switch_link current "$CURRENT"
 compose "$CURRENT" up -d --force-recreate --remove-orphans || true
 if [[ "$ROLLBACK_COMPATIBLE" == true ]]; then

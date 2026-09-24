@@ -951,8 +951,7 @@ export const en = {
       placeholder: "example.com",
       fieldHelp:
         "Do not include a port, path, or IP. Leave empty to remove the domain.",
-      restarting:
-        "Saved. The site will restart. Reopen it at the new address.",
+      restarting: "Saved. The site will restart. Reopen it at the new address.",
       unchanged: "The domain is unchanged.",
       saveFailed: "Could not save the domain",
       loadFailed: "Could not load the domain",
@@ -982,15 +981,15 @@ export const en = {
       description:
         "Prepare the official release while the site runs, then briefly pause access to switch versions.",
       check: "Check for updates",
-      sourceChannel: "Download channel",
-      sourceChannelHint:
-        "Download release packages from GitHub or Gitee. Version checks still use official GitHub releases.",
-      sourceChannelSaved: "Switched to {{channel}}",
-      sourceChannelFailed: "Could not save the download channel",
-      sourceChannels: {
-        github: "GitHub",
-        gitee: "Gitee",
+      downloadMethod: "Download method",
+      downloadMethodHint:
+        "The service downloads from GitHub by default. You can also download both files in your browser and upload them to install.",
+      downloadMethods: {
+        service: "Service download",
+        browser: "Browser download",
       },
+      downloadFile: "Download file",
+      uploadRequired: "Select the deployment archive and SHA256SUMS first",
       checking: "Checking…",
       checkFound: "New version {{version}} is available",
       checkLatest: "You are on the latest version",

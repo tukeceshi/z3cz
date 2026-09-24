@@ -53,13 +53,8 @@ function emptyState() {
     lastBackup: undefined,
     rollbackVersion: "",
     rollbackDatabaseFingerprint: "",
-    sourceChannel: "github",
     operation: emptyOperation(),
   };
-}
-
-function readSourceChannel(value) {
-  return value === "gitee" ? "gitee" : "github";
 }
 
 export class UpdateManager {
@@ -168,7 +163,6 @@ export class UpdateManager {
       return {
         ...emptyState(),
         ...raw,
-        sourceChannel: readSourceChannel(raw.sourceChannel),
         operation: { ...emptyOperation(), ...raw.operation },
       };
     } catch {
@@ -312,7 +306,6 @@ export class UpdateManager {
       repository: this.repository,
       deployment: "docker-self-host",
       currentVersion,
-      sourceChannel: this.sourceChannel(),
       latestRelease: latest,
       updateAvailable,
       checkedAt: this.state.checkedAt,
@@ -339,30 +332,6 @@ export class UpdateManager {
         undefined,
       operation: this.state.operation,
     };
-  }
-
-  sourceChannel() {
-    return readSourceChannel(this.state.sourceChannel);
-  }
-
-  setSourceChannel(value) {
-    if (value !== "github" && value !== "gitee") {
-      throw new Error("源码渠道无效");
-    }
-    if (fs.existsSync(path.join(this.stateDir, "operation.lock"))) {
-      throw new Error("存在更新锁，请等待当前操作完成或检查中断的更新");
-    }
-    if (
-      ACTIVE.has(this.state.operation.phase) ||
-      this.state.operation.phase === "checking"
-    ) {
-      throw Object.assign(new Error("更新操作正在进行，暂时不能更改源码渠道"), {
-        status: this.snapshot(),
-      });
-    }
-    this.state.sourceChannel = value;
-    this.saveState();
-    return this.snapshot();
   }
 
   checksFromState() {

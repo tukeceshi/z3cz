@@ -16,11 +16,8 @@ export function validateSourceRef(ref) {
   }
 }
 
-export const GITEE_SOURCE_REMOTE = "https://gitee.com/daotuke/z3cz.git";
-export function sourceRemote(channel, repository) {
-  return channel === "gitee"
-    ? GITEE_SOURCE_REMOTE
-    : `https://github.com/${repository}.git`;
+export function sourceRemote(repository) {
+  return `https://github.com/${repository}.git`;
 }
 
 export function installationId(hostDir) {
@@ -34,7 +31,6 @@ export function installationId(hostDir) {
 export async function prepareSourceRelease({
   hostDir,
   repository,
-  sourceChannel = "github",
   ref,
   version,
   run,
@@ -64,7 +60,7 @@ export async function prepareSourceRelease({
   await run(hostDir, "git", ["--version"]);
   if (!fs.existsSync(cache))
     await run(hostDir, "git", ["init", "--bare", cache]);
-  log(`从 ${sourceChannel === "gitee" ? "Gitee" : "GitHub"} 增量获取目标版本`);
+  log("从 GitHub 增量获取目标版本");
   await run(
     hostDir,
     "git",
@@ -73,7 +69,7 @@ export async function prepareSourceRelease({
       cache,
       "fetch",
       "--no-tags",
-      sourceRemote(sourceChannel, repository),
+      sourceRemote(repository),
       ref.startsWith("v") ? `refs/tags/${ref}` : ref,
     ],
     { timeoutMs: 10 * 60_000 }
