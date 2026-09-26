@@ -6,9 +6,78 @@ ENV_FILE="$CONFIG_DIR/z3cz.env"
 die() { echo "ERROR: $*" >&2; exit 1; }; log() { echo "==> $*"; }
 need_root() { [[ "${EUID:-$(id -u)}" -eq 0 ]] || die "请使用 sudo 运行"; }
 compose() {
-  Z3CZ_RELEASE_DIR="$1" Z3CZ_ENV_FILE="$ENV_FILE" \
-    Z3CZ_POSTGRES_PASSWORD_FILE="$CONFIG_DIR/postgres.password" \
-    docker compose --env-file "$ENV_FILE" -f "$1/compose.yml" "${@:2}"
+  local release="$1"; shift
+  local args=("$@")
+  local password_source="$CONFIG_DIR/postgres.password"
+  if [[ -f "$release/password-mount.version" && -f "$CONFIG_DIR/postgres-secret/postgres.password" ]]; then
+    password_source="$CONFIG_DIR/postgres-secret"
+  fi
+  if [[ " $* " == *" --wait "* && " $* " != *" --wait-timeout "* ]]; then
+    args+=(--wait-timeout "${Z3CZ_DEPLOY_TIMEOUT:-300}")
+  fi
+  Z3CZ_RELEASE_DIR="$release" Z3CZ_ENV_FILE="$ENV_FILE" \
+    Z3CZ_POSTGRES_PASSWORD_FILE="$password_source" \
+    docker compose --env-file "$ENV_FILE" -f "$release/compose.yml" "${args[@]}"
+}
+
+# Explicit deployment preparation, not a side effect of policy validation.
+# Old update.sh can still start the new template using the original file mount.
+prepare_release_mounts() {
+  local release="$1"
+  [[ -f "$release/password-mount.version" ]] || return 0
+  [[ "$(cat "$release/password-mount.version")" == 1 ]] || die "不支持的密码挂载格式"
+  [[ -f "$CONFIG_DIR/postgres.password" && -s "$CONFIG_DIR/postgres.password" ]] || die "缺少原始数据库密码文件"
+  mkdir -p "$CONFIG_DIR/postgres-secret"
+  chmod 700 "$CONFIG_DIR/postgres-secret"
+  install -m 0600 "$CONFIG_DIR/postgres.password" "$CONFIG_DIR/postgres-secret/postgres.password.next"
+  mv -f "$CONFIG_DIR/postgres-secret/postgres.password.next" "$CONFIG_DIR/postgres-secret/postgres.password"
+}
+
+# One lock shared by install, update and rollback. It is inherited by children.
+lock_deployment() {
+  mkdir -p "$STATE_DIR/deployment"
+  chmod 700 "$STATE_DIR/deployment"
+  exec 9>"$STATE_DIR/deployment/lock"
+  flock -n 9 || die "已有部署操作正在执行"
+}
+
+deployment_phase() {
+  DEPLOY_PHASE="$*"
+  printf '%s\n' "$*" >"$STATE_DIR/deployment/status.next"
+  mv "$STATE_DIR/deployment/status.next" "$STATE_DIR/deployment/status"
+  log "$*"
+}
+
+deployment_failed() {
+  local status="$1"
+  [[ "$status" == 0 ]] || deployment_phase "失败（退出码 $status）：${DEPLOY_PHASE:-部署准备}；维护状态保持不变"
+}
+
+preflight_deployment() {
+  local release="$1" file
+  [[ "${Z3CZ_DEPLOY_TIMEOUT:-300}" =~ ^[1-9][0-9]*$ ]] || die "Z3CZ_DEPLOY_TIMEOUT 必须为正整数秒数"
+  docker info >/dev/null || die "Docker 引擎不可用"
+  docker compose up --help | grep -q -- '--wait-timeout' || die "Docker Compose 需要支持 --wait-timeout"
+  for file in compose.yml api/dist/server.mjs api/dist/migrate.mjs app/index.html scripts/site-address-server.mjs; do
+    [[ -f "$release/$file" ]] || die "发布包缺少文件：$file"
+  done
+  [[ -s "$CONFIG_DIR/postgres.password" && -f "$CONFIG_DIR/postgres.password" ]] || die "数据库密码必须是非空普通文件"
+  compose "$release" config --quiet
+  # Resolve images and check mounts before entering maintenance or replacing services.
+  compose "$release" pull
+  compose "$release" run --rm --no-deps --entrypoint node api -e \
+    "const fs=require('node:fs');for(const p of ['/app/dist/server.mjs','/app/dist/migrate.mjs','/srv/app/index.html'])if(!fs.statSync(p).isFile())throw Error('Invalid release mount: '+p)"
+  compose "$release" run --rm --no-deps --entrypoint sh postgres -ec 'if [ -d /run/z3cz-password ]; then test -s /run/z3cz-password/postgres.password; elif [ -f /run/z3cz-password ]; then test -s /run/z3cz-password; else test -s /run/secrets/postgres_password; fi'
+  compose "$release" run --rm --no-deps --entrypoint node site-address -e \
+    "const fs=require('node:fs');const p=fs.existsSync('/srv/scripts/site-address-server.mjs')?'/srv/scripts/site-address-server.mjs':'/srv/site-address-server.mjs';if(!fs.statSync(p).isFile())throw Error('Invalid site-address mount')"
+  compose "$release" run --rm --no-deps --entrypoint caddy caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
+}
+
+# Older releases only expose liveness. Authenticate a query as well before
+# removing maintenance, including when rolling back to an older template.
+verify_database_access() {
+  compose "$1" exec -T api node -e \
+    "const timer=setTimeout(()=>process.exit(1),10000);import('postgres').then(async({default:postgres})=>{const sql=postgres(process.env.DATABASE_URL,{max:1,connect_timeout:2,connection:{statement_timeout:2000}});try{await sql.unsafe('SELECT 1')}finally{await sql.end({timeout:1})}}).then(()=>clearTimeout(timer)).catch(()=>process.exit(1))"
 }
 install_prod_dependencies() {
   local release="$1"; mkdir -p "$CACHE_DIR"

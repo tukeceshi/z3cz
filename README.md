@@ -37,7 +37,7 @@
 #### 要求
 
 - Linux（推荐 Ubuntu）
-- Docker Engine 24+ 与 Docker Compose v2
+- Docker Engine 24+ 与支持 `up --wait --wait-timeout` 的 Docker Compose v2 或更新版本
 - 建议内存 6G+
 
 #### 安装（一条命令）
@@ -46,7 +46,7 @@
 installer="$(mktemp)" && curl -fL --connect-timeout 20 --max-time 120 "https://raw.githubusercontent.com/tukeceshi/z3cz/main/bootstrap-install" -o "$installer" && sudo bash "$installer"
 ```
 
-安装器默认下载 GitHub 最新正式版的部署包，校验 SHA-256 和包内版本。需要安装指定正式版时，可运行 `sudo Z3CZ_INSTALL_VERSION=v1.0.16 bash "$installer"`。生产只运行 `api`、`postgres`、`caddy` 三个容器，使用固定版本的通用 Node、PostgreSQL、Caddy 镜像；不会构建、发布或拉取 z3cz 专用镜像，也不会在服务器构建 App 或编译 API。
+安装器默认下载 GitHub 最新正式版的部署包，校验 SHA-256 和包内版本。需要安装指定正式版时，可运行 `sudo Z3CZ_INSTALL_VERSION=v1.0.16 bash "$installer"`。生产运行 `api`、`postgres`、`site-address`、`caddy` 四个容器，使用固定版本的通用 Node、PostgreSQL、Caddy 镜像；不会构建、发布或拉取 z3cz 专用镜像，也不会在服务器构建 App 或编译 API。
 
 安装时会询问公网域名。填写后由容器内 Caddy 自动申请并续期证书；直接回车，或当前没有终端时，监听 HTTP 80，不写站点地址。自动化安装跳过提问：
 
@@ -58,6 +58,10 @@ sudo Z3CZ_SITE_ADDRESS=example.com Z3CZ_PUBLIC_URL=https://example.com bash "$in
 
 程序安装到 `/opt/z3cz/releases/<版本>`，`current`/`previous` 为原子版本指针；配置位于 `/etc/z3cz`，PostgreSQL、上传、Caddy 数据与备份位于 `/var/lib/z3cz`，pnpm store 位于 `/var/cache/z3cz/pnpm`。每个版本的 API 生产依赖由一次性 Node 容器以 `--prod --frozen-lockfile` 安装并复用该缓存。
 
+生产服务默认 `restart: always`：Docker 引擎恢复后自动启动，包括此前手动停止的容器。需要跨引擎重启保持停用时，在 `/etc/z3cz/z3cz.env` 配置 `Z3CZ_RESTART_POLICY=unless-stopped` 并通过部署流程应用，或显式卸载该 Compose 服务。Docker 引擎自身的开机启动仍须由宿主机保障。
+
+部署等待默认最多 300 秒，可通过执行安装/升级命令时的环境变量 `Z3CZ_DEPLOY_TIMEOUT` 调整。API 在运行时持续等待数据库，部署验收使用认证查询；失败不会被当作安装完成。安装中断后可重跑同一版本安装器，密码和数据保留。部署阶段记录于 `/var/lib/z3cz/deployment/status`。挂载兼容、旧版本升级边界及验收方法见 [部署可靠性说明](docs/deployment-reliability.md)。
+
 #### 更新
 
 推荐在管理后台「系统设置 → 系统更新」检查 GitHub 正式版本并升级。默认由后台服务下载，也可通过浏览器下载后上传。后台负责版本检查、SHA-256 校验和进度留痕；宿主机执行器负责备份、迁移、原子切换、健康检查和失败回退。
@@ -67,7 +71,7 @@ GitHub 是唯一的版本检查、源码和部署包发布渠道。管理后台�
 也可以使用宿主机命令升级正式版本：
 
 ```bash
-sudo bash /opt/z3cz/current/scripts/update.sh v1.0.21
+sudo bash /opt/z3cz/current/scripts/update.sh v1.0.23
 ```
 
 更新只接受显式 `v*` 正式版本。下载、校验、解压和依赖安装在旧服务运行期间完成；随后进入维护、备份 PostgreSQL、以新版本 `dist/migrate.mjs` 迁移、原子切换并健康检查。应用失败会自动切回；不兼容迁移会保持维护状态并要求显式恢复备份。

@@ -1,0 +1,12 @@
+# The shipped Bun updater targets glibc Linux, so the test host must too.
+FROM docker:29.6.1-dind AS engine
+FROM node:22.12.0-bookworm-slim@sha256:35531c52ce27b6575d69755c73e65d4468dba93a25644eed56dc12879cae9213
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ca-certificates curl openssl util-linux iptables iproute2 procps xz-utils \
+    && rm -rf /var/lib/apt/lists/*
+COPY --from=engine /usr/local/bin/ /usr/local/bin/
+COPY --from=engine /usr/local/libexec/docker/cli-plugins/ /usr/local/libexec/docker/cli-plugins/
+ENV DOCKER_TLS_CERTDIR=""
+VOLUME /var/lib/docker
+ENTRYPOINT ["dockerd-entrypoint.sh"]
+CMD ["dockerd", "--host=unix:///var/run/docker.sock", "--tls=false"]

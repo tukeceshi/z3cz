@@ -5,6 +5,15 @@ const root = path.resolve(import.meta.dirname, "../..");
 const stage = process.argv[2] ? path.resolve(process.argv[2]) : path.join(root, "dist/release");
 const forbidden = new Set(["typescript", "tsx", "esbuild", "drizzle-kit", "vite", "vitest", "wrangler", "@biomejs/biome", "rolldown", "rollup", "lightningcss", "@cloudflare/workers-types"]);
 const pkg = JSON.parse(fs.readFileSync(path.join(stage, "api/package.json"), "utf8"));
+if (fs.readFileSync(path.join(stage, "password-mount.version"), "utf8").trim() !== "1") {
+  throw new Error("Unsupported password mount contract");
+}
+for (const file of ["caddy/Caddyfile", "scripts/common.sh", "scripts/install.sh", "scripts/update.sh", "scripts/rollback.sh", "scripts/site-address-server.mjs"]) {
+  if (!fs.statSync(path.join(stage, file)).isFile()) throw new Error(`Release requires a regular file: ${file}`);
+}
+if (fs.readFileSync(path.join(stage, "Caddyfile"), "utf8") !== fs.readFileSync(path.join(stage, "caddy/Caddyfile"), "utf8")) {
+  throw new Error("Legacy and directory-mounted Caddy configurations must match");
+}
 for (const name of Object.keys(pkg.dependencies ?? {})) {
   if (forbidden.has(name) || name.startsWith("@dafthunk/")) throw new Error(`Forbidden production dependency: ${name}`);
 }

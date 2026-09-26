@@ -56,6 +56,14 @@ jobs:
       - name: Build immutable deployment package
         run: bash scripts/host/pack-deploy.sh
 
+      - name: Verify deployment failure handling
+        run: bash scripts/host/deployment.test.sh
+
+      - name: Verify real deployment and legacy upgrade
+        env:
+          Z3CZ_TEST_LEGACY_REF: 0320364c872d0ba65ad1b19bab6d8d6b2aea2494
+        run: bash scripts/release/smoke-deploy.sh
+
       - name: Prepare release notes
         shell: bash
         run: |

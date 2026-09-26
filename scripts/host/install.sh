@@ -1,10 +1,45 @@
 #!/usr/bin/env bash
 set -euo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"; source "$HERE/common.sh"; need_root
+lock_deployment
 command -v docker >/dev/null || die "需要 Docker Engine"; docker compose version >/dev/null || die "需要 Docker Compose v2"
 RELEASE="$(cd "$HERE/.." && pwd)"; VERSION="$(tr -d 'v\r\n' < "$RELEASE/VERSION")"; TARGET="$INSTALL_DIR/releases/$VERSION"
 mkdir -p "$INSTALL_DIR/releases" "$STATE_DIR"/{postgres,uploads,caddy/data,caddy/config,backups,maintenance} "$CACHE_DIR" "$CONFIG_DIR"
-if [[ "$RELEASE" != "$TARGET" ]]; then [[ ! -e "$TARGET" ]] || die "版本目录已存在：$TARGET"; cp -a "$RELEASE" "$TARGET"; fi
+PENDING="$STATE_DIR/deployment/install-pending"
+ORIGINAL_CURRENT="$(readlink -f "$INSTALL_DIR/current" 2>/dev/null || true)"
+[[ -d "$ORIGINAL_CURRENT" ]] || ORIGINAL_CURRENT=""
+if [[ -n "$ORIGINAL_CURRENT" && ! -f "$PENDING" ]]; then
+  die "已有安装，请使用当前版本的 scripts/update.sh 升级"
+fi
+if [[ -f "$PENDING" ]]; then
+  [[ "$(cat "$PENDING")" == "$TARGET" ]] || die "另一个版本安装未完成，请先处理 $PENDING"
+  [[ -f "$TARGET/VERSION" && "$(tr -d 'v\r\n' < "$TARGET/VERSION")" == "$VERSION" ]] || die "未完成的版本目录不完整"
+else
+  if [[ "$RELEASE" != "$TARGET" ]]; then
+    [[ ! -e "$TARGET" ]] || die "版本目录已存在：$TARGET"
+    COPY_STAGE="$(mktemp -d "$INSTALL_DIR/releases/.install-$VERSION.XXXXXX")"
+    if ! cp -a "$RELEASE/." "$COPY_STAGE/"; then
+      rm -rf "$COPY_STAGE"
+      die "复制发布包失败，尚未切换版本"
+    fi
+    mv -T "$COPY_STAGE" "$TARGET"
+  fi
+  printf '%s\n' "$TARGET" >"$PENDING"
+fi
+INSTALL_COMPLETE=0; LINK_CHANGED=0
+finish_install() {
+  local status=$?
+  if [[ "$INSTALL_COMPLETE" != 1 ]]; then
+    if [[ "$LINK_CHANGED" == 1 ]]; then
+      if [[ -n "$ORIGINAL_CURRENT" ]]; then switch_link current "$ORIGINAL_CURRENT";
+      else rm -f "$INSTALL_DIR/current"; fi
+    fi
+    deployment_phase "安装失败：v$VERSION；可重新运行同版本安装器；数据和密码已保留"
+  fi
+  return "$status"
+}
+trap finish_install EXIT
+deployment_phase "准备安装：v$VERSION"
 if [[ ! -f "$CONFIG_DIR/postgres.password" ]]; then umask 077; openssl rand -hex 32 > "$CONFIG_DIR/postgres.password"; fi
 if [[ ! -f "$ENV_FILE" ]]; then
   DB_PASSWORD="$(cat "$CONFIG_DIR/postgres.password")"; JWT_SECRET="$(openssl rand -hex 32)"; MASTER_KEY="$(openssl rand -hex 32)"
@@ -44,11 +79,19 @@ fi
 chmod 600 "$ENV_FILE" "$CONFIG_DIR/postgres.password"
 prepare_docker_env "$TARGET/compose.yml"
 ensure_site_address_access
-install_prod_dependencies "$TARGET"; switch_link current "$TARGET"
+install_prod_dependencies "$TARGET"
+prepare_release_mounts "$TARGET"
+preflight_deployment "$TARGET"
+deployment_phase "初始化数据库：v$VERSION"
 compose "$TARGET" up -d postgres --wait
 compose "$TARGET" run --rm --no-deps api node dist/migrate.mjs
-if command -v systemctl >/dev/null 2>&1; then
+switch_link current "$TARGET"; LINK_CHANGED=1
+if [[ -d /run/systemd/system ]]; then
   bash "$TARGET/scripts/install-update-runner.sh"
 fi
 compose "$TARGET" up -d --force-recreate --wait
+verify_database_access "$TARGET"
+INSTALL_COMPLETE=1
+rm -f "$PENDING"
+deployment_phase "安装完成：v$VERSION"
 log "已安装 v$VERSION"

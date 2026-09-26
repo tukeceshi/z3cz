@@ -2,6 +2,8 @@
 # Formal-release updater. Preparation happens while the current release remains live.
 set -euo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"; source "$HERE/common.sh"; need_root
+lock_deployment
+[[ ! -e "$STATE_DIR/maintenance/enabled" ]] || die "维护模式已存在，请先处理上次部署或显式回退"
 REPOSITORY="${Z3CZ_REPOSITORY:-tukeceshi/z3cz}"; PREPARED_ARCHIVE=""; PREPARED_CHECKSUM=""
 if [[ "${1:-}" == "--prepared" ]]; then
   PREPARED_ARCHIVE="${2:-}"; PREPARED_CHECKSUM="${3:-}"; VERSION="${4:-}"
@@ -13,6 +15,9 @@ ASSET="z3cz-${VERSION}-deploy.tar.gz"; BASE="https://github.com/$REPOSITORY/rele
 TMP="$(mktemp -d)"; TARGET_CREATED=0; MAINTENANCE_STARTED=0
 cleanup() {
   local status=$?
+  if [[ "$status" -ne 0 ]]; then
+    deployment_failed "$status"
+  fi
   rm -rf "$TMP"
   if [[ "$status" -ne 0 && "$TARGET_CREATED" == 1 && "$MAINTENANCE_STARTED" == 0 ]]; then
     rm -rf "$TARGET"
@@ -40,20 +45,22 @@ case "$(uname -m)" in x86_64|amd64) UPDATER_ARCH=amd64 ;; aarch64|arm64) UPDATER
 POLICY_CHECKER="$STAGED/dist/z3cz-host-updater-linux-$UPDATER_ARCH"
 [[ -x "$POLICY_CHECKER" ]] || die "发布包缺少更新执行器"
 ROLLBACK_COMPATIBLE="$("$POLICY_CHECKER" validate-policy "$STAGED" "$CURRENT_VERSION")" || die "更新策略检查失败"
-WRITE_PROBE="$(mktemp /usr/local/bin/.z3cz-update-runner.XXXXXX)" || die "更新执行器无法写入 /usr/local/bin"
+UPDATER_BIN="${Z3CZ_UPDATER_BIN:-/usr/local/bin/z3cz-update-runner}"
+WRITE_PROBE="$(mktemp "$(dirname "$UPDATER_BIN")/.z3cz-update-runner.XXXXXX")" || die "更新执行器目录不可写"
 rm -f "$WRITE_PROBE"
 mv "$STAGED" "$TARGET"
 TARGET_CREATED=1
-install -m 0755 "$TARGET/dist/z3cz-host-updater-linux-$UPDATER_ARCH" /usr/local/bin/z3cz-update-runner
-log "正在安装生产依赖"
+deployment_phase "准备更新 $VERSION：安装生产依赖"
 install_prod_dependencies "$TARGET"
 log "生产依赖已安装"
+prepare_release_mounts "$TARGET"
+preflight_deployment "$TARGET"
 
 BACKUP="$STATE_DIR/backups/z3cz-before-${VERSION#v}-$(date +%Y%m%d%H%M%S).dump"
-log "进入维护模式并备份数据库"; touch "$STATE_DIR/maintenance/enabled"
+deployment_phase "进入维护模式并备份数据库：$BACKUP"; touch "$STATE_DIR/maintenance/enabled"
 MAINTENANCE_STARTED=1
 "$CURRENT/scripts/backup.sh" "$BACKUP" || { rm -f "$STATE_DIR/maintenance/enabled"; die "备份失败"; }
-log "运行新版本迁移"
+deployment_phase "运行新版本迁移：$VERSION；备份：$BACKUP"
 prepare_docker_env "$TARGET/compose.yml"
 ensure_site_address_access
 if ! compose "$TARGET" run --rm --no-deps api node dist/migrate.mjs; then
@@ -61,7 +68,7 @@ if ! compose "$TARGET" run --rm --no-deps api node dist/migrate.mjs; then
 fi
 
 switch_link previous "$CURRENT"; switch_link current "$TARGET"
-log "切换并验证新版本"
+deployment_phase "切换并验证新版本：$VERSION；备份：$BACKUP"
 ROLLBACK_STATE_DIR="${Z3CZ_UPDATER_STATE_DIR:-/var/lib/z3cz/update/runner}"
 write_release_rollback() {
   mkdir -p "$ROLLBACK_STATE_DIR"
@@ -85,16 +92,21 @@ EOF
   chmod 600 "$ROLLBACK_STATE_DIR/release-rollback.json"
 }
 
-if compose "$TARGET" up -d --force-recreate --remove-orphans --wait; then
+if compose "$TARGET" up -d --force-recreate --remove-orphans --wait && verify_database_access "$TARGET"; then
+  install -m 0755 "$TARGET/dist/z3cz-host-updater-linux-$UPDATER_ARCH" "$UPDATER_BIN"
   write_release_rollback
-  rm -f "$STATE_DIR/maintenance/enabled"; log "已更新到 $VERSION；备份：$BACKUP"; exit 0
+  rm -f "$STATE_DIR/maintenance/enabled"; deployment_phase "已更新到 $VERSION；备份：$BACKUP"; exit 0
 fi
 
 switch_link current "$CURRENT"
 rm -f "$ROLLBACK_STATE_DIR/release-rollback.json"
-compose "$CURRENT" up -d --force-recreate --remove-orphans || true
+if ! compose "$CURRENT" up -d --force-recreate --remove-orphans --wait || ! verify_database_access "$CURRENT"; then
+  DEPLOY_PHASE="新旧版本均未恢复健康；维护模式已保留；备份：$BACKUP"
+  die "新旧版本均未恢复健康；维护模式已保留，请人工检查。备份：$BACKUP"
+fi
 if [[ "$ROLLBACK_COMPATIBLE" == true ]]; then
   rm -f "$STATE_DIR/maintenance/enabled"
+  DEPLOY_PHASE="新版本失败，旧版本已恢复健康并自动回退；备份：$BACKUP"
   die "新应用健康检查失败，已自动回退到旧版本"
 fi
 die "新应用健康检查失败，代码已切回旧版本；数据库声明为不兼容，维护模式保留。请显式恢复 $BACKUP 后再解除维护模式"

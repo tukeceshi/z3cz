@@ -1,3 +1,12 @@
+# Internal readiness is independent of the public domain and maintenance page.
+http://:8081 {
+	bind 127.0.0.1
+	handle /health {
+		rewrite * /health/ready
+		reverse_proxy api:3001
+	}
+}
+
 {$Z3CZ_SITE_ADDRESS::80} {
 	encode gzip zstd
 	@maintenance file /srv/maintenance/enabled

@@ -1,28 +1,52 @@
 # Production release runtime. Copied into each release as compose.yml.
 name: z3cz
 
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
 services:
   postgres:
     image: ${POSTGRES_IMAGE:-postgres:16.6-alpine@sha256:1d04b9ba1d4996401f2552b51beda8187f175c0645c091e4781134fc9c9a3eef}
     environment:
       POSTGRES_USER: z3cz
-      POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password
       POSTGRES_DB: z3cz
-    secrets: [postgres_password]
+    # Legacy updaters supply a file; new deployers supply a password-only directory.
+    # Both paths use the existing password, never reinitialize an existing database.
+    entrypoint: ["/bin/sh", "-ec"]
+    command:
+      - |
+        if [ -d /run/z3cz-password ]; then
+          export POSTGRES_PASSWORD_FILE=/run/z3cz-password/postgres.password
+        else
+          export POSTGRES_PASSWORD_FILE=/run/z3cz-password
+        fi
+        exec docker-entrypoint.sh postgres
     volumes:
       - /var/lib/z3cz/postgres:/var/lib/postgresql/data
+      - type: bind
+        source: ${Z3CZ_POSTGRES_PASSWORD_FILE:-/etc/z3cz/postgres.password}
+        target: /run/z3cz-password
+        read_only: true
+        bind:
+          create_host_path: false
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U z3cz -d z3cz"]
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U z3cz -d z3cz"]
       interval: 5s
       timeout: 5s
       retries: 20
-    restart: unless-stopped
+      start_period: 30s
+    restart: ${Z3CZ_RESTART_POLICY:-always}
+    stop_grace_period: 60s
+    logging: *logging
 
   # Node image has no docker CLI. Mount the host root so this process can chroot
   # and run the host's docker compose after the admin binds a domain.
   site-address:
     image: ${NODE_IMAGE:-node:22.12.0-bookworm-slim@sha256:35531c52ce27b6575d69755c73e65d4468dba93a25644eed56dc12879cae9213}
-    command: ["node", "/srv/site-address-server.mjs"]
+    command: ["node", "/srv/scripts/site-address-server.mjs"]
     cap_add:
       - SYS_CHROOT
     environment:
@@ -33,19 +57,30 @@ services:
     volumes:
       - /:/host
       - /run/z3cz-site:/run/z3cz-site
-      - ${Z3CZ_RELEASE_DIR:?set Z3CZ_RELEASE_DIR}/scripts/site-address-server.mjs:/srv/site-address-server.mjs:ro
-    restart: unless-stopped
+      - ${Z3CZ_RELEASE_DIR:?set Z3CZ_RELEASE_DIR}/scripts:/srv/scripts:ro
+    healthcheck:
+      test: ["CMD", "node", "-e", "const s=require('node:net').connect('/run/z3cz-site/site.sock');s.setTimeout(3000);s.on('connect',()=>{s.end();process.exit(0)});s.on('error',()=>process.exit(1));s.on('timeout',()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 30s
+    restart: ${Z3CZ_RESTART_POLICY:-always}
+    init: true
+    stop_grace_period: 30s
+    logging: *logging
 
   api:
     image: ${NODE_IMAGE:-node:22.12.0-bookworm-slim@sha256:35531c52ce27b6575d69755c73e65d4468dba93a25644eed56dc12879cae9213}
     working_dir: /app
     command: ["node", "dist/server.mjs"]
     env_file: ${Z3CZ_ENV_FILE:-/etc/z3cz/z3cz.env}
+    environment:
+      POSTGRES_WAIT_FOREVER: "1"
     depends_on:
       postgres:
         condition: service_healthy
       site-address:
-        condition: service_started
+        condition: service_healthy
     volumes:
       - ${Z3CZ_RELEASE_DIR:?set Z3CZ_RELEASE_DIR}/api:/app:ro
       - ${Z3CZ_RELEASE_DIR:?set Z3CZ_RELEASE_DIR}/app:/srv/app:ro
@@ -55,12 +90,15 @@ services:
       - /run/z3cz-updater:/run/z3cz-updater
       - /var/lib/z3cz/update:/var/lib/z3cz/update
     healthcheck:
-      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3001/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3001/health/ready',{signal:AbortSignal.timeout(3000)}).then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
       interval: 10s
       timeout: 5s
       retries: 18
-      start_period: 20s
-    restart: unless-stopped
+      start_period: 60s
+    restart: ${Z3CZ_RESTART_POLICY:-always}
+    init: true
+    stop_grace_period: 30s
+    logging: *logging
 
   caddy:
     image: ${CADDY_IMAGE:-caddy:2.9.1-alpine@sha256:b4e3952384eb9524a887633ce65c752dd7c71314d2c2acf98cd5c715aaa534f0}
@@ -73,13 +111,17 @@ services:
       - "${HTTPS_PORT:-443}:443"
       - "${HTTPS_PORT:-443}:443/udp"
     volumes:
-      - ${Z3CZ_RELEASE_DIR:?set Z3CZ_RELEASE_DIR}/Caddyfile:/etc/caddy/Caddyfile:ro
+      - ${Z3CZ_RELEASE_DIR:?set Z3CZ_RELEASE_DIR}/caddy:/etc/caddy:ro
       - ${Z3CZ_RELEASE_DIR:?set Z3CZ_RELEASE_DIR}/app:/srv/app:ro
       - /var/lib/z3cz/maintenance:/srv/maintenance:ro
       - /var/lib/z3cz/caddy/data:/data
       - /var/lib/z3cz/caddy/config:/config
-    restart: unless-stopped
-
-secrets:
-  postgres_password:
-    file: ${Z3CZ_POSTGRES_PASSWORD_FILE:-/etc/z3cz/postgres.password}
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-T", "3", "-O", "/dev/null", "http://127.0.0.1:8081/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 30s
+    restart: ${Z3CZ_RESTART_POLICY:-always}
+    stop_grace_period: 30s
+    logging: *logging

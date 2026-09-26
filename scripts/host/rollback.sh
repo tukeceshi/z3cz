@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"; source "$HERE/common.sh"; need_root
+lock_deployment
 RESTORE=""
 if [[ "${1:-}" == "--restore" ]]; then
   RESTORE="${2:-}"
@@ -13,6 +14,8 @@ PREVIOUS="$(readlink -f "$INSTALL_DIR/previous")"
 [[ -d "$PREVIOUS" ]] || die "没有可回退版本"
 CURRENT="$(readlink -f "$INSTALL_DIR/current")"
 [[ "$PREVIOUS" != "$CURRENT" ]] || die "没有可回退版本"
+prepare_release_mounts "$PREVIOUS"
+preflight_deployment "$PREVIOUS"
 log "进入维护模式并回退"
 touch "$STATE_DIR/maintenance/enabled"
 if [[ -n "$RESTORE" ]]; then
@@ -23,8 +26,10 @@ if [[ -n "$RESTORE" ]]; then
 fi
 switch_link previous "$CURRENT"
 switch_link current "$PREVIOUS"
-if ! compose "$PREVIOUS" up -d --force-recreate --wait; then
+if ! compose "$PREVIOUS" up -d --force-recreate --wait || ! verify_database_access "$PREVIOUS"; then
+  deployment_phase "回退失败：$PREVIOUS；维护模式已保留"
   die "回退启动失败，维护模式已保留"
 fi
 rm -f "$STATE_DIR/maintenance/enabled"
+deployment_phase "回退完成：$PREVIOUS"
 log "应用已回退到 $(tr -d '\r\n' < "$PREVIOUS/VERSION")"
