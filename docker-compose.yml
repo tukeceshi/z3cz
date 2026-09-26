@@ -2,7 +2,8 @@
 #
 # 启动：docker compose up -d --build --wait
 # 状态：docker compose ps
-# 重置：docker compose down -v
+# 恢复：docker compose up -d --wait
+# 清空全部开发数据（包括数据库）：docker compose down -v
 # 单容器：docker compose --profile monolith up -d --build
 
 include:

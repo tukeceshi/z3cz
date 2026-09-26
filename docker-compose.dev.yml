@@ -3,11 +3,18 @@
 # 启动：docker compose up -d --build --wait
 # 状态：docker compose ps
 # 日志：docker compose logs -f api app
-# 重置：docker compose down -v
+# 恢复：docker compose up -d --wait
+# 清空全部开发数据（包括数据库）：docker compose down -v
 # 单容器旧模式：docker compose --profile monolith up -d --build
 #
 # node_modules：每服务独立命名卷（方案 I），避免并行 pnpm install 竞态与 HMR 失效。
-# 升级自旧共享卷 dafthunk_node_modules 后请执行一次：docker compose down -v
+# 升级旧依赖卷时仅重建对应 node_modules 卷，不删除数据库卷。
+
+x-dev-logging: &dev-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
 
 services:
   supabase-db:
@@ -26,7 +33,10 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
-    restart: unless-stopped
+      start_period: 30s
+    stop_grace_period: 60s
+    logging: *dev-logging
+    restart: always
 
   api:
     build:
@@ -41,6 +51,7 @@ services:
     depends_on:
       supabase-db:
         condition: service_healthy
+        restart: true
     extra_hosts:
       - "host.docker.internal:host-gateway"
     volumes:
@@ -62,6 +73,7 @@ services:
         required: false
     environment:
       DAFTHUNK_SERVICE: api
+      POSTGRES_WAIT_FOREVER: "1"
       RUNTIME: docker
       SECRETS_FILE: /data/secrets/.dev.vars
       DEV_VARS_FILE: /app/apps/api/.dev.vars
@@ -84,13 +96,16 @@ services:
       test:
         [
           "CMD-SHELL",
-          "node -e \"fetch('http://127.0.0.1:3001/health').then((r)=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\"",
+          "node -e \"fetch('http://127.0.0.1:3001/health/ready', {signal: AbortSignal.timeout(3000)}).then((r)=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\"",
         ]
-      interval: 15s
+      interval: 10s
       timeout: 5s
-      retries: 20
+      retries: 6
       start_period: 120s
-    restart: on-failure:5
+    logging: *dev-logging
+    restart: always
+    init: true
+    stop_grace_period: 30s
     stdin_open: true
     tty: true
 
@@ -107,6 +122,7 @@ services:
     depends_on:
       api:
         condition: service_healthy
+        restart: true
     volumes:
       - .:/app
       - dafthunk_node_modules_app_root:/app/node_modules
@@ -118,6 +134,7 @@ services:
         required: false
     environment:
       DAFTHUNK_SERVICE: app
+      API_WAIT_TIMEOUT_SEC: "300"
       API_PROXY_TARGET: http://api:3001
       # Browser requests stay same-origin through Caddy at localhost:3000.
       VITE_API_HOST: /api
@@ -126,7 +143,16 @@ services:
       SKIP_EXTRACT_NODES: "1"
     networks:
       - dafthunk-network
-    restart: on-failure:5
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/health', {signal: AbortSignal.timeout(3000)}).then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 120s
+    logging: *dev-logging
+    restart: always
+    init: true
+    stop_grace_period: 30s
     stdin_open: true
     tty: true
 
@@ -136,15 +162,25 @@ services:
     image: caddy:2.9-alpine
     container_name: dafthunk-caddy-gateway-dev
     depends_on:
-      - app
-      - api
+      app:
+        condition: service_healthy
+      api:
+        condition: service_healthy
+    stop_grace_period: 30s
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -T 3 -O /dev/null http://127.0.0.1:8080/health && wget -q -T 3 -O /dev/null http://127.0.0.1:8080/api/health/ready"]
+      interval: 10s
+      timeout: 8s
+      retries: 6
+      start_period: 30s
     ports:
       - "${APP_PORT:-3000}:8080"
     volumes:
       - ./docker/caddy/Caddyfile.dev:/etc/caddy/Caddyfile:ro
     networks:
       - dafthunk-network
-    restart: unless-stopped
+    logging: *dev-logging
+    restart: always
 
 networks:
   dafthunk-network:

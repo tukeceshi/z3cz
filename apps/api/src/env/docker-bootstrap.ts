@@ -96,13 +96,15 @@ async function canConnectToPostgres(
   port: number
 ): Promise<boolean> {
   return new Promise((resolve) => {
-    const socket = net.createConnection({ host, port }, () => {
-      socket.end();
-      resolve(true);
-    });
-    socket.on("error", () => {
-      resolve(false);
-    });
+    const socket = net.createConnection({ host, port });
+    const finish = (connected: boolean) => {
+      clearTimeout(timer);
+      socket.destroy();
+      resolve(connected);
+    };
+    const timer = setTimeout(() => finish(false), 3_000);
+    socket.once("connect", () => finish(true));
+    socket.once("error", () => finish(false));
   });
 }
 
@@ -113,14 +115,19 @@ export async function waitForPostgres(
 ): Promise<void> {
   writeBootPhase("waiting_postgres");
   const { host, port } = parseDatabaseTarget(databaseUrl);
-  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+  const waitForever = process.env.POSTGRES_WAIT_FOREVER === "1";
+  for (let attempt = 1; waitForever || attempt <= maxAttempts; attempt += 1) {
     if (await canConnectToPostgres(host, port)) {
       return;
     }
     console.log(
-      `[api] Waiting for Postgres at ${host}:${port} (${attempt}/${maxAttempts})...`
+      `[api] Waiting for Postgres at ${host}:${port} (${attempt}/${waitForever ? "retrying" : maxAttempts})...`
     );
-    await sleep(delayMs);
+    await sleep(
+      waitForever
+        ? Math.min(delayMs * 2 ** Math.min(attempt - 1, 4), 10_000)
+        : delayMs
+    );
   }
   throw new Error(`[api] Postgres not reachable at ${host}:${port}`);
 }

@@ -39,7 +39,10 @@ export async function runServer(
     request: Request,
     serverEnv?: { incoming: unknown; outgoing: unknown }
   ): Response | Promise<Response> => {
-    if (inMaintenance() && new URL(request.url).pathname !== "/health") {
+    if (
+      inMaintenance() &&
+      !["/health", "/health/ready"].includes(new URL(request.url).pathname)
+    ) {
       return new Response("系统正在更新，请稍后重试。", { status: 503 });
     }
     if (serverEnv && "incoming" in serverEnv) {

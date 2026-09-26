@@ -8,13 +8,13 @@ dafthunk_wait_for_api_if_needed() {
     return 0
   fi
 
-  HEALTH_URL="${API_PROXY_TARGET%/}/health"
+  HEALTH_URL="${API_PROXY_TARGET%/}/health/ready"
   TIMEOUT_SEC="${API_WAIT_TIMEOUT_SEC:-480}"
   echo "[entrypoint] Waiting for API at ${HEALTH_URL} before starting app..."
 
   STARTED_AT=$(date +%s)
   while true; do
-    if node -e "fetch('${HEALTH_URL}').then((r)=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"; then
+    if HEALTH_URL="$HEALTH_URL" node -e "fetch(process.env.HEALTH_URL, {signal: AbortSignal.timeout(3000)}).then((r)=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"; then
       echo "[entrypoint] API is ready."
       return 0
     fi

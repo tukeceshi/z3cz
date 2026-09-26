@@ -21,7 +21,7 @@ export function createApp(options: CreateAppOptions): Hono<ApiContext> {
   app.use("*", corsMiddleware);
 
   app.use("*", async (c, next) => {
-    if (c.req.path === "/health") {
+    if (c.req.path === "/health" || c.req.path === "/health/ready") {
       return next();
     }
 

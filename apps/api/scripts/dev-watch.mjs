@@ -5,6 +5,8 @@
  * - skip migrate on tsx restarts when boot stamp matches (see api-boot-cache)
  */
 import { spawn } from "node:child_process";
+import { existsSync, mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -17,6 +19,19 @@ process.env.CHOKIDAR_INTERVAL ??= "300";
 // Stamp-guarded skip keeps routine restarts fast; FORCE_DB_MIGRATE=1 overrides.
 if (process.env.FORCE_DB_MIGRATE !== "1") {
   process.env.SKIP_DB_MIGRATE ??= "1";
+}
+
+// tsx watch stays alive after the application exits. In Docker, forward a
+// fatal bootstrap failure to the container so its restart policy can act.
+const failureDir =
+  process.env.DAFTHUNK_SERVICE === "api"
+    ? mkdtempSync(join(tmpdir(), "dafthunk-api-"))
+    : undefined;
+if (failureDir) {
+  process.env.API_STARTUP_FAILURE_FILE = join(failureDir, "failed");
+  process.on("exit", () =>
+    rmSync(failureDir, { recursive: true, force: true })
+  );
 }
 
 const child = spawn(
@@ -36,6 +51,21 @@ const child = spawn(
     cwd: apiRoot,
   }
 );
+
+if (failureDir) {
+  setInterval(() => {
+    if (existsSync(process.env.API_STARTUP_FAILURE_FILE)) {
+      console.error("[api] Fatal bootstrap failure; restarting container.");
+      child.kill("SIGTERM");
+      process.exit(1);
+    }
+  }, 1000).unref();
+}
+
+child.on("error", (error) => {
+  console.error("[api] Unable to start watcher:", error);
+  process.exit(1);
+});
 
 child.on("exit", (code, signal) => {
   if (signal) {

@@ -14,5 +14,12 @@ const vite = await createServer({
   },
 });
 
+// Registered before Vite's HTML fallback.
+vite.middlewares.use("/health", (_req, res) => {
+  res.statusCode = 200;
+  res.setHeader("Content-Type", "application/json");
+  res.end(JSON.stringify({ status: "ok" }));
+});
+
 await vite.listen();
 vite.printUrls();
