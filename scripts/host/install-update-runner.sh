@@ -34,7 +34,8 @@ NoNewPrivileges=true
 PrivateTmp=true
 ProtectHome=true
 ProtectSystem=full
-ReadWritePaths=$INSTALL_DIR /var/lib/z3cz $STATE_DIR $SOCKET_DIR /var/cache/z3cz /usr/local/bin
+# /etc 整体只读。更新要写入域名配置和数据库密码目录。
+ReadWritePaths=$INSTALL_DIR /var/lib/z3cz $STATE_DIR $SOCKET_DIR /var/cache/z3cz /usr/local/bin /etc/z3cz
 [Install]
 WantedBy=multi-user.target
 EOF

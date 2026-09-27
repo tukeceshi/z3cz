@@ -201,6 +201,10 @@ if ! grep -q 'Z3CZ_RELEASE_DIR' "$ROOT/docker-compose.legacy.yml"; then
   echo 'legacy compose must keep release mounts for an old updater' >&2
   exit 1
 fi
+if ! grep -q '^ReadWritePaths=.* /etc/z3cz$' "$ROOT/scripts/host/install-update-runner.sh"; then
+  echo 'update runner cannot write /etc/z3cz' >&2
+  exit 1
+fi
 runtime_dir="$TEST_ROOT/runtime-release"
 mkdir -p "$runtime_dir"
 printf 'name: z3cz\n' >"$runtime_dir/compose.yml"
