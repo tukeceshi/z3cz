@@ -234,3 +234,4 @@ if wait_for_mounts; then
   exit 1
 fi
 echo 'PASS: boot reconcile waits for docker and starts without recreating containers'
+bash "$ROOT/scripts/host/boot-reconcile.test.sh"
