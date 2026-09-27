@@ -242,6 +242,7 @@ if wait_for_mounts; then
 fi
 echo 'PASS: boot reconcile waits for docker and starts without recreating containers'
 bash "$ROOT/scripts/host/boot-reconcile.test.sh"
+bash "$ROOT/scripts/host/bootstrap.test.sh"
 
 image_release="$TEST_ROOT/image-release"
 mkdir -p "$image_release/api" "$image_release/app" "$image_release/caddy" "$image_release/scripts"

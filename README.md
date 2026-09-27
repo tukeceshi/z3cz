@@ -37,7 +37,7 @@
 #### 要求
 
 - Linux（推荐 Ubuntu）
-- Docker Engine 24+ 与支持 `up --wait --wait-timeout` 的 Docker Compose v2 或更新版本
+- 没有 Docker 时，一键安装会先安装再继续；已有则跳过
 - 建议内存 6G+
 
 #### 安装（一条命令）
@@ -46,7 +46,7 @@
 installer="$(mktemp)" && curl -fL --connect-timeout 20 --max-time 120 "https://raw.githubusercontent.com/tukeceshi/z3cz/main/bootstrap-install" -o "$installer" && sudo bash "$installer"
 ```
 
-安装器默认下载 GitHub 最新正式版的部署包，校验 SHA-256 和包内版本。需要安装指定正式版时，可运行 `sudo Z3CZ_INSTALL_VERSION=v1.0.16 bash "$installer"`。生产运行 `api`、`postgres`、`site-address`、`caddy` 四个容器。安装和升级用固定版本的 Node、Caddy 镜像，把发布包里已经打好的程序做成仅在本机使用的镜像；不在服务器上编译，也不把镜像推到仓库。PostgreSQL 仍用官方镜像。
+安装器会先检查环境，没有 Docker 时先安装并启动，再下载 GitHub 最新正式版的部署包，校验 SHA-256 和包内版本。需要安装指定正式版时，可运行 `sudo Z3CZ_INSTALL_VERSION=v1.0.16 bash "$installer"`。生产运行 `api`、`postgres`、`site-address`、`caddy` 四个容器。安装和升级用固定版本的 Node、Caddy 镜像，把发布包里已经打好的程序做成仅在本机使用的镜像；不在服务器上编译，也不把镜像推到仓库。PostgreSQL 仍用官方镜像。
 
 安装时会询问公网域名。填写后由容器内 Caddy 自动申请并续期证书；直接回车，或当前没有终端时，监听 HTTP 80，不写站点地址。自动化安装跳过提问：
 
@@ -71,7 +71,7 @@ GitHub 是唯一的版本检查、源码和部署包发布渠道。管理后台�
 也可以使用宿主机命令升级正式版本：
 
 ```bash
-sudo bash /opt/z3cz/current/scripts/update.sh v1.1.0
+sudo bash /opt/z3cz/current/scripts/update.sh v1.1.2
 ```
 
 更新只接受显式 `v*` 正式版本。下载、校验、解压和依赖安装在旧服务运行期间完成；随后进入维护、备份 PostgreSQL、以新版本 `dist/migrate.mjs` 迁移、原子切换并健康检查。应用失败会自动切回；不兼容迁移会保持维护状态并要求显式恢复备份。
