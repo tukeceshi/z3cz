@@ -8,7 +8,7 @@
 - API 使用已有的 `POSTGRES_WAIT_FOREVER=1`，运行时等待数据库；健康检查 `/health/ready` 必须完成认证查询。等待并不能修复错误密码、缺失文件或损坏数据库。
 - 域名服务检查本地 socket；Caddy 只在容器回环地址 `127.0.0.1:8081` 确认自身已监听，不转发 API。公网域名、证书、维护页和数据库恢复都不影响这个检查。该端口不发布到宿主机。API 就绪和认证查询仍由部署验收负责。
 - 安装、更新、回退等待健康的期限默认为 300 秒，可用命令环境变量 `Z3CZ_DEPLOY_TIMEOUT` 设置。健康状态变为 unhealthy 本身不会触发 Docker 重启；数据库恢复后应通过应用连接恢复正常。
-- `depends_on` 用于 Compose 启动编排；引擎自己恢复容器时不会按这个顺序。挂载失败发生在进程启动之前，重启策略也不会重试。因此安装会注册开机编排：最多等待 `Z3CZ_RECONCILE_WAIT`（默认 180 秒）直到 `docker info` 成功且数据库目录、密码文件和当前版本都存在，再执行一次不带 `--force-recreate` 的 `compose up -d --wait`。Linux 有 `docker.service` 时启用 `z3cz-compose.service`，并 `systemctl enable docker`。Docker Desktop / WSL 注册登录任务 `z3cz-compose`（先启动 Docker Desktop，再在发行版里编排）和关机任务 `z3cz-compose-stop`（`compose stop --timeout 70`）。部署锁被占用时跳过开机编排。
+- `depends_on` 用于 Compose 启动编排；引擎自己恢复容器时不会按这个顺序。挂载失败发生在进程启动之前，重启策略也不会重试。因此安装会注册开机编排：最多等待 `Z3CZ_RECONCILE_WAIT`（默认 180 秒）直到 `docker info` 成功且数据库目录、密码文件和当前版本都存在，再执行一次不带 `--force-recreate` 的 `compose up -d --wait`。安装不启用 `docker.service`，也不启动 Docker Desktop。Linux 有 `docker.service` 时只启用 `z3cz-compose.service`，排在 Docker 之后。Docker Desktop / WSL 注册登录任务 `z3cz-compose`（只在发行版里编排）和关机任务 `z3cz-compose-stop`（`compose stop --timeout 70`）。部署锁被占用时跳过开机编排。
 
 ## 挂载与旧版兼容
 

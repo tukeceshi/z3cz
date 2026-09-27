@@ -1,5 +1,7 @@
 # Register logon and shutdown tasks for a WSL install.
-# Logon starts Docker Desktop, then waits inside WSL until mounts exist.
+# Logon only runs reconcile inside WSL. It does not start Docker Desktop;
+# the engine is expected to be opened separately. Reconcile waits until
+# the engine and mounts exist.
 # Shutdown is best-effort: Windows may stop WSL before the 70s checkpoint finishes.
 param(
   [Parameter(Mandatory = $true)]
@@ -20,12 +22,7 @@ $wslStop = "-d $Distro -u root -- bash /usr/local/lib/z3cz/reconcile-stop.sh"
 # AtLogOn without -User means "any user logs on" and requires an administrator.
 # WSL interop runs as the logged-on Windows user, who is not elevated.
 $account = [System.Security.Principal.WindowsIdentity]::GetCurrent().Name
-$actions = @()
-$dockerExe = Join-Path $env:ProgramFiles 'Docker\Docker\Docker Desktop.exe'
-if (Test-Path -LiteralPath $dockerExe) {
-  $actions += New-ScheduledTaskAction -Execute $dockerExe
-}
-$actions += New-ScheduledTaskAction -Execute 'wsl.exe' -Argument $wslStart
+$actions = @(New-ScheduledTaskAction -Execute 'wsl.exe' -Argument $wslStart)
 $startSettings = New-ScheduledTaskSettingsSet `
   -AllowStartIfOnBatteries `
   -DontStopIfGoingOnBatteries `

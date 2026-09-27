@@ -151,12 +151,13 @@ install_reconcile_scripts() {
 }
 
 install_systemd_unit() {
-  systemctl enable docker.service
+  # Do not enable docker.service. The engine is started separately; this unit
+  # only orders after it and reconciles once mounts exist.
   cat >"$UNIT" <<EOF
 [Unit]
 Description=Start z3cz when Docker and its data directories are ready
 After=docker.service network-online.target
-Wants=docker.service network-online.target
+Wants=network-online.target
 
 [Service]
 Type=oneshot

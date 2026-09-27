@@ -58,7 +58,7 @@ sudo Z3CZ_SITE_ADDRESS=example.com Z3CZ_PUBLIC_URL=https://example.com bash "$in
 
 程序安装到 `/opt/z3cz/releases/<版本>`，`current`/`previous` 为原子版本指针；配置位于 `/etc/z3cz`，PostgreSQL、上传、Caddy 数据与备份位于 `/var/lib/z3cz`，pnpm store 位于 `/var/cache/z3cz/pnpm`。每个版本的 API 生产依赖由一次性 Node 容器以 `--prod --frozen-lockfile` 安装并复用该缓存。
 
-生产服务默认 `restart: always`：Docker 引擎恢复后自动启动，包括此前手动停止的容器。需要跨引擎重启保持停用时，在 `/etc/z3cz/z3cz.env` 配置 `Z3CZ_RESTART_POLICY=unless-stopped` 并通过部署流程应用，或显式卸载该 Compose 服务。安装还会注册开机编排：等 Docker 和数据目录都就绪后再执行一次 `compose up`。Linux 上这是 `z3cz-compose.service`；Docker Desktop / WSL 上这是登录任务 `z3cz-compose`，它会先打开 Docker Desktop。关机任务会尽量在引擎退出前停下 Postgres。
+生产服务默认 `restart: always`：Docker 引擎恢复后自动启动，包括此前手动停止的容器。需要跨引擎重启保持停用时，在 `/etc/z3cz/z3cz.env` 配置 `Z3CZ_RESTART_POLICY=unless-stopped` 并通过部署流程应用，或显式卸载该 Compose 服务。安装还会注册开机编排：等 Docker 和数据目录都就绪后再执行一次 `compose up`。安装不会把 Docker 设为开机启动。Linux 上编排单元是 `z3cz-compose.service`；Docker Desktop / WSL 上是登录任务 `z3cz-compose`，只在发行版里编排，不打开 Docker Desktop。关机任务会尽量在引擎退出前停下 Postgres。
 
 部署等待默认最多 300 秒，可通过执行安装/升级命令时的环境变量 `Z3CZ_DEPLOY_TIMEOUT` 调整。API 在运行时持续等待数据库，部署验收使用认证查询；失败不会被当作安装完成。安装中断后可重跑同一版本安装器，密码和数据保留。部署阶段记录于 `/var/lib/z3cz/deployment/status`。挂载兼容、旧版本升级边界及验收方法见 [部署可靠性说明](docs/deployment-reliability.md)。
 
@@ -71,7 +71,7 @@ GitHub 是唯一的版本检查、源码和部署包发布渠道。管理后台�
 也可以使用宿主机命令升级正式版本：
 
 ```bash
-sudo bash /opt/z3cz/current/scripts/update.sh v1.0.28
+sudo bash /opt/z3cz/current/scripts/update.sh v1.0.29
 ```
 
 更新只接受显式 `v*` 正式版本。下载、校验、解压和依赖安装在旧服务运行期间完成；随后进入维护、备份 PostgreSQL、以新版本 `dist/migrate.mjs` 迁移、原子切换并健康检查。应用失败会自动切回；不兼容迁移会保持维护状态并要求显式恢复备份。

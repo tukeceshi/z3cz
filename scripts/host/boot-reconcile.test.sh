@@ -87,4 +87,12 @@ if grep -q -- '-AtLogOn$' "$ps1"; then
   echo 'logon trigger must name the current user so a non-admin can register it' >&2
   exit 1
 fi
+if grep -q 'Docker Desktop.exe' "$ps1"; then
+  echo 'logon task must not start Docker Desktop' >&2
+  exit 1
+fi
+if grep -q 'systemctl enable docker.service' "$ROOT/scripts/host/install-boot-reconcile.sh"; then
+  echo 'boot reconcile must not enable docker.service' >&2
+  exit 1
+fi
 echo "PASS: boot reconcile keeps Linux on systemd and detects WSL without its env var"
