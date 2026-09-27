@@ -32,8 +32,9 @@ services:
       test: ["CMD-SHELL", "pg_isready -U postgres -d postgres"]
       interval: 5s
       timeout: 5s
-      retries: 5
-      start_period: 30s
+      retries: 20
+      # 电脑重启会跳过 60 秒优雅停机，崩溃恢复可能超过 30 秒。
+      start_period: 120s
     stop_grace_period: 60s
     logging: *dev-logging
     restart: always
@@ -171,8 +172,9 @@ services:
       test: ["CMD-SHELL", "wget -q -T 3 -O /dev/null http://127.0.0.1:8080/health && wget -q -T 3 -O /dev/null http://127.0.0.1:8080/api/health/ready"]
       interval: 10s
       timeout: 8s
-      retries: 6
-      start_period: 30s
+      retries: 12
+      # 与 API 冷启动对齐。引擎恢复不遵守 depends_on，网关会和 API 同时启动。
+      start_period: 180s
     ports:
       - "${APP_PORT:-3000}:8080"
     volumes:

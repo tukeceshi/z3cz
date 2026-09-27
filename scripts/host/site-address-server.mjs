@@ -302,9 +302,62 @@ function findChroot() {
   return "";
 }
 
+const HOST_COMPOSE_ENV_KEYS = [
+  "Z3CZ_DOCKER_CLI",
+  "Z3CZ_DOCKER_COMPOSE_PLUGIN",
+  "Z3CZ_DOCKER_SOCKET",
+  "Z3CZ_HOST_LIB",
+  "Z3CZ_HOST_USRLIB",
+  "Z3CZ_HOST_LIB64",
+];
+
+/**
+ * @param {object} paths
+ * @param {string} paths.hostRoot
+ * @param {string} paths.envFile host path
+ * @param {string} paths.releaseDir host path
+ * @param {string} paths.passwordFile host path
+ */
+export function hostComposeInvocation(paths) {
+  const composeFile = path.posix.join(paths.releaseDir, "compose.yml");
+  /** @type {Record<string, string>} */
+  const env = {
+    PATH: "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+    HOME: "/root",
+    Z3CZ_RELEASE_DIR: paths.releaseDir,
+    Z3CZ_ENV_FILE: paths.envFile,
+    Z3CZ_POSTGRES_PASSWORD_FILE: paths.passwordFile,
+  };
+  for (const key of HOST_COMPOSE_ENV_KEYS) {
+    const value = process.env[key];
+    if (value) {
+      env[key] = value;
+    }
+  }
+  return {
+    chroot: findChroot(),
+    args: [
+      paths.hostRoot,
+      "docker",
+      "compose",
+      "--env-file",
+      paths.envFile,
+      "-f",
+      composeFile,
+      "up",
+      "-d",
+      "--force-recreate",
+      "--no-deps",
+      "api",
+      "caddy",
+    ],
+    env,
+  };
+}
+
 /**
  * Recreate api and caddy with the host docker. The node image has no docker CLI,
- * so this chroots into the host root and uses the compose already installed there.
+ * so this chroots into the mounted host paths and uses the staged docker client.
  * @param {object} paths
  * @param {string} paths.hostRoot
  * @param {string} paths.envFile host path
@@ -312,39 +365,14 @@ function findChroot() {
  * @param {string} paths.passwordFile host path
  */
 export function runHostCompose(paths) {
-  const chroot = findChroot();
-  if (!chroot) {
+  const invocation = hostComposeInvocation(paths);
+  if (!invocation.chroot) {
     return Promise.reject(new Error("域名服务找不到 chroot，无法重建站点"));
   }
-  const composeFile = path.posix.join(paths.releaseDir, "compose.yml");
   return new Promise((resolve, reject) => {
-    const child = spawn(
-      chroot,
-      [
-        paths.hostRoot,
-        "docker",
-        "compose",
-        "--env-file",
-        paths.envFile,
-        "-f",
-        composeFile,
-        "up",
-        "-d",
-        "--force-recreate",
-        "--no-deps",
-        "api",
-        "caddy",
-      ],
-      {
-        env: {
-          PATH: "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
-          HOME: "/root",
-          Z3CZ_RELEASE_DIR: paths.releaseDir,
-          Z3CZ_ENV_FILE: paths.envFile,
-          Z3CZ_POSTGRES_PASSWORD_FILE: paths.passwordFile,
-        },
-      }
-    );
+    const child = spawn(invocation.chroot, invocation.args, {
+      env: invocation.env,
+    });
     let stderr = "";
     child.stderr.on("data", (chunk) => {
       stderr += chunk.toString();

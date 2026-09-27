@@ -25,7 +25,12 @@ services:
         fi
         exec docker-entrypoint.sh postgres
     volumes:
-      - /var/lib/z3cz/postgres:/var/lib/postgresql/data
+      # 目录必须已存在。引擎冷启动时若自动创建空目录，会把现有库初始化成新库。
+      - type: bind
+        source: /var/lib/z3cz/postgres
+        target: /var/lib/postgresql/data
+        bind:
+          create_host_path: false
       - type: bind
         source: ${Z3CZ_POSTGRES_PASSWORD_FILE:-/etc/z3cz/postgres.password}
         target: /run/z3cz-password
@@ -42,8 +47,9 @@ services:
     stop_grace_period: 60s
     logging: *logging
 
-  # Node image has no docker CLI. Mount the host root so this process can chroot
-  # and run the host's docker compose after the admin binds a domain.
+  # Node 镜像没有 docker。只挂域名重建需要的路径，再 chroot 进 /host。
+  # 不要挂整棵 /：其中的 /mnt 与 WSL 盘符在整机重启时经常尚未就绪，
+  # 挂载失败发生在进程启动前，重启策略不会再重试。
   site-address:
     image: ${NODE_IMAGE:-node:22.12.0-bookworm-slim@sha256:35531c52ce27b6575d69755c73e65d4468dba93a25644eed56dc12879cae9213}
     command: ["node", "/srv/scripts/site-address-server.mjs"]
@@ -54,8 +60,67 @@ services:
       Z3CZ_ENV_FILE: ${Z3CZ_ENV_FILE:-/etc/z3cz/z3cz.env}
       Z3CZ_INSTALL_DIR: /opt/z3cz
       Z3CZ_SITE_ADDRESS_SOCKET: /run/z3cz-site/site.sock
+      Z3CZ_DOCKER_CLI: ${Z3CZ_DOCKER_CLI:-/usr/bin/docker}
+      Z3CZ_DOCKER_COMPOSE_PLUGIN: ${Z3CZ_DOCKER_COMPOSE_PLUGIN:-/usr/libexec/docker/cli-plugins/docker-compose}
+      Z3CZ_DOCKER_SOCKET: ${Z3CZ_DOCKER_SOCKET:-/var/run/docker.sock}
+      Z3CZ_HOST_LIB: ${Z3CZ_HOST_LIB:-/lib}
+      Z3CZ_HOST_USRLIB: ${Z3CZ_HOST_USRLIB:-/usr/lib}
+      Z3CZ_HOST_LIB64: ${Z3CZ_HOST_LIB64:-/lib64}
     volumes:
-      - /:/host
+      - type: bind
+        source: /opt/z3cz
+        target: /host/opt/z3cz
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: bind
+        source: /etc/z3cz
+        target: /host/etc/z3cz
+        bind:
+          create_host_path: false
+      - type: bind
+        source: /var/lib/z3cz
+        target: /host/var/lib/z3cz
+        read_only: true
+        bind:
+          create_host_path: false
+      - /run/z3cz-site:/host/run/z3cz-site
+      - /run/z3cz-updater:/host/run/z3cz-updater
+      - type: bind
+        source: ${Z3CZ_DOCKER_CLI:-/usr/bin/docker}
+        target: /host/usr/bin/docker
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ${Z3CZ_DOCKER_COMPOSE_PLUGIN:-/usr/libexec/docker/cli-plugins/docker-compose}
+        target: /host/usr/libexec/docker/cli-plugins/docker-compose
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ${Z3CZ_DOCKER_SOCKET:-/var/run/docker.sock}
+        target: /host/var/run/docker.sock
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ${Z3CZ_HOST_LIB:-/lib}
+        target: /host/lib
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ${Z3CZ_HOST_USRLIB:-/usr/lib}
+        target: /host/usr/lib
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ${Z3CZ_HOST_LIB64:-/lib64}
+        target: /host/lib64
+        read_only: true
+        bind:
+          create_host_path: false
       - /run/z3cz-site:/run/z3cz-site
       - ${Z3CZ_RELEASE_DIR:?set Z3CZ_RELEASE_DIR}/scripts:/srv/scripts:ro
     healthcheck:

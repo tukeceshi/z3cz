@@ -53,6 +53,12 @@ BACKUP
   cp "$old/scripts/"{common,update,rollback}.sh "$RELEASE/scripts/"
   cp "$ROOT/scripts/host/install.sh" "$RELEASE/scripts/"
   printf '#!/usr/bin/env bash\nexit 0\n' >"$RELEASE/scripts/install-update-runner.sh"
+  cat >"$RELEASE/scripts/install-boot-reconcile.sh" <<'BOOT'
+#!/usr/bin/env bash
+mkdir -p "${Z3CZ_STATE_DIR:?}/deployment"
+printf 'boot-reconcile\n' >>"$Z3CZ_STATE_DIR/deployment/boot-reconcile"
+BOOT
+  chmod +x "$RELEASE/scripts/install-boot-reconcile.sh" "$RELEASE/scripts/install-update-runner.sh"
   cp "$ROOT/docker-compose.prod.yml" "$RELEASE/compose.yml"
   printf 'v1.0.1\n' >"$RELEASE/VERSION"
   printf '1\n' >"$RELEASE/password-mount.version"
@@ -125,6 +131,7 @@ bash "$RELEASE/scripts/install.sh" >"$TEST_ROOT/output" 2>&1
 [[ ! -e "$Z3CZ_STATE_DIR/deployment/install-pending" ]]
 [[ "$(cat "$Z3CZ_CONFIG_DIR/postgres.password")" == test-password ]]
 [[ "$(cat "$Z3CZ_CONFIG_DIR/postgres-secret/postgres.password")" == test-password ]]
+[[ "$(cat "$Z3CZ_STATE_DIR/deployment/boot-reconcile")" == boot-reconcile ]]
 echo 'PASS: interrupted installation resumes without replacing password'
 
 for failure in '' both; do
@@ -165,3 +172,40 @@ if (exec 9>&-; lock_deployment) 2>/dev/null; then
 fi
 exec 9>&-
 echo 'PASS: concurrent deployments cannot acquire the same lock'
+
+if grep -q '/:/host' "$ROOT/docker-compose.prod.yml"; then
+  echo 'site-address still mounts the host root' >&2
+  exit 1
+fi
+awk '
+  $0 ~ /http:\/\/:8081/ { block=1 }
+  block && /reverse_proxy/ { found=1 }
+  block && /^}/ { block=0 }
+  END { exit found ? 1 : 0 }
+' "$ROOT/docker/Caddyfile.prod"
+echo 'PASS: caddy liveness does not wait for the API, and site-address does not mount /'
+
+boot="$TEST_ROOT/boot"
+export Z3CZ_INSTALL_DIR="$boot/install" Z3CZ_STATE_DIR="$boot/state" Z3CZ_CONFIG_DIR="$boot/config"
+export Z3CZ_PNPM_CACHE_DIR="$boot/cache" Z3CZ_RECONCILE_COMMON="$ROOT/scripts/host/common.sh"
+export Z3CZ_RECONCILE_WAIT=5
+mkdir -p "$Z3CZ_INSTALL_DIR/releases/boot" "$Z3CZ_STATE_DIR/postgres" "$Z3CZ_STATE_DIR/deployment" "$Z3CZ_CONFIG_DIR"
+printf 'name: z3cz\n' >"$Z3CZ_INSTALL_DIR/releases/boot/compose.yml"
+ln -sfn "$Z3CZ_INSTALL_DIR/releases/boot" "$Z3CZ_INSTALL_DIR/current"
+printf 'pw\n' >"$Z3CZ_CONFIG_DIR/postgres.password"
+printf 'NODE_ENV=production\n' >"$Z3CZ_CONFIG_DIR/z3cz.env"
+docker() { return 0; }
+# shellcheck disable=SC1091
+source "$ROOT/scripts/host/reconcile.sh"
+wait_for_mounts
+compose() { printf '%s\n' "$*" >"$boot/up"; }
+reconcile_main
+[[ "$(cat "$boot/up")" == *'up -d --wait'* ]]
+[[ "$(cat "$boot/up")" != *'force-recreate'* ]]
+docker() { return 1; }
+export Z3CZ_RECONCILE_WAIT=0
+if wait_for_mounts; then
+  echo 'reconcile waited successfully while docker was down' >&2
+  exit 1
+fi
+echo 'PASS: boot reconcile waits for docker and starts without recreating containers'

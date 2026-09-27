@@ -9,6 +9,7 @@ import {
   applySiteAddressEnv,
   createSiteAddressServer,
   ensureSiteAddressAccess,
+  hostComposeInvocation,
   isSiteAddressApplied,
   normalizeSiteAddress,
   siteAddressStatus,
@@ -63,6 +64,53 @@ test("applySiteAddressEnv writes the public origin and can clear it", () => {
   assert.doesNotMatch(cleared, /^WEBSITE_URL=/m);
   assert.equal(siteAddressStatus(cleared, null).httpOnly, true);
   assert.equal(siteAddressStatus(cleared, null).siteAddress, null);
+});
+
+test("host compose chroots to the mounted root and forwards docker mount paths", () => {
+  const previous = {
+    Z3CZ_DOCKER_CLI: process.env.Z3CZ_DOCKER_CLI,
+    Z3CZ_DOCKER_COMPOSE_PLUGIN: process.env.Z3CZ_DOCKER_COMPOSE_PLUGIN,
+    Z3CZ_DOCKER_SOCKET: process.env.Z3CZ_DOCKER_SOCKET,
+    Z3CZ_HOST_LIB: process.env.Z3CZ_HOST_LIB,
+    Z3CZ_HOST_USRLIB: process.env.Z3CZ_HOST_USRLIB,
+    Z3CZ_HOST_LIB64: process.env.Z3CZ_HOST_LIB64,
+  };
+  process.env.Z3CZ_DOCKER_CLI = "/var/lib/z3cz/docker-cli/bin/docker";
+  process.env.Z3CZ_DOCKER_COMPOSE_PLUGIN =
+    "/var/lib/z3cz/docker-cli/bin/docker-compose";
+  process.env.Z3CZ_DOCKER_SOCKET = "/var/run/docker.sock";
+  process.env.Z3CZ_HOST_LIB = "/var/lib/z3cz/docker-cli/lib";
+  process.env.Z3CZ_HOST_USRLIB = "/var/lib/z3cz/docker-cli/lib";
+  process.env.Z3CZ_HOST_LIB64 = "/var/lib/z3cz/docker-cli/lib";
+  try {
+    const invocation = hostComposeInvocation({
+      hostRoot: "/host",
+      envFile: "/etc/z3cz/z3cz.env",
+      releaseDir: "/opt/z3cz/current",
+      passwordFile: "/etc/z3cz/postgres.password",
+    });
+    assert.equal(invocation.args[0], "/host");
+    assert.equal(invocation.args[1], "docker");
+    assert.equal(invocation.args.at(-2), "api");
+    assert.equal(invocation.args.at(-1), "caddy");
+    assert.equal(invocation.args.includes("--force-recreate"), true);
+    assert.equal(
+      invocation.env.Z3CZ_DOCKER_CLI,
+      "/var/lib/z3cz/docker-cli/bin/docker"
+    );
+    assert.equal(
+      invocation.env.Z3CZ_HOST_LIB,
+      "/var/lib/z3cz/docker-cli/lib"
+    );
+  } finally {
+    for (const [key, value] of Object.entries(previous)) {
+      if (value === undefined) {
+        delete process.env[key];
+      } else {
+        process.env[key] = value;
+      }
+    }
+  }
 });
 
 test("ensureSiteAddressAccess appends a token once", () => {

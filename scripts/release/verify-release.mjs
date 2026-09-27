@@ -8,7 +8,7 @@ const pkg = JSON.parse(fs.readFileSync(path.join(stage, "api/package.json"), "ut
 if (fs.readFileSync(path.join(stage, "password-mount.version"), "utf8").trim() !== "1") {
   throw new Error("Unsupported password mount contract");
 }
-for (const file of ["caddy/Caddyfile", "scripts/common.sh", "scripts/install.sh", "scripts/update.sh", "scripts/rollback.sh", "scripts/site-address-server.mjs"]) {
+for (const file of ["caddy/Caddyfile", "scripts/common.sh", "scripts/install.sh", "scripts/update.sh", "scripts/rollback.sh", "scripts/site-address-server.mjs", "scripts/reconcile.sh", "scripts/reconcile-stop.sh", "scripts/install-boot-reconcile.sh", "scripts/windows-boot-task.ps1"]) {
   if (!fs.statSync(path.join(stage, file)).isFile()) throw new Error(`Release requires a regular file: ${file}`);
 }
 if (fs.readFileSync(path.join(stage, "Caddyfile"), "utf8") !== fs.readFileSync(path.join(stage, "caddy/Caddyfile"), "utf8")) {
@@ -24,7 +24,7 @@ for (const name of forbidden) {
     throw new Error(`Forbidden package is present in production lockfile: ${name}`);
   }
 }
-for (const required of ["api/dist/server.mjs", "api/dist/migrate.mjs", "api/pnpm-lock.yaml", "app/index.html", "compose.yml", "Caddyfile", "VERSION", "CHANGELOG.md", "update-policy.json", "scripts/install-update-runner.sh", "dist/z3cz-host-updater-linux-amd64", "dist/z3cz-host-updater-linux-arm64"]) {
+for (const required of ["api/dist/server.mjs", "api/dist/migrate.mjs", "api/pnpm-lock.yaml", "app/index.html", "compose.yml", "Caddyfile", "VERSION", "CHANGELOG.md", "update-policy.json", "scripts/install-update-runner.sh", "scripts/reconcile.sh", "scripts/reconcile-stop.sh", "scripts/install-boot-reconcile.sh", "scripts/windows-boot-task.ps1", "dist/z3cz-host-updater-linux-amd64", "dist/z3cz-host-updater-linux-arm64"]) {
   if (!fs.existsSync(path.join(stage, required))) throw new Error(`Release is missing ${required}`);
 }
 for (const forbiddenPath of [".git", "apps", "packages", "node_modules", "Dockerfile"] ) {

@@ -91,7 +91,13 @@ if [[ -d /run/systemd/system ]]; then
 fi
 compose "$TARGET" up -d --force-recreate --wait
 verify_database_access "$TARGET"
+boot_status=0
+bash "$TARGET/scripts/install-boot-reconcile.sh" || boot_status=$?
 INSTALL_COMPLETE=1
 rm -f "$PENDING"
 deployment_phase "安装完成：v$VERSION"
+if [[ "$boot_status" != 0 ]]; then
+  log "服务已安装，但开机编排没有注册。请处理后重新执行：bash $TARGET/scripts/install-boot-reconcile.sh"
+  exit "$boot_status"
+fi
 log "已安装 v$VERSION"

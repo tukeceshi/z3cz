@@ -1,9 +1,9 @@
-# Internal readiness is independent of the public domain and maintenance page.
+# Caddy 自身的存活检查。不转发 API：引擎冷启动时四个服务同时起来，
+# 数据库恢复可能晚于 Caddy。API 与数据库由各自的检查和部署验收负责。
 http://:8081 {
 	bind 127.0.0.1
 	handle /health {
-		rewrite * /health/ready
-		reverse_proxy api:3001
+		respond "ok" 200
 	}
 }
 

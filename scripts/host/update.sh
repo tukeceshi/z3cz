@@ -95,6 +95,9 @@ EOF
 if compose "$TARGET" up -d --force-recreate --remove-orphans --wait && verify_database_access "$TARGET"; then
   install -m 0755 "$TARGET/dist/z3cz-host-updater-linux-$UPDATER_ARCH" "$UPDATER_BIN"
   write_release_rollback
+  if [[ -f "$TARGET/scripts/install-boot-reconcile.sh" ]]; then
+    bash "$TARGET/scripts/install-boot-reconcile.sh" || log "开机编排注册失败。服务已更新到 $VERSION，可稍后执行 bash $TARGET/scripts/install-boot-reconcile.sh"
+  fi
   rm -f "$STATE_DIR/maintenance/enabled"; deployment_phase "已更新到 $VERSION；备份：$BACKUP"; exit 0
 fi
 

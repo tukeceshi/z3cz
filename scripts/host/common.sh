@@ -5,6 +5,108 @@ CONFIG_DIR="${Z3CZ_CONFIG_DIR:-/etc/z3cz}"; CACHE_DIR="${Z3CZ_PNPM_CACHE_DIR:-/v
 ENV_FILE="$CONFIG_DIR/z3cz.env"
 die() { echo "ERROR: $*" >&2; exit 1; }; log() { echo "==> $*"; }
 need_root() { [[ "${EUID:-$(id -u)}" -eq 0 ]] || die "请使用 sudo 运行"; }
+
+# 域名服务要在容器里执行宿主机的 docker。把客户端复制到数据目录，
+# 避免把整棵根目录或 /mnt 绑进容器：那些路径在整机重启时经常还不可用。
+find_compose_plugin() {
+  local bin="$1" dir candidate
+  local -a dirs=(
+    "$(dirname "$bin")/../libexec/docker/cli-plugins"
+    "$(dirname "$bin")/../lib/docker/cli-plugins"
+    /usr/local/libexec/docker/cli-plugins
+    /usr/libexec/docker/cli-plugins
+    /usr/local/lib/docker/cli-plugins
+    /usr/lib/docker/cli-plugins
+    "${HOME:-/root}/.docker/cli-plugins"
+    /root/.docker/cli-plugins
+  )
+  for dir in "${dirs[@]}"; do
+    candidate="$dir/docker-compose"
+    if [[ -f "$candidate" ]]; then
+      readlink -f "$candidate"
+      return 0
+    fi
+  done
+  return 1
+}
+
+elf_executable() {
+  local sig
+  sig="$(od -An -t x1 -N 4 "$1" 2>/dev/null | tr -d '[:space:]')"
+  [[ "$sig" == "7f454c46" ]]
+}
+
+copy_dynamic_libs() {
+  local binary="$1" lib="$2" out line path base parent
+  mkdir -p "$lib"
+  if ! out="$(ldd "$binary" 2>/dev/null)"; then
+    return 0
+  fi
+  while IFS= read -r line; do
+    line="${line#"${line%%[![:space:]]*}"}"
+    [[ -n "$line" ]] || continue
+    path=""
+    if [[ "$line" == *"=>"* ]]; then
+      path="${line#*=> }"
+      path="${path%% *}"
+    elif [[ "$line" == /* ]]; then
+      path="${line%% *}"
+    fi
+    [[ -n "$path" && -f "$path" ]] || continue
+    base="$(basename "$path")"
+    parent="$(basename "$(dirname "$path")")"
+    cp -a "$path" "$lib/$base"
+    mkdir -p "$lib/$parent"
+    cp -a "$path" "$lib/$parent/$base"
+  done <<<"$out"
+}
+
+stage_host_docker_client() {
+  local bin plugin dest
+  if [[ "$(type -t docker 2>/dev/null)" == "function" ]]; then
+    export Z3CZ_DOCKER_CLI="${Z3CZ_DOCKER_CLI:-/usr/bin/docker}"
+    export Z3CZ_DOCKER_COMPOSE_PLUGIN="${Z3CZ_DOCKER_COMPOSE_PLUGIN:-/usr/libexec/docker/cli-plugins/docker-compose}"
+    export Z3CZ_DOCKER_SOCKET="${Z3CZ_DOCKER_SOCKET:-/var/run/docker.sock}"
+    export Z3CZ_HOST_LIB="${Z3CZ_HOST_LIB:-/lib}"
+    export Z3CZ_HOST_USRLIB="${Z3CZ_HOST_USRLIB:-/usr/lib}"
+    export Z3CZ_HOST_LIB64="${Z3CZ_HOST_LIB64:-/lib64}"
+    return 0
+  fi
+  bin="$(command -v docker 2>/dev/null || true)"
+  [[ -n "$bin" ]] || die "找不到 docker"
+  bin="$(readlink -f "$bin")"
+  elf_executable "$bin" || die "docker 不是 Linux 可执行文件：$bin"
+  plugin="$(find_compose_plugin "$bin" || true)"
+  [[ -n "$plugin" && -f "$plugin" ]] || die "找不到 docker compose 插件"
+  elf_executable "$plugin" || die "docker compose 插件不是 Linux 可执行文件：$plugin"
+  if [[ -S /var/run/docker.sock ]]; then
+    export Z3CZ_DOCKER_SOCKET=/var/run/docker.sock
+  elif [[ -S /run/docker.sock ]]; then
+    export Z3CZ_DOCKER_SOCKET=/run/docker.sock
+  else
+    die "找不到 Docker socket"
+  fi
+  dest="$STATE_DIR/docker-cli"
+  if [[ ! -f "$dest/bin/docker" || ! -f "$dest/bin/docker-compose" ]] \
+    || ! cmp -s "$bin" "$dest/bin/docker" \
+    || ! cmp -s "$plugin" "$dest/bin/docker-compose"; then
+    command -v ldd >/dev/null 2>&1 || die "需要 ldd 才能把 docker 客户端放进域名服务"
+    rm -rf "$dest"
+    mkdir -p "$dest/bin" "$dest/lib"
+    cp -a "$bin" "$dest/bin/docker"
+    cp -a "$plugin" "$dest/bin/docker-compose"
+    chmod 755 "$dest/bin/docker" "$dest/bin/docker-compose"
+    copy_dynamic_libs "$dest/bin/docker" "$dest/lib"
+    copy_dynamic_libs "$dest/bin/docker-compose" "$dest/lib"
+  fi
+  mkdir -p "$dest/lib"
+  export Z3CZ_DOCKER_CLI="$dest/bin/docker"
+  export Z3CZ_DOCKER_COMPOSE_PLUGIN="$dest/bin/docker-compose"
+  export Z3CZ_HOST_LIB="$dest/lib"
+  export Z3CZ_HOST_USRLIB="$dest/lib"
+  export Z3CZ_HOST_LIB64="$dest/lib"
+}
+
 compose() {
   local release="$1"; shift
   local args=("$@")
@@ -15,8 +117,15 @@ compose() {
   if [[ " $* " == *" --wait "* && " $* " != *" --wait-timeout "* ]]; then
     args+=(--wait-timeout "${Z3CZ_DEPLOY_TIMEOUT:-300}")
   fi
+  stage_host_docker_client
   Z3CZ_RELEASE_DIR="$release" Z3CZ_ENV_FILE="$ENV_FILE" \
     Z3CZ_POSTGRES_PASSWORD_FILE="$password_source" \
+    Z3CZ_DOCKER_CLI="$Z3CZ_DOCKER_CLI" \
+    Z3CZ_DOCKER_COMPOSE_PLUGIN="$Z3CZ_DOCKER_COMPOSE_PLUGIN" \
+    Z3CZ_DOCKER_SOCKET="$Z3CZ_DOCKER_SOCKET" \
+    Z3CZ_HOST_LIB="$Z3CZ_HOST_LIB" \
+    Z3CZ_HOST_USRLIB="$Z3CZ_HOST_USRLIB" \
+    Z3CZ_HOST_LIB64="$Z3CZ_HOST_LIB64" \
     docker compose --env-file "$ENV_FILE" -f "$release/compose.yml" "${args[@]}"
 }
 
@@ -58,7 +167,7 @@ preflight_deployment() {
   [[ "${Z3CZ_DEPLOY_TIMEOUT:-300}" =~ ^[1-9][0-9]*$ ]] || die "Z3CZ_DEPLOY_TIMEOUT 必须为正整数秒数"
   docker info >/dev/null || die "Docker 引擎不可用"
   docker compose up --help | grep -q -- '--wait-timeout' || die "Docker Compose 需要支持 --wait-timeout"
-  for file in compose.yml api/dist/server.mjs api/dist/migrate.mjs app/index.html scripts/site-address-server.mjs; do
+  for file in compose.yml api/dist/server.mjs api/dist/migrate.mjs app/index.html scripts/site-address-server.mjs scripts/reconcile.sh scripts/reconcile-stop.sh scripts/install-boot-reconcile.sh scripts/windows-boot-task.ps1; do
     [[ -f "$release/$file" ]] || die "发布包缺少文件：$file"
   done
   [[ -s "$CONFIG_DIR/postgres.password" && -f "$CONFIG_DIR/postgres.password" ]] || die "数据库密码必须是非空普通文件"
