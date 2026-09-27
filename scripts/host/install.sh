@@ -92,7 +92,6 @@ if [[ -d /run/systemd/system ]]; then
 fi
 compose "$TARGET" up -d --force-recreate --wait
 verify_database_access "$TARGET"
-remove_boot_reconcile
 INSTALL_COMPLETE=1
 rm -f "$PENDING"
 deployment_phase "安装完成：v$VERSION"

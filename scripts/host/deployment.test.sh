@@ -27,7 +27,6 @@ fixture() {
 need_root() { :; }
 install_prod_dependencies() { :; }
 build_release_image() { printf 'build %s\n' "$1" >>"$TEST_LOG"; }
-remove_boot_reconcile() { :; }
 preflight_deployment() { [[ "$TEST_FAIL" != preflight ]]; }
 compose() {
   printf '%s\n' "$*" >>"$TEST_LOG"

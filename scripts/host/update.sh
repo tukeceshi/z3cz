@@ -96,7 +96,6 @@ EOF
 if compose "$TARGET" up -d --force-recreate --remove-orphans --wait && verify_database_access "$TARGET"; then
   install -m 0755 "$TARGET/dist/z3cz-host-updater-linux-$UPDATER_ARCH" "$UPDATER_BIN"
   write_release_rollback
-  remove_boot_reconcile
   rm -f "$STATE_DIR/maintenance/enabled"; deployment_phase "已更新到 $VERSION；备份：$BACKUP"; exit 0
 fi
 

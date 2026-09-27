@@ -230,29 +230,6 @@ COPY app /srv/app
 EOF
 }
 
-# Drop the logon task and systemd unit from earlier installs. Missing tasks are fine.
-remove_boot_reconcile() {
-  if command -v systemctl >/dev/null 2>&1 && systemctl cat z3cz-compose.service >/dev/null 2>&1; then
-    systemctl disable --now z3cz-compose.service >/dev/null 2>&1 || true
-    rm -f /etc/systemd/system/z3cz-compose.service
-    systemctl daemon-reload >/dev/null 2>&1 || true
-    log "已取消开机编排 z3cz-compose.service"
-  fi
-  local ps=""
-  if [[ -x /mnt/c/Windows/System32/WindowsPowerShell/v1.0/powershell.exe ]]; then
-    ps=/mnt/c/Windows/System32/WindowsPowerShell/v1.0/powershell.exe
-  else
-    ps="$(command -v powershell.exe 2>/dev/null || true)"
-  fi
-  if [[ -z "$ps" ]]; then
-    return 0
-  fi
-  if "$ps" -NoProfile -NonInteractive -Command 'Unregister-ScheduledTask -TaskName ''z3cz-compose'' -Confirm:$false -ErrorAction SilentlyContinue; Unregister-ScheduledTask -TaskName ''z3cz-compose-stop'' -Confirm:$false -ErrorAction SilentlyContinue'; then
-    log "已取消 Windows 登录任务 z3cz-compose"
-  else
-    log "取消 Windows 登录任务失败"
-  fi
-}
 switch_link() { local name="$1" target="$2"; ln -sfn "$target" "$INSTALL_DIR/$name.next"; mv -Tf "$INSTALL_DIR/$name.next" "$INSTALL_DIR/$name"; }
 compose_database_service() {
   awk '
