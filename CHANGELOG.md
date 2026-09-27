@@ -1,5 +1,9 @@
 # Changelog
 
+## v1.0.26
+
+- 发布包同时提供旧升级入口可读的 `compose.yml` 和新脚本使用的 `compose.runtime.yml`。旧入口不会传入分阶段的 docker 路径，因此第一跳仍挂载根目录；新安装、开机编排和之后的部署只挂域名服务需要的路径。
+
 ## v1.0.25
 
 - 安装后注册开机编排：Docker 和数据目录就绪后再启动服务。Linux 使用 systemd；Docker Desktop / WSL 使用登录任务，并尽量在关机前停下数据库。

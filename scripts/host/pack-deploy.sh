@@ -9,7 +9,8 @@ VITE_API_HOST=/api VITE_WS_VIA_PROXY=1 pnpm --filter @dafthunk/app build:docker-
 pnpm --filter @dafthunk/api build:production
 cp -R "$ROOT/apps/app/dist/." "$STAGE/app/"
 cp "$ROOT/deploy/api/package.json" "$ROOT/deploy/api/pnpm-lock.yaml" "$STAGE/api/"
-cp "$ROOT/docker-compose.prod.yml" "$STAGE/compose.yml"
+cp "$ROOT/docker-compose.legacy.yml" "$STAGE/compose.yml"
+cp "$ROOT/docker-compose.prod.yml" "$STAGE/compose.runtime.yml"
 cp "$ROOT/docker/Caddyfile.prod" "$STAGE/Caddyfile"
 mkdir -p "$STAGE/caddy"
 cp "$ROOT/docker/Caddyfile.prod" "$STAGE/caddy/Caddyfile"

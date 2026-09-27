@@ -174,16 +174,41 @@ exec 9>&-
 echo 'PASS: concurrent deployments cannot acquire the same lock'
 
 if grep -q '/:/host' "$ROOT/docker-compose.prod.yml"; then
-  echo 'site-address still mounts the host root' >&2
+  echo 'runtime compose still mounts the host root' >&2
   exit 1
 fi
+if ! grep -q '/:/host' "$ROOT/docker-compose.legacy.yml"; then
+  echo 'legacy compose must mount / so an old updater can start the release' >&2
+  exit 1
+fi
+if ! grep -q 'compose.runtime.yml' "$ROOT/scripts/host/common.sh"; then
+  echo 'compose wrapper does not select compose.runtime.yml' >&2
+  exit 1
+fi
+strip_site_address() {
+  awk '
+    /^  site-address:/ { skip=1; next }
+    skip && /^  [A-Za-z0-9_-]+:[[:space:]]*$/ { skip=0 }
+    skip { next }
+    { print }
+  ' "$1"
+}
+diff -u <(strip_site_address "$ROOT/docker-compose.prod.yml") <(strip_site_address "$ROOT/docker-compose.legacy.yml") >/dev/null
+runtime_dir="$TEST_ROOT/runtime-release"
+mkdir -p "$runtime_dir"
+printf 'name: z3cz\n' >"$runtime_dir/compose.yml"
+printf 'name: z3cz\n' >"$runtime_dir/compose.runtime.yml"
+docker() { printf '%s\n' "$*"; }
+runtime_output="$(compose "$runtime_dir" config --quiet)"
+[[ "$runtime_output" == *"-f $runtime_dir/compose.runtime.yml"* ]]
+[[ "$runtime_output" != *"-f $runtime_dir/compose.yml "* ]]
 awk '
   $0 ~ /http:\/\/:8081/ { block=1 }
   block && /reverse_proxy/ { found=1 }
   block && /^}/ { block=0 }
   END { exit found ? 1 : 0 }
 ' "$ROOT/docker/Caddyfile.prod"
-echo 'PASS: caddy liveness does not wait for the API, and site-address does not mount /'
+echo 'PASS: caddy liveness does not wait for the API; runtime mounts are narrow and legacy compose keeps /'
 
 boot="$TEST_ROOT/boot"
 export Z3CZ_INSTALL_DIR="$boot/install" Z3CZ_STATE_DIR="$boot/state" Z3CZ_CONFIG_DIR="$boot/config"

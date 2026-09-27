@@ -118,6 +118,12 @@ compose() {
     args+=(--wait-timeout "${Z3CZ_DEPLOY_TIMEOUT:-300}")
   fi
   stage_host_docker_client
+  # 旧 update.sh 只执行 compose.yml。那个文件必须能在不传 Z3CZ_DOCKER_* 时启动，
+  # 所以它仍挂载根目录。新脚本有 compose.runtime.yml 时只用它，避免整机重启去挂 /mnt。
+  local compose_file="$release/compose.yml"
+  if [[ -f "$release/compose.runtime.yml" ]]; then
+    compose_file="$release/compose.runtime.yml"
+  fi
   Z3CZ_RELEASE_DIR="$release" Z3CZ_ENV_FILE="$ENV_FILE" \
     Z3CZ_POSTGRES_PASSWORD_FILE="$password_source" \
     Z3CZ_DOCKER_CLI="$Z3CZ_DOCKER_CLI" \
@@ -126,7 +132,7 @@ compose() {
     Z3CZ_HOST_LIB="$Z3CZ_HOST_LIB" \
     Z3CZ_HOST_USRLIB="$Z3CZ_HOST_USRLIB" \
     Z3CZ_HOST_LIB64="$Z3CZ_HOST_LIB64" \
-    docker compose --env-file "$ENV_FILE" -f "$release/compose.yml" "${args[@]}"
+    docker compose --env-file "$ENV_FILE" -f "$compose_file" "${args[@]}"
 }
 
 # Explicit deployment preparation, not a side effect of policy validation.

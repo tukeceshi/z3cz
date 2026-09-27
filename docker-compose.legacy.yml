@@ -58,69 +58,10 @@ services:
       Z3CZ_ENV_FILE: ${Z3CZ_ENV_FILE:-/etc/z3cz/z3cz.env}
       Z3CZ_INSTALL_DIR: /opt/z3cz
       Z3CZ_SITE_ADDRESS_SOCKET: /run/z3cz-site/site.sock
-      Z3CZ_DOCKER_CLI: ${Z3CZ_DOCKER_CLI:-/usr/bin/docker}
-      Z3CZ_DOCKER_COMPOSE_PLUGIN: ${Z3CZ_DOCKER_COMPOSE_PLUGIN:-/usr/libexec/docker/cli-plugins/docker-compose}
-      Z3CZ_DOCKER_SOCKET: ${Z3CZ_DOCKER_SOCKET:-/var/run/docker.sock}
-      Z3CZ_HOST_LIB: ${Z3CZ_HOST_LIB:-/lib}
-      Z3CZ_HOST_USRLIB: ${Z3CZ_HOST_USRLIB:-/usr/lib}
-      Z3CZ_HOST_LIB64: ${Z3CZ_HOST_LIB64:-/lib64}
-    # 不要挂整棵 /：其中的 /mnt 与 WSL 盘符在整机重启时经常尚未就绪，
-    # 挂载失败发生在进程启动前，重启策略不会再重试。
+    # 旧 update.sh 只读取 compose.yml，并且不会传入分阶段的 docker 路径。
+    # 固定路径在 Docker Engine 与冒烟环境里不一致，所以第一跳继续挂载根目录。
     volumes:
-      - type: bind
-        source: /opt/z3cz
-        target: /host/opt/z3cz
-        read_only: true
-        bind:
-          create_host_path: false
-      - type: bind
-        source: /etc/z3cz
-        target: /host/etc/z3cz
-        bind:
-          create_host_path: false
-      - type: bind
-        source: /var/lib/z3cz
-        target: /host/var/lib/z3cz
-        read_only: true
-        bind:
-          create_host_path: false
-      - /run/z3cz-site:/host/run/z3cz-site
-      - /run/z3cz-updater:/host/run/z3cz-updater
-      - type: bind
-        source: ${Z3CZ_DOCKER_CLI:-/usr/bin/docker}
-        target: /host/usr/bin/docker
-        read_only: true
-        bind:
-          create_host_path: false
-      - type: bind
-        source: ${Z3CZ_DOCKER_COMPOSE_PLUGIN:-/usr/libexec/docker/cli-plugins/docker-compose}
-        target: /host/usr/libexec/docker/cli-plugins/docker-compose
-        read_only: true
-        bind:
-          create_host_path: false
-      - type: bind
-        source: ${Z3CZ_DOCKER_SOCKET:-/var/run/docker.sock}
-        target: /host/var/run/docker.sock
-        bind:
-          create_host_path: false
-      - type: bind
-        source: ${Z3CZ_HOST_LIB:-/lib}
-        target: /host/lib
-        read_only: true
-        bind:
-          create_host_path: false
-      - type: bind
-        source: ${Z3CZ_HOST_USRLIB:-/usr/lib}
-        target: /host/usr/lib
-        read_only: true
-        bind:
-          create_host_path: false
-      - type: bind
-        source: ${Z3CZ_HOST_LIB64:-/lib64}
-        target: /host/lib64
-        read_only: true
-        bind:
-          create_host_path: false
+      - /:/host
       - /run/z3cz-site:/run/z3cz-site
       - ${Z3CZ_RELEASE_DIR:?set Z3CZ_RELEASE_DIR}/scripts:/srv/scripts:ro
     healthcheck:

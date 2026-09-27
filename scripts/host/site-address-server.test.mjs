@@ -113,6 +113,28 @@ test("host compose chroots to the mounted root and forwards docker mount paths",
   }
 });
 
+test("host compose uses compose.runtime.yml when the release ships it", () => {
+  const hostRoot = fs.mkdtempSync(path.join(os.tmpdir(), "z3cz-site-"));
+  const releaseOnHost = path.join(hostRoot, "opt", "z3cz", "current");
+  fs.mkdirSync(releaseOnHost, { recursive: true });
+  fs.writeFileSync(path.join(releaseOnHost, "compose.runtime.yml"), "name: z3cz\n");
+  try {
+    const invocation = hostComposeInvocation({
+      hostRoot,
+      envFile: "/etc/z3cz/z3cz.env",
+      releaseDir: "/opt/z3cz/current",
+      passwordFile: "/etc/z3cz/postgres.password",
+    });
+    assert.equal(
+      invocation.args.includes("/opt/z3cz/current/compose.runtime.yml"),
+      true
+    );
+    assert.equal(invocation.args.includes("/opt/z3cz/current/compose.yml"), false);
+  } finally {
+    fs.rmSync(hostRoot, { recursive: true, force: true });
+  }
+});
+
 test("ensureSiteAddressAccess appends a token once", () => {
   const first = ensureSiteAddressAccess("NODE_ENV=production\n", () => token);
   assert.equal(first.changed, true);

@@ -14,6 +14,14 @@ for (const file of ["caddy/Caddyfile", "scripts/common.sh", "scripts/install.sh"
 if (fs.readFileSync(path.join(stage, "Caddyfile"), "utf8") !== fs.readFileSync(path.join(stage, "caddy/Caddyfile"), "utf8")) {
   throw new Error("Legacy and directory-mounted Caddy configurations must match");
 }
+const legacyCompose = fs.readFileSync(path.join(stage, "compose.yml"), "utf8");
+const runtimeCompose = fs.readFileSync(path.join(stage, "compose.runtime.yml"), "utf8");
+if (!legacyCompose.includes("\n      - /:/host\n")) {
+  throw new Error("compose.yml must keep the root mount so an old updater can start this release");
+}
+if (runtimeCompose.includes("/:/host")) {
+  throw new Error("compose.runtime.yml must not mount the host root");
+}
 for (const name of Object.keys(pkg.dependencies ?? {})) {
   if (forbidden.has(name) || name.startsWith("@dafthunk/")) throw new Error(`Forbidden production dependency: ${name}`);
 }
@@ -24,7 +32,7 @@ for (const name of forbidden) {
     throw new Error(`Forbidden package is present in production lockfile: ${name}`);
   }
 }
-for (const required of ["api/dist/server.mjs", "api/dist/migrate.mjs", "api/pnpm-lock.yaml", "app/index.html", "compose.yml", "Caddyfile", "VERSION", "CHANGELOG.md", "update-policy.json", "scripts/install-update-runner.sh", "scripts/reconcile.sh", "scripts/reconcile-stop.sh", "scripts/install-boot-reconcile.sh", "scripts/windows-boot-task.ps1", "dist/z3cz-host-updater-linux-amd64", "dist/z3cz-host-updater-linux-arm64"]) {
+for (const required of ["api/dist/server.mjs", "api/dist/migrate.mjs", "api/pnpm-lock.yaml", "app/index.html", "compose.yml", "compose.runtime.yml", "Caddyfile", "VERSION", "CHANGELOG.md", "update-policy.json", "scripts/install-update-runner.sh", "scripts/reconcile.sh", "scripts/reconcile-stop.sh", "scripts/install-boot-reconcile.sh", "scripts/windows-boot-task.ps1", "dist/z3cz-host-updater-linux-amd64", "dist/z3cz-host-updater-linux-arm64"]) {
   if (!fs.existsSync(path.join(stage, required))) throw new Error(`Release is missing ${required}`);
 }
 for (const forbiddenPath of [".git", "apps", "packages", "node_modules", "Dockerfile"] ) {

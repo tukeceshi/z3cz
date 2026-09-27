@@ -319,7 +319,12 @@ const HOST_COMPOSE_ENV_KEYS = [
  * @param {string} paths.passwordFile host path
  */
 export function hostComposeInvocation(paths) {
-  const composeFile = path.posix.join(paths.releaseDir, "compose.yml");
+  const runtimeFile = path.posix.join(paths.releaseDir, "compose.runtime.yml");
+  const runtimeOnHost = path.join(paths.hostRoot, runtimeFile.replace(/^\/+/, ""));
+  const composeFile =
+    paths.hostRoot && fs.existsSync(runtimeOnHost)
+      ? runtimeFile
+      : path.posix.join(paths.releaseDir, "compose.yml");
   /** @type {Record<string, string>} */
   const env = {
     PATH: "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
