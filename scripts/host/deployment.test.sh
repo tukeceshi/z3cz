@@ -26,7 +26,7 @@ fixture() {
   cat >>"$old/scripts/common.sh" <<'MOCK'
 need_root() { :; }
 install_prod_dependencies() { :; }
-build_release_image() { :; }
+build_release_image() { printf 'build %s\n' "$1" >>"$TEST_LOG"; }
 remove_boot_reconcile() { :; }
 preflight_deployment() { [[ "$TEST_FAIL" != preflight ]]; }
 compose() {
@@ -109,6 +109,9 @@ expect_failure run_update
 [[ ! -e "$Z3CZ_STATE_DIR/maintenance/enabled" ]]
 grep -q '1.0.0 up -d --force-recreate --remove-orphans --wait' "$TEST_LOG"
 grep -q '1.0.0 exec -T api' "$TEST_LOG"
+build_line="$(grep -n 'build .*/1.0.0$' "$TEST_LOG" | head -1 | cut -d: -f1)"
+up_line="$(grep -n '1.0.0 up -d --force-recreate --remove-orphans --wait' "$TEST_LOG" | head -1 | cut -d: -f1)"
+[[ -n "$build_line" && -n "$up_line" && "$build_line" -lt "$up_line" ]]
 [[ "$(cat "$Z3CZ_UPDATER_BIN")" == old-updater ]]
 echo 'PASS: rollback waits for old release and authenticates database access'
 

@@ -102,6 +102,7 @@ fi
 
 switch_link current "$CURRENT"
 rm -f "$ROLLBACK_STATE_DIR/release-rollback.json"
+build_release_image "$CURRENT"
 if ! compose "$CURRENT" up -d --force-recreate --remove-orphans --wait || ! verify_database_access "$CURRENT"; then
   DEPLOY_PHASE="新旧版本均未恢复健康；维护模式已保留；备份：$BACKUP"
   die "新旧版本均未恢复健康；维护模式已保留，请人工检查。备份：$BACKUP"
