@@ -5,6 +5,7 @@ import type { AgentRunner } from "../durable-objects/agent-runner";
 import type { EmailAgentRunner } from "../durable-objects/email-agent-runner";
 import type { MailboxDO } from "../durable-objects/mailbox-do";
 import type { WorkflowAgent } from "../durable-objects/workflow-agent";
+import { readSiteAddressSetting } from "./site-address-binding";
 import { resolveSecret } from "./startup-secrets";
 import { setNodeBindings } from "./node-bindings-ref";
 import { MemoryKvNamespace } from "../storage/memory-kv";
@@ -126,8 +127,8 @@ export async function createNodeBindings(
     UPDATER_SOCKET: env.UPDATER_SOCKET,
     UPDATER_TOKEN: env.UPDATER_TOKEN,
     UPDATE_STATE_DIR: env.Z3CZ_UPDATE_DIR,
-    SITE_ADDRESS_SOCKET: env.SITE_ADDRESS_SOCKET,
-    SITE_ADDRESS_TOKEN: env.SITE_ADDRESS_TOKEN,
+    SITE_ADDRESS_SOCKET: readSiteAddressSetting(env, "SITE_ADDRESS_SOCKET"),
+    SITE_ADDRESS_TOKEN: readSiteAddressSetting(env, "SITE_ADDRESS_TOKEN"),
     CLOUDFLARE_ACCOUNT_ID: env.CLOUDFLARE_ACCOUNT_ID ?? "",
     CLOUDFLARE_API_TOKEN: env.CLOUDFLARE_API_TOKEN ?? "",
     CLOUDFLARE_AI_GATEWAY_ID: env.CLOUDFLARE_AI_GATEWAY_ID,

@@ -85,4 +85,26 @@ command() {
 assert_fail 'missing curl' ensure_docker
 grep -q '需要 curl' "$TEST_ROOT/err"
 
+CLEAN_ROOT="$ROOT" CLEAN_TEST="$TEST_ROOT" bash -s <<'EOF'
+set -euo pipefail
+source "$CLEAN_ROOT/scripts/host/bootstrap.sh"
+export Z3CZ_INSTALL_VERSION=v1.2.3
+stage="$CLEAN_TEST/release-src"
+mkdir -p "$stage/scripts"
+printf 'v1.2.3\n' >"$stage/VERSION"
+printf '#!/usr/bin/env bash\nexit 0\n' >"$stage/scripts/install.sh"
+chmod +x "$stage/scripts/install.sh"
+tar -czf "$CLEAN_TEST/pkg.tar.gz" -C "$stage" .
+checksum="$(sha256sum "$CLEAN_TEST/pkg.tar.gz" | awk '{print $1}')"
+printf '%s  z3cz-v1.2.3-deploy.tar.gz\n' "$checksum" >"$CLEAN_TEST/SHA256SUMS"
+curl() {
+  case "$*" in
+    *SHA256SUMS*) cp "$CLEAN_TEST/SHA256SUMS" "${@: -1}" ;;
+    *deploy.tar.gz*) cp "$CLEAN_TEST/pkg.tar.gz" "${@: -1}" ;;
+    *) echo "unexpected curl $*" >&2; return 1 ;;
+  esac
+}
+install_release
+EOF
+
 echo 'PASS: bootstrap installs Docker before downloading a release'

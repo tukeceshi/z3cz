@@ -33,7 +33,7 @@ ensure_docker() {
 }
 
 install_release() {
-  local REPOSITORY VERSION LATEST_URL BASE ASSET TMP CHECKSUM
+  local REPOSITORY VERSION LATEST_URL BASE ASSET CHECKSUM
   REPOSITORY="${Z3CZ_REPOSITORY:-tukeceshi/z3cz}"
   [[ "$REPOSITORY" =~ ^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$ ]] || die "仓库名称无效"
 
@@ -48,7 +48,7 @@ install_release() {
   BASE="https://github.com/$REPOSITORY/releases/download/$VERSION"
   ASSET="z3cz-${VERSION}-deploy.tar.gz"
   TMP="$(mktemp -d)"
-  trap 'rm -rf "$TMP"' EXIT
+  trap '[[ -z "${TMP:-}" ]] || rm -rf "$TMP"' EXIT
   curl -fL --retry 3 "$BASE/SHA256SUMS" -o "$TMP/SHA256SUMS"
   CHECKSUM="$(awk -v asset="$ASSET" '$2 == asset && length($1) == 64 && $1 ~ /^[a-fA-F0-9]+$/ {print $1}' "$TMP/SHA256SUMS")"
   [[ "$CHECKSUM" =~ ^[a-fA-F0-9]{64}$ ]] || die "找不到部署包的 SHA-256 校验值"
