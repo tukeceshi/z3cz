@@ -118,6 +118,7 @@ test("host compose uses compose.runtime.yml when the release ships it", () => {
   const releaseOnHost = path.join(hostRoot, "opt", "z3cz", "current");
   fs.mkdirSync(releaseOnHost, { recursive: true });
   fs.writeFileSync(path.join(releaseOnHost, "compose.runtime.yml"), "name: z3cz\n");
+  fs.writeFileSync(path.join(releaseOnHost, "VERSION"), "v1.2.3\n");
   try {
     const invocation = hostComposeInvocation({
       hostRoot,
@@ -130,6 +131,8 @@ test("host compose uses compose.runtime.yml when the release ships it", () => {
       true
     );
     assert.equal(invocation.args.includes("/opt/z3cz/current/compose.yml"), false);
+    assert.equal(invocation.env.Z3CZ_APP_IMAGE, "z3cz:1.2.3");
+    assert.equal(invocation.env.Z3CZ_WEB_IMAGE, "z3cz-web:1.2.3");
   } finally {
     fs.rmSync(hostRoot, { recursive: true, force: true });
   }

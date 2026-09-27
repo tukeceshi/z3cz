@@ -81,6 +81,7 @@ prepare_docker_env "$TARGET/compose.yml"
 ensure_site_address_access
 install_prod_dependencies "$TARGET"
 prepare_release_mounts "$TARGET"
+build_release_image "$TARGET"
 preflight_deployment "$TARGET"
 deployment_phase "初始化数据库：v$VERSION"
 compose "$TARGET" up -d postgres --wait
@@ -91,13 +92,8 @@ if [[ -d /run/systemd/system ]]; then
 fi
 compose "$TARGET" up -d --force-recreate --wait
 verify_database_access "$TARGET"
-boot_status=0
-bash "$TARGET/scripts/install-boot-reconcile.sh" || boot_status=$?
+remove_boot_reconcile
 INSTALL_COMPLETE=1
 rm -f "$PENDING"
 deployment_phase "安装完成：v$VERSION"
-if [[ "$boot_status" != 0 ]]; then
-  log "服务已安装，但开机编排没有注册。请处理后重新执行：bash $TARGET/scripts/install-boot-reconcile.sh"
-  exit "$boot_status"
-fi
 log "已安装 v$VERSION"

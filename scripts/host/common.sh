@@ -124,6 +124,12 @@ compose() {
   if [[ -f "$release/compose.runtime.yml" ]]; then
     compose_file="$release/compose.runtime.yml"
   fi
+  if [[ -f "$release/VERSION" ]]; then
+    local image_version
+    image_version="$(tr -d 'v\r\n' < "$release/VERSION")"
+    export Z3CZ_APP_IMAGE="z3cz:${image_version}"
+    export Z3CZ_WEB_IMAGE="z3cz-web:${image_version}"
+  fi
   Z3CZ_RELEASE_DIR="$release" Z3CZ_ENV_FILE="$ENV_FILE" \
     Z3CZ_POSTGRES_PASSWORD_FILE="$password_source" \
     Z3CZ_DOCKER_CLI="$Z3CZ_DOCKER_CLI" \
@@ -200,6 +206,52 @@ install_prod_dependencies() {
     -v "$release/api:/app" -v "$CACHE_DIR:/pnpm/store" -w /app \
     node:22.12.0-bookworm-slim@sha256:35531c52ce27b6575d69755c73e65d4468dba93a25644eed56dc12879cae9213 \
     sh -ec 'npm install --global pnpm@10.3.0 --silent; pnpm config set store-dir /pnpm/store; pnpm install --prod --frozen-lockfile --config.auto-install-peers=false --reporter=silent'
+}
+
+# Copy the already-built release into local images. The server does not compile source.
+# Old releases without compose.runtime.yml keep their directory mounts.
+build_release_image() {
+  local release="$1" version
+  [[ -f "$release/compose.runtime.yml" && -f "$release/VERSION" ]] || return 0
+  version="$(tr -d 'v\r\n' < "$release/VERSION")"
+  [[ -n "$version" ]] || die "版本号为空"
+  log "构建本地镜像 z3cz:$version"
+  docker build -t "z3cz:$version" -f - "$release" <<EOF
+FROM node:22.12.0-bookworm-slim@sha256:35531c52ce27b6575d69755c73e65d4468dba93a25644eed56dc12879cae9213
+COPY api /app
+COPY app /srv/app
+COPY scripts/site-address-server.mjs /srv/scripts/site-address-server.mjs
+WORKDIR /app
+EOF
+  docker build -t "z3cz-web:$version" -f - "$release" <<EOF
+FROM caddy:2.9.1-alpine@sha256:b4e3952384eb9524a887633ce65c752dd7c71314d2c2acf98cd5c715aaa534f0
+COPY caddy/Caddyfile /etc/caddy/Caddyfile
+COPY app /srv/app
+EOF
+}
+
+# Drop the logon task and systemd unit from earlier installs. Missing tasks are fine.
+remove_boot_reconcile() {
+  if command -v systemctl >/dev/null 2>&1 && systemctl cat z3cz-compose.service >/dev/null 2>&1; then
+    systemctl disable --now z3cz-compose.service >/dev/null 2>&1 || true
+    rm -f /etc/systemd/system/z3cz-compose.service
+    systemctl daemon-reload >/dev/null 2>&1 || true
+    log "已取消开机编排 z3cz-compose.service"
+  fi
+  local ps=""
+  if [[ -x /mnt/c/Windows/System32/WindowsPowerShell/v1.0/powershell.exe ]]; then
+    ps=/mnt/c/Windows/System32/WindowsPowerShell/v1.0/powershell.exe
+  else
+    ps="$(command -v powershell.exe 2>/dev/null || true)"
+  fi
+  if [[ -z "$ps" ]]; then
+    return 0
+  fi
+  if "$ps" -NoProfile -NonInteractive -Command 'Unregister-ScheduledTask -TaskName ''z3cz-compose'' -Confirm:$false -ErrorAction SilentlyContinue; Unregister-ScheduledTask -TaskName ''z3cz-compose-stop'' -Confirm:$false -ErrorAction SilentlyContinue'; then
+    log "已取消 Windows 登录任务 z3cz-compose"
+  else
+    log "取消 Windows 登录任务失败"
+  fi
 }
 switch_link() { local name="$1" target="$2"; ln -sfn "$target" "$INSTALL_DIR/$name.next"; mv -Tf "$INSTALL_DIR/$name.next" "$INSTALL_DIR/$name"; }
 compose_database_service() {

@@ -26,6 +26,8 @@ fixture() {
   cat >>"$old/scripts/common.sh" <<'MOCK'
 need_root() { :; }
 install_prod_dependencies() { :; }
+build_release_image() { :; }
+remove_boot_reconcile() { :; }
 preflight_deployment() { [[ "$TEST_FAIL" != preflight ]]; }
 compose() {
   printf '%s\n' "$*" >>"$TEST_LOG"
@@ -46,7 +48,7 @@ sha256sum "$1" >"$1.sha256"
 BACKUP
   chmod +x "$old/scripts/backup.sh"
   printf 'v1.0.0\n' >"$old/VERSION"
-  cp "$ROOT/docker-compose.prod.yml" "$old/compose.yml"
+  cp "$ROOT/docker-compose.legacy.yml" "$old/compose.yml"
   ln -s "$old" "$Z3CZ_INSTALL_DIR/current"
   RELEASE="$TEST_ROOT/$name/package"
   mkdir -p "$RELEASE/scripts" "$RELEASE/dist"
@@ -59,7 +61,7 @@ mkdir -p "${Z3CZ_STATE_DIR:?}/deployment"
 printf 'boot-reconcile\n' >>"$Z3CZ_STATE_DIR/deployment/boot-reconcile"
 BOOT
   chmod +x "$RELEASE/scripts/install-boot-reconcile.sh" "$RELEASE/scripts/install-update-runner.sh"
-  cp "$ROOT/docker-compose.prod.yml" "$RELEASE/compose.yml"
+  cp "$ROOT/docker-compose.legacy.yml" "$RELEASE/compose.yml"
   printf 'v1.0.1\n' >"$RELEASE/VERSION"
   printf '1\n' >"$RELEASE/password-mount.version"
   for arch in amd64 arm64; do
@@ -131,7 +133,7 @@ bash "$RELEASE/scripts/install.sh" >"$TEST_ROOT/output" 2>&1
 [[ ! -e "$Z3CZ_STATE_DIR/deployment/install-pending" ]]
 [[ "$(cat "$Z3CZ_CONFIG_DIR/postgres.password")" == test-password ]]
 [[ "$(cat "$Z3CZ_CONFIG_DIR/postgres-secret/postgres.password")" == test-password ]]
-[[ "$(cat "$Z3CZ_STATE_DIR/deployment/boot-reconcile")" == boot-reconcile ]]
+[[ ! -e "$Z3CZ_STATE_DIR/deployment/boot-reconcile" ]]
 echo 'PASS: interrupted installation resumes without replacing password'
 
 for failure in '' both; do
@@ -185,15 +187,18 @@ if ! grep -q 'compose.runtime.yml' "$ROOT/scripts/host/common.sh"; then
   echo 'compose wrapper does not select compose.runtime.yml' >&2
   exit 1
 fi
-strip_site_address() {
-  awk '
-    /^  site-address:/ { skip=1; next }
-    skip && /^  [A-Za-z0-9_-]+:[[:space:]]*$/ { skip=0 }
-    skip { next }
-    { print }
-  ' "$1"
-}
-diff -u <(strip_site_address "$ROOT/docker-compose.prod.yml") <(strip_site_address "$ROOT/docker-compose.legacy.yml") >/dev/null
+if grep -q 'Z3CZ_RELEASE_DIR' "$ROOT/docker-compose.prod.yml"; then
+  echo 'runtime compose still bind-mounts the release' >&2
+  exit 1
+fi
+if ! grep -q 'Z3CZ_APP_IMAGE' "$ROOT/docker-compose.prod.yml" || ! grep -q 'Z3CZ_WEB_IMAGE' "$ROOT/docker-compose.prod.yml"; then
+  echo 'runtime compose does not use the local images' >&2
+  exit 1
+fi
+if ! grep -q 'Z3CZ_RELEASE_DIR' "$ROOT/docker-compose.legacy.yml"; then
+  echo 'legacy compose must keep release mounts for an old updater' >&2
+  exit 1
+fi
 runtime_dir="$TEST_ROOT/runtime-release"
 mkdir -p "$runtime_dir"
 printf 'name: z3cz\n' >"$runtime_dir/compose.yml"
@@ -235,3 +240,15 @@ if wait_for_mounts; then
 fi
 echo 'PASS: boot reconcile waits for docker and starts without recreating containers'
 bash "$ROOT/scripts/host/boot-reconcile.test.sh"
+
+image_release="$TEST_ROOT/image-release"
+mkdir -p "$image_release/api" "$image_release/app" "$image_release/caddy" "$image_release/scripts"
+printf 'v1.2.3\n' >"$image_release/VERSION"
+printf 'name: z3cz\n' >"$image_release/compose.runtime.yml"
+printf 'ok\n' >"$image_release/caddy/Caddyfile"
+printf 'node\n' >"$image_release/scripts/site-address-server.mjs"
+docker() { cat >/dev/null; printf '%s\n' "$*" >>"$TEST_ROOT/builds"; }
+build_release_image "$image_release"
+grep -q -- '-t z3cz:1.2.3' "$TEST_ROOT/builds"
+grep -q -- '-t z3cz-web:1.2.3' "$TEST_ROOT/builds"
+echo 'PASS: a runtime release is copied into local app and web images'

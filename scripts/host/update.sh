@@ -54,6 +54,7 @@ deployment_phase "准备更新 $VERSION：安装生产依赖"
 install_prod_dependencies "$TARGET"
 log "生产依赖已安装"
 prepare_release_mounts "$TARGET"
+build_release_image "$TARGET"
 preflight_deployment "$TARGET"
 
 BACKUP="$STATE_DIR/backups/z3cz-before-${VERSION#v}-$(date +%Y%m%d%H%M%S).dump"
@@ -95,9 +96,7 @@ EOF
 if compose "$TARGET" up -d --force-recreate --remove-orphans --wait && verify_database_access "$TARGET"; then
   install -m 0755 "$TARGET/dist/z3cz-host-updater-linux-$UPDATER_ARCH" "$UPDATER_BIN"
   write_release_rollback
-  if [[ -f "$TARGET/scripts/install-boot-reconcile.sh" ]]; then
-    bash "$TARGET/scripts/install-boot-reconcile.sh" || log "开机编排注册失败。服务已更新到 $VERSION，可稍后执行 bash $TARGET/scripts/install-boot-reconcile.sh"
-  fi
+  remove_boot_reconcile
   rm -f "$STATE_DIR/maintenance/enabled"; deployment_phase "已更新到 $VERSION；备份：$BACKUP"; exit 0
 fi
 

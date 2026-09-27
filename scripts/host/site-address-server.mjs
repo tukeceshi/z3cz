@@ -333,6 +333,16 @@ export function hostComposeInvocation(paths) {
     Z3CZ_ENV_FILE: paths.envFile,
     Z3CZ_POSTGRES_PASSWORD_FILE: paths.passwordFile,
   };
+  if (paths.hostRoot) {
+    const versionFile = path.join(paths.hostRoot, paths.releaseDir.replace(/^\/+/, ""), "VERSION");
+    if (fs.existsSync(versionFile)) {
+      const version = fs.readFileSync(versionFile, "utf8").replace(/[v\r\n]/g, "");
+      if (version) {
+        env.Z3CZ_APP_IMAGE = `z3cz:${version}`;
+        env.Z3CZ_WEB_IMAGE = `z3cz-web:${version}`;
+      }
+    }
+  }
   for (const key of HOST_COMPOSE_ENV_KEYS) {
     const value = process.env[key];
     if (value) {
