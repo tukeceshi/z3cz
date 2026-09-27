@@ -74,4 +74,17 @@ fi
   fi
 )
 
+ps1="$ROOT/scripts/host/windows-boot-task.ps1"
+grep -q -- '-d $Distro -u root --' "$ps1"
+if grep -F -q -- '-d `"$Distro`"' "$ps1"; then
+  echo 'wsl.exe treats quotes as part of the distribution name' >&2
+  exit 1
+fi
+grep -q -- '-AtLogOn -User' "$ps1"
+grep -q -- '-RunLevel Limited' "$ps1"
+grep -q -- '<UserId>USER_ID</UserId>' "$ps1"
+if grep -q -- '-AtLogOn$' "$ps1"; then
+  echo 'logon trigger must name the current user so a non-admin can register it' >&2
+  exit 1
+fi
 echo "PASS: boot reconcile keeps Linux on systemd and detects WSL without its env var"

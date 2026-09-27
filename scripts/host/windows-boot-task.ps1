@@ -9,9 +9,17 @@ param(
 
 $ErrorActionPreference = 'Stop'
 
-$wslStart = "-d `"$Distro`" -u root -- bash /usr/local/lib/z3cz/reconcile.sh"
-$wslStop = "-d `"$Distro`" -u root -- bash /usr/local/lib/z3cz/reconcile-stop.sh"
+# wsl.exe keeps quotation marks as part of the distribution name, so -d "Ubuntu"
+# exits with WSL_E_DISTRO_NOT_FOUND and the scheduled task stops there.
+if ($Distro.Contains(' ')) {
+  throw "发行版名称包含空格，计划任务无法调用 wsl.exe：$Distro"
+}
+$wslStart = "-d $Distro -u root -- bash /usr/local/lib/z3cz/reconcile.sh"
+$wslStop = "-d $Distro -u root -- bash /usr/local/lib/z3cz/reconcile-stop.sh"
 
+# AtLogOn without -User means "any user logs on" and requires an administrator.
+# WSL interop runs as the logged-on Windows user, who is not elevated.
+$account = [System.Security.Principal.WindowsIdentity]::GetCurrent().Name
 $actions = @()
 $dockerExe = Join-Path $env:ProgramFiles 'Docker\Docker\Docker Desktop.exe'
 if (Test-Path -LiteralPath $dockerExe) {
@@ -24,12 +32,14 @@ $startSettings = New-ScheduledTaskSettingsSet `
   -StartWhenAvailable `
   -MultipleInstances IgnoreNew `
   -ExecutionTimeLimit (New-TimeSpan -Minutes 15)
-$startTrigger = New-ScheduledTaskTrigger -AtLogOn
+$startTrigger = New-ScheduledTaskTrigger -AtLogOn -User $account
+$principal = New-ScheduledTaskPrincipal -UserId $account -LogonType Interactive -RunLevel Limited
 Register-ScheduledTask `
   -TaskName 'z3cz-compose' `
   -Action $actions `
   -Trigger $startTrigger `
   -Settings $startSettings `
+  -Principal $principal `
   -Force | Out-Null
 
 $stopXml = @'
@@ -46,6 +56,7 @@ $stopXml = @'
   </Triggers>
   <Principals>
     <Principal>
+      <UserId>USER_ID</UserId>
       <LogonType>InteractiveToken</LogonType>
       <RunLevel>LeastPrivilege</RunLevel>
     </Principal>
@@ -68,5 +79,6 @@ $stopXml = @'
 </Task>
 '@
 $escapedStop = [System.Security.SecurityElement]::Escape($wslStop)
-Register-ScheduledTask -TaskName 'z3cz-compose-stop' -Xml ($stopXml.Replace('WSL_STOP', $escapedStop)) -Force | Out-Null
+$escapedUser = [System.Security.SecurityElement]::Escape($account)
+Register-ScheduledTask -TaskName 'z3cz-compose-stop' -Xml ($stopXml.Replace('USER_ID', $escapedUser).Replace('WSL_STOP', $escapedStop)) -Force | Out-Null
 Write-Output "registered z3cz-compose for $Distro"
