@@ -12,9 +12,9 @@ const ready = {
 describe("siteDomainStatusLine", () => {
   it("shows the live domain only after a switch with no error", () => {
     expect(siteDomainStatusLine(ready, false)).toBe("currentDomain");
-    expect(
-      siteDomainStatusLine({ ...ready, siteAddress: null }, false)
-    ).toBe("currentHttp");
+    expect(siteDomainStatusLine({ ...ready, siteAddress: null }, false)).toBe(
+      "currentHttp"
+    );
   });
 
   it("does not describe a failed save as the current domain", () => {
