@@ -4,10 +4,12 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 STAGE="$ROOT/dist/release"; OUT="${Z3CZ_OUT_DIR:-$ROOT/dist/deploy}"
 VERSION="$(tr -d '\r\n' < "$ROOT/VERSION")"
 bash "$ROOT/scripts/host/compile-updater.sh"
-rm -rf "$STAGE"; mkdir -p "$STAGE/api" "$STAGE/app" "$STAGE/scripts" "$OUT"
+rm -rf "$STAGE"; mkdir -p "$STAGE/api" "$STAGE/app" "$STAGE/persist-worker" "$STAGE/scripts" "$OUT"
 VITE_API_HOST=/api VITE_WS_VIA_PROXY=1 pnpm --filter @dafthunk/app build:docker-prod
 pnpm --filter @dafthunk/api build:production
 cp -R "$ROOT/apps/app/dist/." "$STAGE/app/"
+cp "$ROOT/apps/persist-worker/worker.mjs" "$STAGE/persist-worker/worker.mjs"
+printf '1\n' >"$STAGE/persist-worker.version"
 cp "$ROOT/deploy/api/package.json" "$ROOT/deploy/api/pnpm-lock.yaml" "$STAGE/api/"
 cp "$ROOT/docker-compose.legacy.yml" "$STAGE/compose.yml"
 cp "$ROOT/docker-compose.prod.yml" "$STAGE/compose.runtime.yml"

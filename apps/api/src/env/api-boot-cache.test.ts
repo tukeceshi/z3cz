@@ -1,4 +1,5 @@
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 
@@ -57,7 +58,7 @@ describe("api boot cache", () => {
 
   it("does not crash startup when the cache directory cannot be created", () => {
     rememberEnv();
-    const blocker = `/tmp/z3cz-boot-blocker-${Date.now()}`;
+    const blocker = path.join(os.tmpdir(), `z3cz-boot-blocker-${Date.now()}`);
     fs.writeFileSync(pathToFileURL(blocker), "x");
     process.env.API_BOOT_CACHE_DIR = blocker;
 

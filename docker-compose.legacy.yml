@@ -90,6 +90,7 @@ services:
     volumes:
       - ${Z3CZ_RELEASE_DIR:?set Z3CZ_RELEASE_DIR}/api:/app:ro
       - ${Z3CZ_RELEASE_DIR:?set Z3CZ_RELEASE_DIR}/app:/srv/app:ro
+      - ${Z3CZ_RELEASE_DIR:?set Z3CZ_RELEASE_DIR}/persist-worker:/persist-worker:ro
       - /var/lib/z3cz/uploads:/var/lib/z3cz/uploads
       - /var/lib/z3cz/maintenance:/var/lib/z3cz/maintenance:ro
       - /run/z3cz-site:/run/z3cz-site

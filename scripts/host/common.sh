@@ -262,12 +262,23 @@ preflight_deployment() {
   for file in compose.yml api/dist/server.mjs api/dist/migrate.mjs app/index.html scripts/site-address-server.mjs scripts/reconcile.sh scripts/reconcile-stop.sh scripts/install-boot-reconcile.sh scripts/windows-boot-task.ps1; do
     [[ -f "$release/$file" ]] || die "发布包缺少文件：$file"
   done
+  if [[ -f "$release/persist-worker.version" ]]; then
+    [[ -f "$release/persist-worker/worker.mjs" ]] || die "发布包缺少加速服务：persist-worker/worker.mjs"
+  fi
   [[ -s "$CONFIG_DIR/postgres.password" && -f "$CONFIG_DIR/postgres.password" ]] || die "数据库密码必须是非空普通文件"
   compose "$release" config --quiet
   # Resolve images and check mounts before entering maintenance or replacing services.
   compose "$release" pull
   compose "$release" run --rm --no-deps --entrypoint node api -e \
     "const fs=require('node:fs');for(const p of ['/app/dist/server.mjs','/app/dist/migrate.mjs','/srv/app/index.html'])if(!fs.statSync(p).isFile())throw Error('Invalid release mount: '+p)"
+  if [[ -f "$release/app/bootstrap-manifest.json" ]]; then
+    compose "$release" run --rm --no-deps --entrypoint node api -e \
+      "const fs=require('node:fs'),p=require('node:path').join(process.env.BOOTSTRAP_ASSETS_DIR||'','bootstrap-manifest.json');if(!fs.statSync(p).isFile())throw Error('Invalid bootstrap assets: '+p)"
+  fi
+  if [[ -f "$release/persist-worker.version" ]]; then
+    compose "$release" run --rm --no-deps --entrypoint node api -e \
+      "require('node:fs').statSync('/persist-worker/worker.mjs').isFile()||process.exit(1)"
+  fi
   compose "$release" run --rm --no-deps --entrypoint sh postgres -ec 'if [ -d /run/z3cz-password ]; then test -s /run/z3cz-password/postgres.password; elif [ -f /run/z3cz-password ]; then test -s /run/z3cz-password; else test -s /run/secrets/postgres_password; fi'
   compose "$release" run --rm --no-deps --entrypoint node site-address -e \
     "const fs=require('node:fs');const p=fs.existsSync('/srv/scripts/site-address-server.mjs')?'/srv/scripts/site-address-server.mjs':'/srv/site-address-server.mjs';if(!fs.statSync(p).isFile())throw Error('Invalid site-address mount')"
@@ -292,16 +303,20 @@ install_prod_dependencies() {
 # Copy the already-built release into local images. The server does not compile source.
 # Old releases without compose.runtime.yml keep their directory mounts.
 build_release_image() {
-  local release="$1" version
+  local release="$1" version worker_copy=""
   [[ -f "$release/compose.runtime.yml" && -f "$release/VERSION" ]] || return 0
   version="$(tr -d 'v\r\n' < "$release/VERSION")"
   [[ -n "$version" ]] || die "版本号为空"
+  if [[ -f "$release/persist-worker/worker.mjs" ]]; then
+    worker_copy="COPY persist-worker /persist-worker"
+  fi
   log "构建本地镜像 z3cz:$version"
   ensure_docker_cli_home
   docker build -t "z3cz:$version" -f - "$release" <<EOF
 FROM node:22.12.0-bookworm-slim@sha256:35531c52ce27b6575d69755c73e65d4468dba93a25644eed56dc12879cae9213
 COPY api /app
 COPY app /srv/app
+$worker_copy
 COPY scripts/site-address-server.mjs /srv/scripts/site-address-server.mjs
 WORKDIR /app
 EOF
@@ -399,7 +414,8 @@ prepare_docker_env() {
     /^RUNTIME=(native|node)$/ { print "RUNTIME=docker"; next }
     /^HOST=127\.0\.0\.1$/ { print "HOST=0.0.0.0"; next }
     /^LOCAL_STORAGE_PATH=\/var\/lib\/z3cz\/storage$/ { print "LOCAL_STORAGE_PATH=" uploads; next }
-    /^BOOTSTRAP_ASSETS_DIR=\/opt\/z3cz\// { print "BOOTSTRAP_ASSETS_DIR=" assets; next }
+    /^BOOTSTRAP_ASSETS_DIR=\/opt\/z3cz\// { print "BOOTSTRAP_ASSETS_DIR=/srv/app"; next }
+    /^BOOTSTRAP_ASSETS_DIR=\/app$/ { print "BOOTSTRAP_ASSETS_DIR=/srv/app"; next }
     /^WEB_HOST=https?:\/\/(localhost|127\.0\.0\.1)(:[0-9]+)?\/?$/ { next }
     /^WEBSITE_URL=https?:\/\/(localhost|127\.0\.0\.1)(:[0-9]+)?\/?$/ { next }
     /^WEB_HOST=https?:\/\/([0-9]{1,3}\.){3}[0-9]{1,3}(:[0-9]+)?\/?$/ { next }

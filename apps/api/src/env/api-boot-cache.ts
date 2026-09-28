@@ -58,13 +58,25 @@ export function hashFile(filePath: string): string {
     .digest("hex");
 }
 
+function firstExistingPath(...candidates: string[]): string {
+  return candidates.find((candidate) => fs.existsSync(candidate)) ?? candidates[0];
+}
+
 export function getLockfileHash(): string {
-  return hashFile(path.join(getMonorepoRootPath(), "pnpm-lock.yaml"));
+  return hashFile(
+    firstExistingPath(
+      path.join(getMonorepoRootPath(), "pnpm-lock.yaml"),
+      path.join(process.cwd(), "pnpm-lock.yaml")
+    )
+  );
 }
 
 export function getMigrationJournalHash(): string {
   return hashFile(
-    path.join(getApiRootPath(), "src/db/migrations/meta/_journal.json")
+    firstExistingPath(
+      path.join(getApiRootPath(), "src/db/migrations/meta/_journal.json"),
+      path.join(process.cwd(), "migrations/meta/_journal.json")
+    )
   );
 }
 
