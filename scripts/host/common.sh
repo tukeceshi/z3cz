@@ -158,6 +158,7 @@ compose() {
   if [[ " $* " == *" --wait "* && " $* " != *" --wait-timeout "* ]]; then
     args+=(--wait-timeout "${Z3CZ_DEPLOY_TIMEOUT:-300}")
   fi
+  ensure_docker_cli_home
   stage_host_docker_client
   # 旧 update.sh 只执行 compose.yml。那个文件必须能在不传 Z3CZ_DOCKER_* 时启动，
   # 所以它仍挂载根目录。新脚本有 compose.runtime.yml 时只用它，避免整机重启去挂 /mnt。
@@ -195,6 +196,22 @@ prepare_release_mounts() {
   mv -f "$CONFIG_DIR/postgres-secret/postgres.password.next" "$CONFIG_DIR/postgres-secret/postgres.password"
 }
 
+# 更新服务把 /root 挂成只读。docker build 会创建配置目录，改到数据目录下。
+ensure_docker_cli_home() {
+  if [[ -n "${DOCKER_CONFIG:-}" && -w "$DOCKER_CONFIG" ]]; then
+    return 0
+  fi
+  local default_home="${HOME:-/root}"
+  if [[ -z "${DOCKER_CONFIG:-}" ]] && mkdir -p "$default_home/.docker" 2>/dev/null; then
+    return 0
+  fi
+  local home="$STATE_DIR/docker-home"
+  mkdir -p "$home/.docker"
+  chmod 700 "$home" "$home/.docker"
+  export HOME="$home"
+  export DOCKER_CONFIG="$home/.docker"
+}
+
 # One lock shared by install, update and rollback. It is inherited by children.
 lock_deployment() {
   mkdir -p "$STATE_DIR/deployment"
@@ -218,6 +235,7 @@ deployment_failed() {
 preflight_deployment() {
   local release="$1" file
   [[ "${Z3CZ_DEPLOY_TIMEOUT:-300}" =~ ^[1-9][0-9]*$ ]] || die "Z3CZ_DEPLOY_TIMEOUT 必须为正整数秒数"
+  ensure_docker_cli_home
   docker info >/dev/null || die "Docker 引擎不可用"
   docker compose up --help | grep -q -- '--wait-timeout' || die "Docker Compose 需要支持 --wait-timeout"
   for file in compose.yml api/dist/server.mjs api/dist/migrate.mjs app/index.html scripts/site-address-server.mjs scripts/reconcile.sh scripts/reconcile-stop.sh scripts/install-boot-reconcile.sh scripts/windows-boot-task.ps1; do
@@ -243,6 +261,7 @@ verify_database_access() {
 }
 install_prod_dependencies() {
   local release="$1"; mkdir -p "$CACHE_DIR"
+  ensure_docker_cli_home
   docker run --rm \
     -v "$release/api:/app" -v "$CACHE_DIR:/pnpm/store" -w /app \
     node:22.12.0-bookworm-slim@sha256:35531c52ce27b6575d69755c73e65d4468dba93a25644eed56dc12879cae9213 \
@@ -257,6 +276,7 @@ build_release_image() {
   version="$(tr -d 'v\r\n' < "$release/VERSION")"
   [[ -n "$version" ]] || die "版本号为空"
   log "构建本地镜像 z3cz:$version"
+  ensure_docker_cli_home
   docker build -t "z3cz:$version" -f - "$release" <<EOF
 FROM node:22.12.0-bookworm-slim@sha256:35531c52ce27b6575d69755c73e65d4468dba93a25644eed56dc12879cae9213
 COPY api /app

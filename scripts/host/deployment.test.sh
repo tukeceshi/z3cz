@@ -282,3 +282,24 @@ copy_dynamic_libs "$lib_root/bin/fake-docker" "$lib_root/stage2"
 [[ "$(cat "$lib_root/stage2/libc.so.6")" == libc ]]
 unset -f ldd
 echo 'PASS: staged docker libraries are real files, not broken links'
+
+ok_home="$TEST_ROOT/ok-home"
+blocked_home="$TEST_ROOT/not-a-directory"
+mkdir -p "$ok_home"
+printf 'x\n' >"$blocked_home"
+saved_home="${HOME:-}"
+saved_config="${DOCKER_CONFIG-unset}"
+HOME="$ok_home"
+unset DOCKER_CONFIG
+ensure_docker_cli_home
+[[ -d "$ok_home/.docker" ]]
+[[ -z "${DOCKER_CONFIG:-}" ]]
+HOME="$blocked_home"
+unset DOCKER_CONFIG
+ensure_docker_cli_home
+[[ "$HOME" == "$STATE_DIR/docker-home" ]]
+[[ "$DOCKER_CONFIG" == "$STATE_DIR/docker-home/.docker" ]]
+[[ -d "$DOCKER_CONFIG" ]]
+if [[ "$saved_config" == unset ]]; then unset DOCKER_CONFIG; else DOCKER_CONFIG="$saved_config"; fi
+HOME="$saved_home"
+echo 'PASS: docker config moves off an unwritable home'
