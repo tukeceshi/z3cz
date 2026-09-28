@@ -944,7 +944,7 @@ export const en = {
     siteDomain: {
       title: "Site domain",
       description:
-        "The domain must already point at this machine, with ports 80 and 443 open. Saving briefly interrupts the site; reopen it at the new address. Leave the field empty to remove the domain and use HTTP.",
+        "The domain must already point at this machine, with ports 80 and 443 open. After saving, this address will stop working; open the new address shown on this page. Leave the field empty to remove the domain and use HTTP.",
       currentHttp: "No domain is bound. The site is using HTTP.",
       currentDomain: "Current domain: {{domain}}",
       savedNotApplied:
@@ -955,8 +955,14 @@ export const en = {
       placeholder: "example.com",
       fieldHelp:
         "Do not include a port, path, or IP. Leave empty to remove the domain.",
-      applyingNow: "Switching the domain. Please wait.",
+      applyingNow:
+        "Switching the domain. This address will stop working; open the new address below.",
       switching: "Switching",
+      jumpTitle: "Open the new address",
+      jumpHint:
+        "After the switch, this address will stop working. Use the new address below; this page jumps there when it is ready.",
+      originLost: "This address no longer works. Open the new address.",
+      openNewSite: "Open the new address",
       switched:
         "The site has restarted with this domain. Open https://{{domain}}. A certificate still requires the domain to point at this machine, with ports 80 and 443 open.",
       switchedHttp: "The domain was removed. The site is back on HTTP.",

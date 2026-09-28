@@ -911,7 +911,7 @@ export const zh: TranslationDictionary = {
     siteDomain: {
       title: "站点域名",
       description:
-        "域名须已解析到这台机器，并开放 80 和 443。保存后站点会短暂中断，请用新地址重新打开。留空并保存会取消域名，改回 HTTP。",
+        "域名须已解析到这台机器，并开放 80 和 443。保存后当前地址将无法继续使用，请用页面上的新地址打开。留空并保存会取消域名，改回 HTTP。",
       currentHttp: "当前未绑定域名，站点使用 HTTP。",
       currentDomain: "当前域名：{{domain}}",
       savedNotApplied:
@@ -921,8 +921,13 @@ export const zh: TranslationDictionary = {
       fieldLabel: "公网域名",
       placeholder: "example.com",
       fieldHelp: "不要填写端口、路径或 IP。留空表示取消绑定。",
-      applyingNow: "正在切换域名，请稍候。",
+      applyingNow: "正在切换域名。完成后当前地址会失效，请从下方打开新地址。",
       switching: "正在切换",
+      jumpTitle: "前往新地址",
+      jumpHint:
+        "切换后当前地址将无法继续使用。请用下面的新地址打开站点；新地址就绪后会自动跳转。",
+      originLost: "当前地址已无法继续使用。请打开新地址。",
+      openNewSite: "打开新地址",
       switched:
         "站点已按该域名重启。请用 https://{{domain}} 打开。证书仍要域名已解析到本机，并且 80 和 443 已开放。",
       switchedHttp: "已取消域名，站点改回 HTTP。",

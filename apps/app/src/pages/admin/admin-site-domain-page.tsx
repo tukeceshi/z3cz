@@ -1,5 +1,5 @@
 import type { SiteDomainErrorCode, SiteDomainStatus } from "@dafthunk/types";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { FormEvent } from "react";
 import { toast } from "sonner";
 
@@ -9,6 +9,7 @@ import { InsetLoading } from "@/components/inset-loading";
 import { InsetLayout } from "@/components/layouts/inset-layout";
 import { useTranslation } from "@/components/locale-provider";
 import { useBreadcrumbsSetter } from "@/components/page-context";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -19,12 +20,13 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
-import { ApiRequestError } from "@/services/utils";
 import {
   getSiteDomain,
   updateSiteDomain,
 } from "@/services/site-domain-service";
+import { ApiRequestError } from "@/services/utils";
 
+import { probeSiteUrl, siteDomainJumpUrl } from "./site-domain-next-url";
 import { siteDomainStatusLine } from "./site-domain-status-line";
 
 const STATUS_LINE_KEYS = {
@@ -57,7 +59,9 @@ export function AdminSiteDomainPage() {
   const [draft, setDraft] = useState("");
   const [saving, setSaving] = useState(false);
   const [switching, setSwitching] = useState(false);
+  const [originLost, setOriginLost] = useState(false);
   const announced = useRef(false);
+  const jumped = useRef(false);
 
   const load = useCallback(async () => {
     try {
@@ -88,6 +92,16 @@ export function AdminSiteDomainPage() {
     void load();
   }, [load]);
 
+  const jumpUrl = useMemo(() => {
+    if (!status || typeof window === "undefined") {
+      return null;
+    }
+    return siteDomainJumpUrl(status.siteAddress, window.location, {
+      switching,
+      applyError: status.applyError,
+    });
+  }, [status, switching]);
+
   useEffect(() => {
     if (!switching) {
       return;
@@ -99,6 +113,7 @@ export function AdminSiteDomainPage() {
         if (stopped || announced.current) {
           return;
         }
+        setOriginLost(false);
         setStatus(next);
         setDraft(next.siteAddress ?? "");
         if (next.applying) {
@@ -118,7 +133,7 @@ export function AdminSiteDomainPage() {
         }
         toast.success(t("admin.siteDomain.switchedHttp"));
       } catch {
-        // 重建 api 期间请求会失败，继续等它起来。
+        setOriginLost(true);
       }
     };
     void poll();
@@ -130,6 +145,33 @@ export function AdminSiteDomainPage() {
       window.clearInterval(timer);
     };
   }, [switching, t]);
+
+  useEffect(() => {
+    jumped.current = false;
+    if (!jumpUrl || !originLost) {
+      return;
+    }
+    let stopped = false;
+    const probe = async () => {
+      if (stopped || jumped.current) {
+        return;
+      }
+      const ready = await probeSiteUrl(jumpUrl);
+      if (stopped || !ready || jumped.current) {
+        return;
+      }
+      jumped.current = true;
+      window.location.replace(jumpUrl);
+    };
+    void probe();
+    const timer = window.setInterval(() => {
+      void probe();
+    }, 2000);
+    return () => {
+      stopped = true;
+      window.clearInterval(timer);
+    };
+  }, [jumpUrl, originLost]);
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -145,6 +187,8 @@ export function AdminSiteDomainPage() {
         return;
       }
       announced.current = false;
+      jumped.current = false;
+      setOriginLost(false);
       setStatus((current) =>
         current
           ? {
@@ -202,6 +246,29 @@ export function AdminSiteDomainPage() {
           </p>
           {switching ? (
             <p className="text-sm">{t("admin.siteDomain.applyingNow")}</p>
+          ) : null}
+          {jumpUrl ? (
+            <Alert>
+              <AlertTitle>{t("admin.siteDomain.jumpTitle")}</AlertTitle>
+              <AlertDescription className="grid gap-3">
+                <p>
+                  {originLost
+                    ? t("admin.siteDomain.originLost")
+                    : t("admin.siteDomain.jumpHint")}
+                </p>
+                <a
+                  className="break-all font-medium text-primary underline-offset-4 hover:underline"
+                  href={jumpUrl}
+                >
+                  {jumpUrl}
+                </a>
+                <div>
+                  <Button asChild>
+                    <a href={jumpUrl}>{t("admin.siteDomain.openNewSite")}</a>
+                  </Button>
+                </div>
+              </AlertDescription>
+            </Alert>
           ) : null}
           {status.applyError && !switching ? (
             <p className="whitespace-pre-wrap text-sm text-destructive">
