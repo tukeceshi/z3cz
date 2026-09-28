@@ -981,8 +981,7 @@ export const en = {
       errorUnavailable: "The domain cannot be changed right now",
     },
     systemUpdate: {
-      settings: "Update settings",
-      details: "Checks, logs and recovery",
+      details: "Logs, checks and recovery",
       preparing: "Preparing update",
       installing: "Installing update",
       checkedAt: "Last checked",
@@ -998,13 +997,11 @@ export const en = {
       check: "Check for updates",
       downloadMethod: "Download method",
       downloadMethodHint:
-        "The service downloads from GitHub by default. You can also download both files in your browser and upload them to install.",
+        "The service downloads from GitHub by default. Browser download fetches both files here and uploads them automatically.",
       downloadMethods: {
         service: "Service download",
         browser: "Browser download",
       },
-      downloadFile: "Download file",
-      uploadRequired: "Select the deployment archive and SHA256SUMS first",
       checking: "Checking…",
       checkFound: "New version {{version}} is available",
       checkLatest: "You are on the latest version",
@@ -1027,6 +1024,12 @@ export const en = {
       deployment: "Deployment",
       publishedAt: "Published",
       start: "Start update",
+      abort: "Abort",
+      aborting: "Aborting…",
+      abortSuccess: "Download aborted",
+      abortFailed: "Could not abort",
+      browserDownloadBlocked:
+        "This browser could not download from GitHub. Use service download instead.",
       startSuccess: "Update started. Progress will appear on this page.",
       startFailed: "Could not start the update",
       checksTitle: "Preflight checks",
@@ -1040,7 +1043,7 @@ export const en = {
       },
       progressTitle: "Progress",
       progressHint:
-        "Progress is stored on the server and survives a page refresh.",
+        "Logs are stored on the server. After download finishes, closing this page does not stop installation.",
       progressEmpty: "Operation logs appear after you check for updates.",
       backupTitle: "Backup and rollback",
       backupHint:

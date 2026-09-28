@@ -7,6 +7,10 @@ import type { SystemUpdateOperation } from "@dafthunk/types";
 
 const MAX_PACKAGE_BYTES = 512 * 1024 * 1024;
 const VERSION_RE = /^v\d+\.\d+\.\d+(?:[.-][0-9A-Za-z.-]+)?$/;
+const PROGRESS_PERSIST_BYTES = 1024 * 1024;
+
+export const ABORT_MESSAGE = "已中止更新下载";
+export const ABORT_NOT_ALLOWED_MESSAGE = "仅下载过程可以中止";
 
 export interface PreparedUpdate {
   readonly archivePath: string;
@@ -56,6 +60,57 @@ export function releaseAssetUrls(
   return [github];
 }
 
+export function isUpdateAbortError(error: unknown): boolean {
+  return (
+    (error instanceof Error && error.name === "AbortError") ||
+    (error instanceof Error && error.message === ABORT_MESSAGE)
+  );
+}
+
+export function abortPreparation(
+  store: PreparationStore,
+  root: string
+): SystemUpdateOperation {
+  const current = store.read();
+  if (current?.phase === "failed" && current.error === ABORT_MESSAGE) {
+    return current;
+  }
+  if (current?.phase !== "downloading") {
+    throw new Error(ABORT_NOT_ALLOWED_MESSAGE);
+  }
+  if (current.targetVersion) {
+    fs.rmSync(path.join(root, "downloads", current.targetVersion), {
+      recursive: true,
+      force: true,
+    });
+  }
+  const next: SystemUpdateOperation = {
+    ...current,
+    phase: "failed",
+    error: ABORT_MESSAGE,
+    finishedAt: new Date().toISOString(),
+    files: current.files?.map((file) =>
+      file.status === "complete" ? file : { ...file, status: "failed" as const }
+    ),
+    logs: [
+      ...current.logs,
+      {
+        at: new Date().toISOString(),
+        phase: "failed" as const,
+        message: ABORT_MESSAGE,
+      },
+    ].slice(-120),
+  };
+  store.write(next);
+  return next;
+}
+
+function throwIfAborted(signal?: AbortSignal) {
+  if (signal?.aborted) {
+    throw new Error(ABORT_MESSAGE);
+  }
+}
+
 function appendLog(
   operation: SystemUpdateOperation,
   phase: SystemUpdateOperation["phase"],
@@ -75,13 +130,16 @@ async function fetchAsset(
   urls: string[],
   destination: string,
   onProgress?: (downloaded: number, total?: number) => void,
-  limitBytes = MAX_PACKAGE_BYTES
+  limitBytes = MAX_PACKAGE_BYTES,
+  signal?: AbortSignal
 ) {
   let failure: Error | undefined;
   for (const url of urls) {
+    throwIfAborted(signal);
     try {
       const response = await fetch(url, {
         headers: { "User-Agent": "z3cz-admin-updater" },
+        signal,
       });
       if (!response.ok || !response.body)
         throw new Error(`下载返回 HTTP ${response.status}`);
@@ -94,19 +152,34 @@ async function fetchAsset(
         digest(encoding: "hex"): string;
       };
       const stream = Readable.fromWeb(response.body as never);
+      const onAbort = () => stream.destroy(new Error(ABORT_MESSAGE));
+      signal?.addEventListener("abort", onAbort, { once: true });
       stream.on("data", (chunk: Buffer) => {
         downloaded += chunk.length;
         if (downloaded > limitBytes)
           stream.destroy(new Error("更新包超过大小限制"));
         digest.update(chunk);
-        onProgress?.(downloaded, total);
+        try {
+          onProgress?.(downloaded, total);
+        } catch (error) {
+          stream.destroy(
+            error instanceof Error ? error : new Error(ABORT_MESSAGE)
+          );
+        }
       });
       const partial = `${destination}.partial`;
-      await pipeline(stream, fs.createWriteStream(partial, { mode: 0o600 }));
+      try {
+        await pipeline(stream, fs.createWriteStream(partial, { mode: 0o600 }));
+      } finally {
+        signal?.removeEventListener("abort", onAbort);
+      }
       fs.renameSync(partial, destination);
       return { checksum: digest.digest("hex"), size: downloaded };
     } catch (error) {
       fs.rmSync(`${destination}.partial`, { force: true });
+      if (signal?.aborted || isUpdateAbortError(error)) {
+        throw new Error(ABORT_MESSAGE);
+      }
       failure = error instanceof Error ? error : new Error(String(error));
     }
   }
@@ -118,9 +191,11 @@ export async function prepareSystemUpdate(options: {
   version: string;
   root: string;
   store: PreparationStore;
+  signal?: AbortSignal;
 }): Promise<PreparedUpdate> {
-  const { repository, version, root, store } = options;
+  const { repository, version, root, store, signal } = options;
   if (!VERSION_RE.test(version)) throw new Error("目标版本无效");
+  throwIfAborted(signal);
   const id = crypto.randomUUID();
   const directory = path.join(root, "downloads", version);
   fs.mkdirSync(directory, { recursive: true });
@@ -151,6 +226,7 @@ export async function prepareSystemUpdate(options: {
     totalBytes: number | undefined,
     status: "pending" | "downloading" | "complete" | "failed"
   ) => {
+    throwIfAborted(signal);
     operation = {
       ...operation,
       files: operation.files?.map((file) =>
@@ -167,7 +243,8 @@ export async function prepareSystemUpdate(options: {
     sumsPath,
     (downloaded, total) =>
       setFile("SHA256SUMS", downloaded, total, "downloading"),
-    1024 * 1024
+    1024 * 1024,
+    signal
   );
   setFile("SHA256SUMS", sumsResult.size, sumsResult.size, "complete");
   let lastPersisted = 0;
@@ -177,7 +254,10 @@ export async function prepareSystemUpdate(options: {
     assetUrls,
     archivePath,
     (downloaded, total) => {
-      if (downloaded - lastPersisted < 1024 * 1024 && downloaded !== total)
+      if (
+        downloaded - lastPersisted < PROGRESS_PERSIST_BYTES &&
+        downloaded !== total
+      )
         return;
       lastPersisted = downloaded;
       operation = {
@@ -189,7 +269,9 @@ export async function prepareSystemUpdate(options: {
           : undefined,
       };
       setFile(asset, downloaded, total, "downloading");
-    }
+    },
+    MAX_PACKAGE_BYTES,
+    signal
   );
   setFile(asset, result.size, result.size, "complete");
   operation = appendLog(
@@ -231,8 +313,11 @@ export async function receiveUploadedAsset(options: {
   root: string;
   body: ReadableStream<Uint8Array>;
   store: PreparationStore;
+  totalBytes?: number;
+  signal?: AbortSignal;
 }): Promise<void> {
-  const { version, name, root, body, store } = options;
+  const { version, name, root, body, store, totalBytes, signal } = options;
+  throwIfAborted(signal);
   releaseAssetUrls("tukeceshi/z3cz", version, name);
   if (name !== "SHA256SUMS" && name !== `z3cz-${version}-deploy.tar.gz`)
     throw new Error("上传文件名与版本不匹配");
@@ -240,10 +325,36 @@ export async function receiveUploadedAsset(options: {
   fs.mkdirSync(directory, { recursive: true });
   const destination = path.join(directory, name);
   const partial = `${destination}.partial`;
-  const operation = store.read();
+  const persist = (
+    downloadedBytes: number,
+    status: "downloading" | "complete"
+  ) => {
+    throwIfAborted(signal);
+    const current = store.read();
+    if (!current || current.phase !== "downloading") {
+      throw new Error(ABORT_MESSAGE);
+    }
+    store.write({
+      ...current,
+      files: current.files?.map((file) =>
+        file.name === name
+          ? {
+              name,
+              downloadedBytes,
+              totalBytes: totalBytes || downloadedBytes,
+              status,
+            }
+          : file
+      ),
+    });
+  };
+  persist(0, "downloading");
   let downloadedBytes = 0;
+  let lastPersisted = 0;
   try {
     const stream = Readable.fromWeb(body as never);
+    const onAbort = () => stream.destroy(new Error(ABORT_MESSAGE));
+    signal?.addEventListener("abort", onAbort, { once: true });
     stream.on("data", (chunk: Buffer) => {
       downloadedBytes += chunk.length;
       if (
@@ -251,27 +362,31 @@ export async function receiveUploadedAsset(options: {
         (name === "SHA256SUMS" ? 1024 * 1024 : MAX_PACKAGE_BYTES)
       )
         stream.destroy(new Error("上传文件超过大小限制"));
+      if (
+        downloadedBytes - lastPersisted < PROGRESS_PERSIST_BYTES &&
+        downloadedBytes !== totalBytes
+      )
+        return;
+      lastPersisted = downloadedBytes;
+      try {
+        persist(downloadedBytes, "downloading");
+      } catch (error) {
+        stream.destroy(
+          error instanceof Error ? error : new Error(ABORT_MESSAGE)
+        );
+      }
     });
-    await pipeline(stream, fs.createWriteStream(partial, { mode: 0o600 }));
+    try {
+      await pipeline(stream, fs.createWriteStream(partial, { mode: 0o600 }));
+    } finally {
+      signal?.removeEventListener("abort", onAbort);
+    }
     if (downloadedBytes === 0) throw new Error("上传文件为空");
     fs.renameSync(partial, destination);
-    if (operation)
-      store.write({
-        ...operation,
-        files: operation.files?.map((file) =>
-          file.name === name
-            ? {
-                name,
-                downloadedBytes,
-                totalBytes: downloadedBytes,
-                status: "complete",
-              }
-            : file
-        ),
-      });
+    persist(downloadedBytes, "complete");
   } catch (error) {
     fs.rmSync(partial, { force: true });
-    throw error;
+    throw isUpdateAbortError(error) ? new Error(ABORT_MESSAGE) : error;
   }
 }
 
@@ -288,6 +403,16 @@ export async function prepareUploadedUpdate(options: {
   const sumsPath = path.join(directory, "SHA256SUMS");
   if (!fs.existsSync(archivePath) || !fs.existsSync(sumsPath))
     throw new Error("请先上传部署包和 SHA256SUMS");
+  const current = store.read();
+  if (current && current.phase === "downloading") {
+    store.write(
+      appendLog(
+        { ...current, phase: "verifying_download" },
+        "verifying_download",
+        "上传完成，正在校验 SHA-256"
+      )
+    );
+  }
   const sums = fs.readFileSync(sumsPath, "utf8");
   if (Buffer.byteLength(sums) > 1024 * 1024)
     throw new Error("SHA256SUMS 文件过大");

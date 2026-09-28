@@ -1,4 +1,5 @@
 import {
+  type SystemUpdateFileProgress,
   type SystemUpdatePhase,
   type SystemUpdateStatus,
 } from "@dafthunk/types";
@@ -34,13 +35,16 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { groupSystemUpdateLogs } from "@/pages/admin/system-update-log-groups";
 import {
+  abortSystemUpdate,
+  BROWSER_GITHUB_BLOCKED,
   checkSystemUpdate,
-  getSystemUpdateStatus,
-  rollbackSystemUpdate,
-  startSystemUpdateUpload,
-  uploadSystemUpdateFile,
   finishSystemUpdateUpload,
+  getSystemUpdateStatus,
+  isSystemUpdateAbortError,
+  rollbackSystemUpdate,
   startSystemUpdate,
+  startSystemUpdateUpload,
+  transferBrowserUpdateFile,
 } from "@/services/system-update-service";
 
 const ACTIVE_PHASES = new Set<SystemUpdatePhase>([
@@ -114,13 +118,15 @@ export function AdminSystemUpdatePage() {
   const [downloadMethod, setDownloadMethod] = useState<"service" | "browser">(
     "service"
   );
-  const [uploadFiles, setUploadFiles] = useState<File[]>([]);
-  const [uploadProgress, setUploadProgress] = useState<Record<string, number>>(
-    {}
-  );
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [rollbackOpen, setRollbackOpen] = useState(false);
   const [rollbackReason, setRollbackReason] = useState("");
+  const [aborting, setAborting] = useState(false);
+  const [localFiles, setLocalFiles] = useState<
+    readonly SystemUpdateFileProgress[] | null
+  >(null);
+  const browserAbortRef = useRef<AbortController | null>(null);
+  const logListRef = useRef<HTMLDivElement>(null);
   const mountedRef = useRef(true);
 
   const phaseLabel = useCallback(
@@ -202,6 +208,14 @@ export function AdminSystemUpdatePage() {
     };
   }, [load, operationActive, status?.connected, status?.supported]);
 
+  useEffect(() => {
+    const element = logListRef.current;
+    if (!element) {
+      return;
+    }
+    element.scrollTop = element.scrollHeight;
+  }, [status?.operation.logs]);
+
   const blockingFailed =
     status?.checks.some(
       (check) => check.blocking && check.status === "failed"
@@ -236,31 +250,68 @@ export function AdminSystemUpdatePage() {
       return;
     }
     setStarting(true);
+    const version = status.latestRelease.version;
     try {
-      const version = status.latestRelease.version;
       let next: SystemUpdateStatus;
       if (downloadMethod === "browser") {
-        const archive = `z3cz-${version}-deploy.tar.gz`;
-        const required = ["SHA256SUMS", archive];
-        if (
-          required.some(
-            (name) => !uploadFiles.some((file) => file.name === name)
-          )
-        ) {
-          throw new Error(t("admin.systemUpdate.uploadRequired"));
-        }
+        const abort = new AbortController();
+        browserAbortRef.current = abort;
+        const required = [
+          "SHA256SUMS",
+          `z3cz-${version}-deploy.tar.gz`,
+        ] as const;
+        setLocalFiles(
+          required.map((name) => ({
+            name,
+            downloadedBytes: 0,
+            status: "pending",
+          }))
+        );
         next = await startSystemUpdateUpload(version);
         setStatus(next);
+        setConfirmOpen(false);
+        const repository = status.repository || "tukeceshi/z3cz";
         for (const name of required) {
-          const file = uploadFiles.find((item) => item.name === name)!;
-          await uploadSystemUpdateFile(file, (loaded, total) =>
-            setUploadProgress((previous) => ({
-              ...previous,
-              [name]: Math.floor((loaded * 100) / total),
-            }))
+          setLocalFiles((previous) =>
+            (previous ?? []).map((file) =>
+              file.name === name
+                ? { ...file, status: "downloading" as const }
+                : file
+            )
+          );
+          await transferBrowserUpdateFile(
+            `https://github.com/${repository}/releases/download/${version}/${name}`,
+            name,
+            (loaded, total) => {
+              setLocalFiles((previous) =>
+                (previous ?? []).map((file) =>
+                  file.name === name
+                    ? {
+                        ...file,
+                        downloadedBytes: loaded,
+                        totalBytes: total,
+                        status: "downloading",
+                      }
+                    : file
+                )
+              );
+            },
+            abort.signal
+          );
+          setLocalFiles((previous) =>
+            (previous ?? []).map((file) =>
+              file.name === name
+                ? {
+                    ...file,
+                    downloadedBytes: file.totalBytes || file.downloadedBytes,
+                    status: "complete" as const,
+                  }
+                : file
+            )
           );
         }
         next = await finishSystemUpdateUpload();
+        setLocalFiles(null);
       } else {
         next = await startSystemUpdate(version);
       }
@@ -268,13 +319,50 @@ export function AdminSystemUpdatePage() {
       setConfirmOpen(false);
       toast.success(t("admin.systemUpdate.startSuccess"));
     } catch (error) {
+      if (isSystemUpdateAbortError(error)) {
+        return;
+      }
+      if (downloadMethod === "browser") {
+        try {
+          await abortSystemUpdate();
+        } catch {
+          /* download may not have started */
+        }
+        setLocalFiles(null);
+      }
+      toast.error(
+        error instanceof Error && error.message === BROWSER_GITHUB_BLOCKED
+          ? t("admin.systemUpdate.browserDownloadBlocked")
+          : error instanceof Error
+            ? error.message
+            : t("admin.systemUpdate.startFailed")
+      );
+      await load(false);
+    } finally {
+      browserAbortRef.current = null;
+      setStarting(false);
+    }
+  };
+
+  const handleAbort = async () => {
+    if (aborting || status?.operation.phase !== "downloading") {
+      return;
+    }
+    setAborting(true);
+    try {
+      const next = await abortSystemUpdate();
+      browserAbortRef.current?.abort();
+      setLocalFiles(null);
+      setStatus(next);
+      toast.success(t("admin.systemUpdate.abortSuccess"));
+    } catch (error) {
       toast.error(
         error instanceof Error
           ? error.message
-          : t("admin.systemUpdate.startFailed")
+          : t("admin.systemUpdate.abortFailed")
       );
     } finally {
-      setStarting(false);
+      setAborting(false);
     }
   };
 
@@ -317,10 +405,8 @@ export function AdminSystemUpdatePage() {
 
   const phase = status?.operation.phase ?? "idle";
   const busy =
-    (operationActive && status?.operation.downloadMethod !== "browser") ||
-    checking ||
-    starting ||
-    rollingBack;
+    operationActive || checking || starting || rollingBack || aborting;
+  const canAbort = phase === "downloading" && !aborting;
   const needsRecovery = phase === "manual_intervention";
   const summaryPhase =
     phase === "preflight" || phase === "pulling"
@@ -460,21 +546,32 @@ export function AdminSystemUpdatePage() {
                   {status.latestRelease.body}
                 </pre>
               ) : null}
-              {typeof status?.operation.progress === "number" ? (
-                <div className="space-y-1">
-                  <div className="flex justify-between text-xs text-muted-foreground">
-                    <span>{phaseLabel(status.operation.phase)}</span>
-                    <span>{status.operation.progress}%</span>
-                  </div>
-                  <div className="h-2 overflow-hidden rounded-full bg-muted">
-                    <div
-                      className="h-full bg-primary transition-[width]"
-                      style={{ width: `${status.operation.progress}%` }}
-                    />
-                  </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-sm text-muted-foreground">
+                  {t("admin.systemUpdate.downloadMethod")}
+                </span>
+                <div className="inline-flex rounded-md border p-0.5">
+                  {(["service", "browser"] as const).map((channel) => {
+                    const selected = downloadMethod === channel;
+                    return (
+                      <Button
+                        key={channel}
+                        type="button"
+                        size="sm"
+                        variant={selected ? "default" : "ghost"}
+                        disabled={busy || needsRecovery}
+                        onClick={() => setDownloadMethod(channel)}
+                      >
+                        {t(`admin.systemUpdate.downloadMethods.${channel}`)}
+                      </Button>
+                    );
+                  })}
                 </div>
-              ) : null}
-              {status?.operation.files?.map((file) => (
+                <p className="w-full text-xs text-muted-foreground">
+                  {t("admin.systemUpdate.downloadMethodHint")}
+                </p>
+              </div>
+              {(localFiles ?? status?.operation.files)?.map((file) => (
                 <div key={file.name} className="space-y-1">
                   <div className="flex justify-between text-xs text-muted-foreground">
                     <span>{file.name}</span>
@@ -496,7 +593,16 @@ export function AdminSystemUpdatePage() {
                 </div>
               ))}
             </CardContent>
-            <CardFooter className="justify-end">
+            <CardFooter className="justify-end gap-2">
+              <Button
+                variant="outline"
+                onClick={() => void handleAbort()}
+                disabled={!canAbort}
+              >
+                {aborting
+                  ? t("admin.systemUpdate.aborting")
+                  : t("admin.systemUpdate.abort")}
+              </Button>
               <Button
                 onClick={() => setConfirmOpen(true)}
                 disabled={
@@ -524,64 +630,54 @@ export function AdminSystemUpdatePage() {
           <div className="mt-4 flex flex-col gap-4">
             <Card>
               <CardHeader>
-                <CardTitle>{t("admin.systemUpdate.settings")}</CardTitle>
+                <CardTitle>{t("admin.systemUpdate.progressTitle")}</CardTitle>
                 <CardDescription>
-                  {t("admin.systemUpdate.downloadMethodHint")}
+                  {t("admin.systemUpdate.progressHint")}
                 </CardDescription>
               </CardHeader>
-              <CardContent className="flex flex-wrap items-center gap-2">
-                <span className="text-sm text-muted-foreground">
-                  {t("admin.systemUpdate.downloadMethod")}
-                </span>
-                <div className="inline-flex rounded-md border p-0.5">
-                  {(["service", "browser"] as const).map((channel) => {
-                    const selected = downloadMethod === channel;
-                    return (
-                      <Button
-                        key={channel}
-                        type="button"
-                        size="sm"
-                        variant={selected ? "default" : "ghost"}
-                        disabled={busy || needsRecovery}
-                        onClick={() => setDownloadMethod(channel)}
-                      >
-                        {t(`admin.systemUpdate.downloadMethods.${channel}`)}
-                      </Button>
-                    );
-                  })}
-                </div>
-                {downloadMethod === "browser" && status?.latestRelease ? (
-                  <div className="w-full space-y-2 text-sm">
-                    {(
-                      [
-                        "SHA256SUMS",
-                        `z3cz-${status.latestRelease.version}-deploy.tar.gz`,
-                      ] as const
-                    ).map((name) => (
-                      <a
-                        key={name}
-                        className="block text-primary underline"
-                        href={`https://github.com/tukeceshi/z3cz/releases/download/${status.latestRelease!.version}/${name}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                      >
-                        {t("admin.systemUpdate.downloadFile")}: {name}
-                      </a>
-                    ))}
-                    <input
-                      type="file"
-                      multiple
-                      onChange={(event) =>
-                        setUploadFiles(Array.from(event.target.files || []))
-                      }
-                    />
-                    {uploadFiles.map((file) => (
-                      <div key={file.name}>
-                        {file.name}: {uploadProgress[file.name] || 0}%
-                      </div>
-                    ))}
-                  </div>
+              <CardContent>
+                {status?.operation.error ? (
+                  <p className="mb-3 text-sm text-destructive">
+                    {status.operation.error}
+                  </p>
                 ) : null}
+                <div ref={logListRef} className="h-64 overflow-y-auto pr-1">
+                  {(status?.operation.logs || []).length ? (
+                    <ol className="space-y-4">
+                      {groupSystemUpdateLogs(status?.operation.logs ?? []).map(
+                        (group, index) => (
+                          <li
+                            key={`${group.phase}-${index}`}
+                            className="border-l-2 border-muted pl-3 text-sm"
+                          >
+                            <div className="grid grid-cols-[1fr_auto] gap-3">
+                              <p className="font-medium">
+                                {phaseLabel(group.phase)}
+                              </p>
+                              <time className="text-xs text-muted-foreground">
+                                {formatDate(group.at)}
+                              </time>
+                            </div>
+                            <ul className="mt-1 space-y-1">
+                              {group.messages.map((message, messageIndex) => (
+                                <li
+                                  key={`${group.at}-${messageIndex}`}
+                                  className="text-muted-foreground"
+                                >
+                                  {message}
+                                </li>
+                              ))}
+                            </ul>
+                          </li>
+                        )
+                      )}
+                    </ol>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">
+                      {t("admin.systemUpdate.progressEmpty")}
+                    </p>
+                  )}
+                </div>
               </CardContent>
             </Card>
 
@@ -626,57 +722,6 @@ export function AdminSystemUpdatePage() {
                       </Badge>
                     </div>
                   ))
-                )}
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>{t("admin.systemUpdate.progressTitle")}</CardTitle>
-                <CardDescription>
-                  {t("admin.systemUpdate.progressHint")}
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                {status?.operation.error ? (
-                  <p className="mb-3 text-sm text-destructive">
-                    {status.operation.error}
-                  </p>
-                ) : null}
-                {(status?.operation.logs || []).length ? (
-                  <ol className="space-y-4">
-                    {groupSystemUpdateLogs(status?.operation.logs ?? []).map(
-                      (group, index) => (
-                        <li
-                          key={`${group.phase}-${index}`}
-                          className="border-l-2 border-muted pl-3 text-sm"
-                        >
-                          <div className="grid grid-cols-[1fr_auto] gap-3">
-                            <p className="font-medium">
-                              {phaseLabel(group.phase)}
-                            </p>
-                            <time className="text-xs text-muted-foreground">
-                              {formatDate(group.at)}
-                            </time>
-                          </div>
-                          <ul className="mt-1 space-y-1">
-                            {group.messages.map((message, messageIndex) => (
-                              <li
-                                key={`${group.at}-${messageIndex}`}
-                                className="text-muted-foreground"
-                              >
-                                {message}
-                              </li>
-                            ))}
-                          </ul>
-                        </li>
-                      )
-                    )}
-                  </ol>
-                ) : (
-                  <p className="text-sm text-muted-foreground">
-                    {t("admin.systemUpdate.progressEmpty")}
-                  </p>
                 )}
               </CardContent>
             </Card>

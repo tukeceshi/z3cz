@@ -39,6 +39,7 @@ export default defineConfig({
     exclude: [
       "**/node_modules/**",
       "**/.git/**",
+      "src/env/api-boot-cache.test.ts",
       "src/services/system-update-preparer-node.test.ts",
     ],
   },

@@ -12,6 +12,12 @@ import type { SystemUpdateOperation } from "@dafthunk/types";
 const adminSystemUpdateRoutes = new Hono<ApiContext>();
 const DEFAULT_UPDATE_ROOT = "/var/lib/z3cz/update";
 let preparationRunning = false;
+let preparationAbort: AbortController | undefined;
+
+function beginPreparationAbort() {
+  preparationAbort = new AbortController();
+  return preparationAbort;
+}
 
 async function preparation(env: ApiContext["Bindings"]) {
   const { createPreparationStore } = await import(
@@ -36,7 +42,8 @@ async function failBrowserUpload(env: ApiContext["Bindings"], message: string) {
     const current = store.read();
     if (
       current?.downloadMethod === "browser" &&
-      current.phase !== "preflight"
+      (current.phase === "downloading" ||
+        current.phase === "verifying_download")
     ) {
       store.write({
         ...current,
@@ -193,11 +200,13 @@ adminSystemUpdateRoutes.post(
         "../../services/system-update-preparer-node"
       );
       preparationRunning = true;
+      const abort = beginPreparationAbort();
       void prepareSystemUpdate({
         repository: "tukeceshi/z3cz",
         version: body.targetVersion,
         root,
         store,
+        signal: abort.signal,
       })
         .then(async (prepared) => {
           const next = await callUpdater(c.env, "POST", "/v1/prepared-update", {
@@ -223,9 +232,15 @@ adminSystemUpdateRoutes.post(
         })
         .catch(async (error) => {
           const current = store.read();
-          if (!current) return;
-          const message =
-            error instanceof Error ? error.message : String(error);
+          if (!current || current.phase === "failed") return;
+          const { isUpdateAbortError, ABORT_MESSAGE } = await import(
+            "../../services/system-update-preparer-node"
+          );
+          const message = isUpdateAbortError(error)
+            ? ABORT_MESSAGE
+            : error instanceof Error
+              ? error.message
+              : String(error);
           store.write({
             ...current,
             phase: "failed",
@@ -243,15 +258,23 @@ adminSystemUpdateRoutes.post(
         })
         .finally(() => {
           preparationRunning = false;
+          if (preparationAbort === abort) {
+            preparationAbort = undefined;
+          }
         });
+      const archive = `z3cz-${body.targetVersion}-deploy.tar.gz`;
       return c.json({
         ...status,
         operation: {
           phase: "downloading",
+          downloadMethod: "service" as const,
           targetVersion: body.targetVersion,
           startedAt: new Date().toISOString(),
           automaticRollback: false,
-          progress: 0,
+          files: [
+            { name: "SHA256SUMS", downloadedBytes: 0, status: "pending" },
+            { name: archive, downloadedBytes: 0, status: "pending" },
+          ],
           logs: [],
         },
       });
@@ -282,13 +305,18 @@ adminSystemUpdateRoutes.post(
   async (c) => {
     try {
       const status = await callUpdater(c.env, "GET", "/v1/status");
-      if (preparationRunning || preparationIsActive(status.operation))
+      const { store } = await preparation(c.env);
+      if (
+        preparationRunning ||
+        preparationIsActive(status.operation) ||
+        preparationIsActive(store.read())
+      )
         return c.json({ error: "已有更新正在执行" }, 409);
       const version = c.req.valid("json").targetVersion;
       const latest = await fetchLatestGithubRelease();
       if (version !== latest.version)
         return c.json({ error: "目标版本不是最新 GitHub 正式版本" }, 409);
-      const { store } = await preparation(c.env);
+      beginPreparationAbort();
       const operation: SystemUpdateOperation = {
         phase: "downloading",
         downloadMethod: "browser",
@@ -303,7 +331,13 @@ adminSystemUpdateRoutes.post(
             status: "pending",
           },
         ],
-        logs: [],
+        logs: [
+          {
+            at: new Date().toISOString(),
+            phase: "downloading",
+            message: `由浏览器下载 ${version}`,
+          },
+        ],
       };
       store.write(operation);
       return c.json({ ...status, operation });
@@ -330,12 +364,15 @@ adminSystemUpdateRoutes.put("/upload/:name", async (c) => {
     const { receiveUploadedAsset } = await import(
       "../../services/system-update-preparer-node"
     );
+    const totalBytes = Number(c.req.header("content-length") || 0) || undefined;
     await receiveUploadedAsset({
       version,
       name,
       root,
       store,
       body: c.req.raw.body,
+      totalBytes,
+      signal: preparationAbort?.signal,
     });
     return c.json({ ok: true });
   } catch (error) {
@@ -404,6 +441,31 @@ adminSystemUpdateRoutes.post("/upload/finish", async (c) => {
     );
   } finally {
     preparationRunning = false;
+  }
+});
+
+adminSystemUpdateRoutes.post("/abort", async (c) => {
+  try {
+    const { abortPreparation } = await import(
+      "../../services/system-update-preparer-node"
+    );
+    const { root, store } = await preparation(c.env);
+    preparationAbort?.abort();
+    const operation = abortPreparation(store, root);
+    let status: SystemUpdateStatus;
+    try {
+      status = await callUpdater(c.env, "GET", "/v1/status");
+    } catch {
+      status = disconnectedUpdateStatus(c.env);
+    }
+    return c.json({ ...status, operation });
+  } catch (error) {
+    const { ABORT_NOT_ALLOWED_MESSAGE } = await import(
+      "../../services/system-update-preparer-node"
+    );
+    const message =
+      error instanceof Error ? error.message : ABORT_NOT_ALLOWED_MESSAGE;
+    return c.json({ error: message }, 409);
   }
 });
 

@@ -59,7 +59,9 @@ export function hashFile(filePath: string): string {
 }
 
 function firstExistingPath(...candidates: string[]): string {
-  return candidates.find((candidate) => fs.existsSync(candidate)) ?? candidates[0];
+  return (
+    candidates.find((candidate) => fs.existsSync(candidate)) ?? candidates[0]
+  );
 }
 
 export function getLockfileHash(): string {
