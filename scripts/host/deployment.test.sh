@@ -201,6 +201,10 @@ if ! grep -q 'Z3CZ_RELEASE_DIR' "$ROOT/docker-compose.legacy.yml"; then
   echo 'legacy compose must keep release mounts for an old updater' >&2
   exit 1
 fi
+if ! grep -q '/host/proc' "$ROOT/docker-compose.prod.yml"; then
+  echo 'runtime compose must mount /proc for the domain service' >&2
+  exit 1
+fi
 if ! grep -q '^ReadWritePaths=.* /etc/z3cz$' "$ROOT/scripts/host/install-update-runner.sh"; then
   echo 'update runner cannot write /etc/z3cz' >&2
   exit 1
@@ -282,6 +286,13 @@ copy_dynamic_libs "$lib_root/bin/fake-docker" "$lib_root/stage2"
 [[ "$(cat "$lib_root/stage2/libc.so.6")" == libc ]]
 unset -f ldd
 echo 'PASS: staged docker libraries are real files, not broken links'
+
+lib_mount="$TEST_ROOT/lib-mount"
+mkdir -p "$lib_mount/lib/real" "$lib_mount/usr-lib"
+ln -s real "$lib_mount/lib/linked"
+[[ "$(host_lib_mount "$lib_mount/lib/linked" "")" == "$(readlink -f "$lib_mount/lib/real")" ]]
+[[ "$(host_lib_mount "$lib_mount/missing" "$lib_mount/usr-lib")" == "$lib_mount/usr-lib" ]]
+echo 'PASS: domain service mounts real library directories and skips a missing path'
 
 ok_home="$TEST_ROOT/ok-home"
 blocked_home="$TEST_ROOT/not-a-directory"

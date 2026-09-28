@@ -98,6 +98,24 @@ copy_dynamic_libs() {
   done <<<"$out"
 }
 
+# 域名服务的 chroot 需要动态链接器的原始绝对路径。ldd 复制品经常对不上，
+# 所以挂真实目录。缺少的路径退回已有目录，避免绑定一个不存在的源。
+host_lib_mount() {
+  local candidate="$1" fallback="${2:-}" resolved=""
+  if [[ -e "$candidate" || -L "$candidate" ]]; then
+    resolved="$(readlink -f "$candidate" 2>/dev/null || true)"
+  fi
+  if [[ -n "$resolved" && -d "$resolved" ]]; then
+    printf '%s\n' "$resolved"
+    return 0
+  fi
+  if [[ -n "$fallback" && -d "$fallback" ]]; then
+    printf '%s\n' "$fallback"
+    return 0
+  fi
+  die "找不到域名服务需要的系统库目录：$candidate"
+}
+
 stage_host_docker_client() {
   local bin plugin dest
   if [[ "$(type -t docker 2>/dev/null)" == "function" ]]; then
@@ -143,9 +161,12 @@ stage_host_docker_client() {
   mkdir -p "$dest/lib"
   export Z3CZ_DOCKER_CLI="$dest/bin/docker"
   export Z3CZ_DOCKER_COMPOSE_PLUGIN="$dest/bin/docker-compose"
-  export Z3CZ_HOST_LIB="$dest/lib"
-  export Z3CZ_HOST_USRLIB="$dest/lib"
-  export Z3CZ_HOST_LIB64="$dest/lib"
+  # 插件在精简 chroot 里要能被动态链接器启动。复制出来的库目录没有 ld.so.cache，
+  # 也经常不在 ELF 解释器的绝对路径上，于是 docker 找不到 compose。
+  Z3CZ_HOST_LIB="$(host_lib_mount /lib "")" || exit 1
+  Z3CZ_HOST_USRLIB="$(host_lib_mount /usr/lib "$Z3CZ_HOST_LIB")" || exit 1
+  Z3CZ_HOST_LIB64="$(host_lib_mount /lib64 "$Z3CZ_HOST_LIB")" || exit 1
+  export Z3CZ_HOST_LIB Z3CZ_HOST_USRLIB Z3CZ_HOST_LIB64
 }
 
 compose() {

@@ -25,6 +25,17 @@ import {
   updateSiteDomain,
 } from "@/services/site-domain-service";
 
+import { siteDomainStatusLine } from "./site-domain-status-line";
+
+const STATUS_LINE_KEYS = {
+  unavailable: "admin.siteDomain.unavailable",
+  unreachable: "admin.siteDomain.unreachable",
+  savedNotApplied: "admin.siteDomain.savedNotApplied",
+  savedHttpNotApplied: "admin.siteDomain.savedHttpNotApplied",
+  currentDomain: "admin.siteDomain.currentDomain",
+  currentHttp: "admin.siteDomain.currentHttp",
+} as const;
+
 const ERROR_KEYS: Record<SiteDomainErrorCode, string> = {
   invalid_chars: "admin.siteDomain.errorInvalidChars",
   local_name: "admin.siteDomain.errorLocalName",
@@ -185,21 +196,17 @@ export function AdminSiteDomainPage() {
         </CardHeader>
         <CardContent className="grid gap-4">
           <p className="text-sm">
-            {status.available
-              ? status.siteAddress
-                ? t("admin.siteDomain.currentDomain", {
-                    domain: status.siteAddress,
-                  })
-                : t("admin.siteDomain.currentHttp")
-              : status.unavailableReason === "unreachable"
-                ? t("admin.siteDomain.unreachable")
-                : t("admin.siteDomain.unavailable")}
+            {t(STATUS_LINE_KEYS[siteDomainStatusLine(status, switching)], {
+              domain: status.siteAddress ?? "",
+            })}
           </p>
           {switching ? (
             <p className="text-sm">{t("admin.siteDomain.applyingNow")}</p>
           ) : null}
           {status.applyError && !switching ? (
-            <p className="text-sm text-destructive">{status.applyError}</p>
+            <p className="whitespace-pre-wrap text-sm text-destructive">
+              {status.applyError}
+            </p>
           ) : null}
           {status.available ? (
             <form

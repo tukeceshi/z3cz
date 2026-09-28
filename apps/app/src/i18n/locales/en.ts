@@ -947,6 +947,10 @@ export const en = {
         "The domain must already point at this machine, with ports 80 and 443 open. Saving briefly interrupts the site; reopen it at the new address. Leave the field empty to remove the domain and use HTTP.",
       currentHttp: "No domain is bound. The site is using HTTP.",
       currentDomain: "Current domain: {{domain}}",
+      savedNotApplied:
+        "Saved {{domain}}, but the switch did not finish. The site is still using the previous address.",
+      savedHttpNotApplied:
+        "Saved HTTP with no domain, but the switch did not finish. The site is still using the previous address.",
       fieldLabel: "Public domain",
       placeholder: "example.com",
       fieldHelp:

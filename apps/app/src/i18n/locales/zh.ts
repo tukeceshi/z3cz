@@ -914,6 +914,10 @@ export const zh: TranslationDictionary = {
         "域名须已解析到这台机器，并开放 80 和 443。保存后站点会短暂中断，请用新地址重新打开。留空并保存会取消域名，改回 HTTP。",
       currentHttp: "当前未绑定域名，站点使用 HTTP。",
       currentDomain: "当前域名：{{domain}}",
+      savedNotApplied:
+        "已保存域名 {{domain}}，但切换没有完成。站点仍使用切换前的地址。",
+      savedHttpNotApplied:
+        "已保存为不使用域名，但切换没有完成。站点仍使用切换前的地址。",
       fieldLabel: "公网域名",
       placeholder: "example.com",
       fieldHelp: "不要填写端口、路径或 IP。留空表示取消绑定。",

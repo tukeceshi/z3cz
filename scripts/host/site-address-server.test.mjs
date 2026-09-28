@@ -7,7 +7,9 @@ import test from "node:test";
 
 import {
   applySiteAddressEnv,
+  composePluginInChroot,
   createSiteAddressServer,
+  dockerHostInChroot,
   ensureSiteAddressAccess,
   hostComposeInvocation,
   isSiteAddressApplied,
@@ -92,8 +94,11 @@ test("host compose chroots to the mounted root and forwards docker mount paths",
       passwordFile: "/etc/z3cz/postgres.password",
     });
     assert.equal(invocation.args[0], "/host");
-    assert.equal(invocation.args[1], "/usr/bin/docker");
+    assert.equal(invocation.args[2], "--env-file");
+    assert.equal(invocation.args.includes("compose"), false);
+    assert.equal(invocation.args.includes("/usr/bin/docker"), false);
     assert.equal(invocation.env.LD_LIBRARY_PATH, "/lib:/usr/lib:/lib64");
+    assert.equal(invocation.env.DOCKER_HOST, "unix:///var/run/docker.sock");
     assert.equal(invocation.args.at(-2), "api");
     assert.equal(invocation.args.at(-1), "caddy");
     assert.equal(invocation.args.includes("--force-recreate"), true);
@@ -113,6 +118,69 @@ test("host compose chroots to the mounted root and forwards docker mount paths",
         process.env[key] = value;
       }
     }
+  }
+});
+
+test("host compose runs the mounted plugin instead of docker compose", () => {
+  const hostRoot = fs.mkdtempSync(path.join(os.tmpdir(), "z3cz-site-"));
+  const mounted = path.join(
+    hostRoot,
+    "usr",
+    "libexec",
+    "docker",
+    "cli-plugins"
+  );
+  const staged = path.join(hostRoot, "var", "lib", "z3cz", "docker-cli", "bin");
+  fs.mkdirSync(mounted, { recursive: true });
+  fs.mkdirSync(staged, { recursive: true });
+  fs.writeFileSync(path.join(mounted, "docker-compose"), "");
+  fs.writeFileSync(path.join(staged, "docker-compose"), "");
+  const previous = process.env.Z3CZ_DOCKER_COMPOSE_PLUGIN;
+  process.env.Z3CZ_DOCKER_COMPOSE_PLUGIN =
+    "/var/lib/z3cz/docker-cli/bin/docker-compose";
+  try {
+    assert.equal(
+      composePluginInChroot(hostRoot),
+      "/usr/libexec/docker/cli-plugins/docker-compose"
+    );
+    const invocation = hostComposeInvocation({
+      hostRoot,
+      envFile: "/etc/z3cz/z3cz.env",
+      releaseDir: "/opt/z3cz/current",
+      passwordFile: "/etc/z3cz/postgres.password",
+    });
+    assert.equal(
+      invocation.args[1],
+      "/usr/libexec/docker/cli-plugins/docker-compose"
+    );
+    assert.equal(invocation.args[2], "--env-file");
+  } finally {
+    if (previous === undefined) {
+      delete process.env.Z3CZ_DOCKER_COMPOSE_PLUGIN;
+    } else {
+      process.env.Z3CZ_DOCKER_COMPOSE_PLUGIN = previous;
+    }
+    fs.rmSync(hostRoot, { recursive: true, force: true });
+  }
+});
+
+test("host compose uses the staged plugin when only a full root mount can see it", () => {
+  const hostRoot = fs.mkdtempSync(path.join(os.tmpdir(), "z3cz-site-"));
+  const staged = path.join(hostRoot, "opt", "compose", "docker-compose");
+  fs.mkdirSync(path.dirname(staged), { recursive: true });
+  fs.writeFileSync(staged, "");
+  const previous = process.env.Z3CZ_DOCKER_COMPOSE_PLUGIN;
+  process.env.Z3CZ_DOCKER_COMPOSE_PLUGIN = "/opt/compose/docker-compose";
+  try {
+    assert.equal(composePluginInChroot(hostRoot), "/opt/compose/docker-compose");
+    assert.equal(dockerHostInChroot(hostRoot), "unix:///var/run/docker.sock");
+  } finally {
+    if (previous === undefined) {
+      delete process.env.Z3CZ_DOCKER_COMPOSE_PLUGIN;
+    } else {
+      process.env.Z3CZ_DOCKER_COMPOSE_PLUGIN = previous;
+    }
+    fs.rmSync(hostRoot, { recursive: true, force: true });
   }
 });
 

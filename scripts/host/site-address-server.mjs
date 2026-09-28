@@ -320,6 +320,59 @@ const HOST_COMPOSE_ENV_KEYS = [
   "Z3CZ_HOST_LIB64",
 ];
 
+const COMPOSE_PLUGIN_CANDIDATES = [
+  "/usr/libexec/docker/cli-plugins/docker-compose",
+  "/usr/local/libexec/docker/cli-plugins/docker-compose",
+  "/usr/lib/docker/cli-plugins/docker-compose",
+  "/usr/local/lib/docker/cli-plugins/docker-compose",
+  "/root/.docker/cli-plugins/docker-compose",
+];
+
+/**
+ * Compose plugin path after chroot. Production bind-mounts the staged plugin
+ * at the first candidate. A full-root mount can only see Z3CZ_DOCKER_COMPOSE_PLUGIN.
+ * @param {string} hostRoot
+ */
+export function composePluginInChroot(hostRoot) {
+  const fromEnv = process.env.Z3CZ_DOCKER_COMPOSE_PLUGIN || "";
+  const candidates = [...COMPOSE_PLUGIN_CANDIDATES];
+  if (fromEnv.startsWith("/") && !candidates.includes(fromEnv)) {
+    candidates.push(fromEnv);
+  }
+  const fallback = COMPOSE_PLUGIN_CANDIDATES[0];
+  if (!hostRoot) {
+    return fallback;
+  }
+  for (const candidate of candidates) {
+    const visible = path.join(hostRoot, candidate.replace(/^\/+/, ""));
+    if (fs.existsSync(visible)) {
+      return candidate;
+    }
+  }
+  return fallback;
+}
+
+/**
+ * Socket path inside the chroot. Production always mounts it at /var/run/docker.sock.
+ * @param {string} hostRoot
+ */
+export function dockerHostInChroot(hostRoot) {
+  const sockets = ["/var/run/docker.sock", "/run/docker.sock"];
+  if (hostRoot) {
+    for (const socketPath of sockets) {
+      const visible = path.join(hostRoot, socketPath.replace(/^\/+/, ""));
+      try {
+        if (fs.statSync(visible).isSocket()) {
+          return `unix://${socketPath}`;
+        }
+      } catch {
+        // This root does not include that socket.
+      }
+    }
+  }
+  return "unix:///var/run/docker.sock";
+}
+
 /**
  * @param {object} paths
  * @param {string} paths.hostRoot
@@ -338,8 +391,9 @@ export function hostComposeInvocation(paths) {
   const env = {
     PATH: "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
     HOME: "/root",
-    // 在 chroot 之后由 docker 读取。库目录同时挂在这三个路径上。
+    // 真实库挂在这三个路径上。直接执行插件，避免 docker 根命令吞掉 --env-file。
     LD_LIBRARY_PATH: "/lib:/usr/lib:/lib64",
+    DOCKER_HOST: dockerHostInChroot(paths.hostRoot),
     Z3CZ_RELEASE_DIR: paths.releaseDir,
     Z3CZ_ENV_FILE: paths.envFile,
     Z3CZ_POSTGRES_PASSWORD_FILE: paths.passwordFile,
@@ -364,8 +418,7 @@ export function hostComposeInvocation(paths) {
     chroot: findChroot(),
     args: [
       paths.hostRoot,
-      "/usr/bin/docker",
-      "compose",
+      composePluginInChroot(paths.hostRoot),
       "--env-file",
       paths.envFile,
       "-f",
@@ -382,8 +435,10 @@ export function hostComposeInvocation(paths) {
 }
 
 /**
- * Recreate api and caddy with the host docker. The node image has no docker CLI,
- * so this chroots into the mounted host paths and uses the staged docker client.
+ * Recreate api and caddy with the host Compose plugin. The node image has no
+ * docker CLI, so this chroots into the mounted host paths and runs the staged
+ * plugin directly. `docker compose --env-file` is parsed by the docker root
+ * command when that chroot cannot register the plugin.
  * @param {object} paths
  * @param {string} paths.hostRoot
  * @param {string} paths.envFile host path

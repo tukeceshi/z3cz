@@ -122,6 +122,13 @@ services:
         read_only: true
         bind:
           create_host_path: false
+      # Go 客户端和插件握手会读 /proc。不要挂整棵根目录。
+      - type: bind
+        source: /proc
+        target: /host/proc
+        read_only: true
+        bind:
+          create_host_path: false
       - /run/z3cz-site:/run/z3cz-site
     healthcheck:
       test: ["CMD", "node", "-e", "const s=require('node:net').connect('/run/z3cz-site/site.sock');s.setTimeout(3000);s.on('connect',()=>{s.end();process.exit(0)});s.on('error',()=>process.exit(1));s.on('timeout',()=>process.exit(1))"]
