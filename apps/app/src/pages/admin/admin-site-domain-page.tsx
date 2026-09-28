@@ -1,5 +1,5 @@
 import type { SiteDomainErrorCode, SiteDomainStatus } from "@dafthunk/types";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { FormEvent } from "react";
 import { toast } from "sonner";
 
@@ -45,6 +45,8 @@ export function AdminSiteDomainPage() {
   const [loading, setLoading] = useState(true);
   const [draft, setDraft] = useState("");
   const [saving, setSaving] = useState(false);
+  const [switching, setSwitching] = useState(false);
+  const announced = useRef(false);
 
   const load = useCallback(async () => {
     try {
@@ -52,6 +54,9 @@ export function AdminSiteDomainPage() {
       setStatus(next);
       setDraft(next.siteAddress ?? "");
       setLoadError("");
+      if (next.applying) {
+        setSwitching(true);
+      }
     } catch (error) {
       setLoadError(
         error instanceof Error
@@ -72,22 +77,75 @@ export function AdminSiteDomainPage() {
     void load();
   }, [load]);
 
+  useEffect(() => {
+    if (!switching) {
+      return;
+    }
+    let stopped = false;
+    const poll = async () => {
+      try {
+        const next = await getSiteDomain();
+        if (stopped || announced.current) {
+          return;
+        }
+        setStatus(next);
+        setDraft(next.siteAddress ?? "");
+        if (next.applying) {
+          return;
+        }
+        announced.current = true;
+        setSwitching(false);
+        if (next.applyError) {
+          toast.error(t("admin.siteDomain.switchFailed"));
+          return;
+        }
+        if (next.siteAddress) {
+          toast.success(
+            t("admin.siteDomain.switched", { domain: next.siteAddress })
+          );
+          return;
+        }
+        toast.success(t("admin.siteDomain.switchedHttp"));
+      } catch {
+        // 重建 api 期间请求会失败，继续等它起来。
+      }
+    };
+    void poll();
+    const timer = window.setInterval(() => {
+      void poll();
+    }, 2000);
+    return () => {
+      stopped = true;
+      window.clearInterval(timer);
+    };
+  }, [switching, t]);
+
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (!status?.available || saving) {
+    if (!status?.available || saving || switching) {
       return;
     }
     setSaving(true);
     try {
       const result = await updateSiteDomain(draft.trim());
-      toast.success(
-        result.restarting
-          ? t("admin.siteDomain.restarting")
-          : t("admin.siteDomain.unchanged")
-      );
       if (!result.restarting) {
+        toast.success(t("admin.siteDomain.unchanged"));
         await load();
+        return;
       }
+      announced.current = false;
+      setStatus((current) =>
+        current
+          ? {
+              ...current,
+              siteAddress: result.siteAddress,
+              httpOnly: result.siteAddress === null,
+              applyError: null,
+              applying: true,
+            }
+          : current
+      );
+      setSwitching(true);
     } catch (error) {
       const code =
         error instanceof ApiRequestError &&
@@ -137,7 +195,10 @@ export function AdminSiteDomainPage() {
                 ? t("admin.siteDomain.unreachable")
                 : t("admin.siteDomain.unavailable")}
           </p>
-          {status.applyError ? (
+          {switching ? (
+            <p className="text-sm">{t("admin.siteDomain.applyingNow")}</p>
+          ) : null}
+          {status.applyError && !switching ? (
             <p className="text-sm text-destructive">{status.applyError}</p>
           ) : null}
           {status.available ? (
@@ -155,7 +216,7 @@ export function AdminSiteDomainPage() {
                   name="site_domain"
                   value={draft}
                   placeholder={t("admin.siteDomain.placeholder")}
-                  disabled={saving}
+                  disabled={saving || switching}
                   onChange={(event) => setDraft(event.target.value)}
                 />
                 <p className="text-sm text-muted-foreground">
@@ -163,8 +224,12 @@ export function AdminSiteDomainPage() {
                 </p>
               </div>
               <div>
-                <Button type="submit" disabled={saving}>
-                  {saving ? t("common.saving") : t("common.save")}
+                <Button type="submit" disabled={saving || switching}>
+                  {switching
+                    ? t("admin.siteDomain.switching")
+                    : saving
+                      ? t("common.saving")
+                      : t("common.save")}
                 </Button>
               </div>
             </form>

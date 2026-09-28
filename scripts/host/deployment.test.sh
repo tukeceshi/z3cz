@@ -259,3 +259,26 @@ build_release_image "$image_release"
 grep -q -- '-t z3cz:1.2.3' "$TEST_ROOT/builds"
 grep -q -- '-t z3cz-web:1.2.3' "$TEST_ROOT/builds"
 echo 'PASS: a runtime release is copied into local app and web images'
+
+lib_root="$TEST_ROOT/docker-libs"
+mkdir -p "$lib_root/real" "$lib_root/stage" "$lib_root/bin"
+printf 'linker\n' >"$lib_root/real/ld-linux-x86-64.so.2"
+printf 'libc\n' >"$lib_root/real/libc-2.36.so"
+ln -s "libc-2.36.so" "$lib_root/real/libc.so.6"
+printf 'padding /lib64/ld-linux-x86-64.so.2 end\n' >"$lib_root/bin/fake-docker"
+[[ "$(library_stage_rel /lib64/ld-linux-x86-64.so.2)" == ld-linux-x86-64.so.2 ]]
+[[ "$(library_stage_rel /lib/x86_64-linux-gnu/ld-linux-x86-64.so.2)" == x86_64-linux-gnu/ld-linux-x86-64.so.2 ]]
+[[ "$(library_stage_rel /usr/lib/x86_64-linux-gnu/libc.so.6)" == x86_64-linux-gnu/libc.so.6 ]]
+[[ "$(elf_interpreter "$lib_root/bin/fake-docker")" == /lib64/ld-linux-x86-64.so.2 ]]
+install_real_library "$lib_root/real/libc.so.6" "$lib_root/stage"
+[[ ! -L "$lib_root/stage/libc.so.6" ]]
+[[ "$(cat "$lib_root/stage/libc.so.6")" == libc ]]
+ldd() {
+  printf '\tlibc.so.6 => %s (0x1)\n' "$lib_root/real/libc.so.6"
+}
+mkdir -p "$lib_root/stage2"
+copy_dynamic_libs "$lib_root/bin/fake-docker" "$lib_root/stage2"
+[[ -f "$lib_root/stage2/libc.so.6" && ! -L "$lib_root/stage2/libc.so.6" ]]
+[[ "$(cat "$lib_root/stage2/libc.so.6")" == libc ]]
+unset -f ldd
+echo 'PASS: staged docker libraries are real files, not broken links'

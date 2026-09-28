@@ -64,6 +64,8 @@ test("applySiteAddressEnv writes the public origin and can clear it", () => {
   assert.doesNotMatch(cleared, /^WEBSITE_URL=/m);
   assert.equal(siteAddressStatus(cleared, null).httpOnly, true);
   assert.equal(siteAddressStatus(cleared, null).siteAddress, null);
+  assert.equal(siteAddressStatus(cleared, null).applying, false);
+  assert.equal(siteAddressStatus(cleared, "failed", true).applying, true);
 });
 
 test("host compose chroots to the mounted root and forwards docker mount paths", () => {
@@ -90,7 +92,8 @@ test("host compose chroots to the mounted root and forwards docker mount paths",
       passwordFile: "/etc/z3cz/postgres.password",
     });
     assert.equal(invocation.args[0], "/host");
-    assert.equal(invocation.args[1], "docker");
+    assert.equal(invocation.args[1], "/usr/bin/docker");
+    assert.equal(invocation.env.LD_LIBRARY_PATH, "/lib:/usr/lib:/lib64");
     assert.equal(invocation.args.at(-2), "api");
     assert.equal(invocation.args.at(-1), "caddy");
     assert.equal(invocation.args.includes("--force-recreate"), true);
@@ -202,6 +205,103 @@ test("site address server saves then asks the host to recreate api and caddy", a
     assert.equal(rejected.status, 400);
     assert.equal(rejected.body.code, "local_name");
   } finally {
+    await new Promise((resolve, reject) => {
+      server.close((error) => (error ? reject(error) : resolve()));
+    });
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("a failed switch is retried when the same domain is saved again", async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "z3cz-site-"));
+  const envFile = path.join(dir, "z3cz.env");
+  const socketPath =
+    process.platform === "win32"
+      ? `\\\\.\\pipe\\z3cz-site-${process.pid}-retry`
+      : path.join(dir, "site.sock");
+  fs.writeFileSync(
+    envFile,
+    `Z3CZ_SITE_ADDRESS=example.com\nWEB_HOST=https://example.com\nWEBSITE_URL=https://example.com\nZ3CZ_SITE_ADDRESS_TOKEN=${token}\n`
+  );
+  let applyError = "chroot: failed to run command 'docker'";
+  let composed = 0;
+  const server = createSiteAddressServer({
+    envFile,
+    readToken: () => token,
+    readApplyError: () => applyError,
+    writeApplyError: (message) => {
+      applyError = message;
+    },
+    runCompose: async () => {
+      composed += 1;
+    },
+  });
+  await new Promise((resolve) => {
+    server.listen(socketPath, resolve);
+  });
+  try {
+    const saved = await request(socketPath, "POST", {
+      siteAddress: "example.com",
+    });
+    assert.equal(saved.status, 200);
+    assert.equal(saved.body.restarting, true);
+    assert.equal(composed, 1);
+    assert.equal(applyError, null);
+  } finally {
+    await new Promise((resolve, reject) => {
+      server.close((error) => (error ? reject(error) : resolve()));
+    });
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("status stays applying until the host finishes recreating the site", async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "z3cz-site-"));
+  const envFile = path.join(dir, "z3cz.env");
+  const socketPath =
+    process.platform === "win32"
+      ? `\\\\.\\pipe\\z3cz-site-${process.pid}-applying`
+      : path.join(dir, "site.sock");
+  fs.writeFileSync(
+    envFile,
+    `Z3CZ_SITE_ADDRESS=:80\nZ3CZ_SITE_ADDRESS_TOKEN=${token}\n`
+  );
+  let releaseCompose = () => {};
+  let markComposeStarted = () => {};
+  const composeStarted = new Promise((resolve) => {
+    markComposeStarted = resolve;
+  });
+  const server = createSiteAddressServer({
+    envFile,
+    readToken: () => token,
+    readApplyError: () => null,
+    writeApplyError: () => {},
+    runCompose: () => {
+      markComposeStarted();
+      return new Promise((resolve) => {
+        releaseCompose = resolve;
+      });
+    },
+  });
+  await new Promise((resolve) => {
+    server.listen(socketPath, resolve);
+  });
+  try {
+    const saved = request(socketPath, "POST", {
+      siteAddress: "example.com",
+    });
+    await composeStarted;
+    const pending = await request(socketPath, "GET");
+    assert.equal(pending.body.applying, true);
+    assert.equal(pending.body.applyError, null);
+    releaseCompose();
+    assert.equal((await saved).body.restarting, true);
+    await new Promise((resolve) => setImmediate(resolve));
+    const done = await request(socketPath, "GET");
+    assert.equal(done.body.applying, false);
+    assert.equal(done.body.siteAddress, "example.com");
+  } finally {
+    releaseCompose();
     await new Promise((resolve, reject) => {
       server.close((error) => (error ? reject(error) : resolve()));
     });

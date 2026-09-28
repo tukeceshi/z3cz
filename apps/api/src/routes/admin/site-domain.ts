@@ -24,6 +24,7 @@ function unavailableStatus(
     siteAddress: null,
     httpOnly: true,
     applyError: null,
+    applying: false,
     unavailableReason: reason,
   };
 }
@@ -69,12 +70,14 @@ adminSiteDomainRoutes.get("/", async (c) => {
       siteAddress: string | null;
       httpOnly: boolean;
       applyError: string | null;
+      applying?: boolean;
     }>(c.env, "GET");
     const status: SiteDomainStatus = {
       available: true,
       siteAddress: remote.siteAddress,
       httpOnly: remote.httpOnly,
       applyError: remote.applyError,
+      applying: remote.applying === true,
       unavailableReason: null,
     };
     return c.json(status);

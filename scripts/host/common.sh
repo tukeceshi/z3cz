@@ -36,9 +36,50 @@ elf_executable() {
   [[ "$sig" == "7f454c46" ]]
 }
 
+# 挂进域名服务的是同一份库目录，对应容器里的 /lib、/usr/lib、/lib64。
+library_stage_rel() {
+  local src="$1"
+  case "$src" in
+    /lib64/*) printf '%s\n' "${src#/lib64/}" ;;
+    /usr/lib64/*) printf '%s\n' "${src#/usr/lib64/}" ;;
+    /lib/*) printf '%s\n' "${src#/lib/}" ;;
+    /usr/lib/*) printf '%s\n' "${src#/usr/lib/}" ;;
+    *) printf '%s\n' "$(basename "$src")" ;;
+  esac
+}
+
+elf_interpreter() {
+  local bin="$1" interp=""
+  if command -v readelf >/dev/null 2>&1; then
+    interp="$(readelf -l "$bin" 2>/dev/null | sed -n 's/.*Requesting program interpreter: \(.*\)\]/\1/p' | head -1 || true)"
+  fi
+  if [[ -z "$interp" ]]; then
+    interp="$(grep -a -o -m 1 -E '/(usr/)?lib(64)?/[^[:space:]]*ld-(linux|musl)[^[:space:]]*' "$bin" 2>/dev/null || true)"
+  fi
+  printf '%s\n' "$interp"
+}
+
+# 复制真实文件。符号链接在精简目录里会断开，内核就会报找不到 docker。
+install_real_library() {
+  local src="$1" dest="$2" real rel
+  [[ -e "$src" || -L "$src" ]] || return 0
+  real="$(readlink -f "$src" 2>/dev/null || true)"
+  [[ -n "$real" && -f "$real" ]] || return 0
+  cp -f "$real" "$dest/$(basename "$src")"
+  rel="$(library_stage_rel "$src")"
+  if [[ "$rel" == */* ]]; then
+    mkdir -p "$dest/$(dirname "$rel")"
+    cp -f "$real" "$dest/$rel"
+  fi
+}
+
 copy_dynamic_libs() {
-  local binary="$1" lib="$2" out line path base parent
+  local binary="$1" lib="$2" out line path interp
   mkdir -p "$lib"
+  interp="$(elf_interpreter "$binary")"
+  if [[ -n "$interp" ]]; then
+    install_real_library "$interp" "$lib"
+  fi
   if ! out="$(ldd "$binary" 2>/dev/null)"; then
     return 0
   fi
@@ -52,12 +93,8 @@ copy_dynamic_libs() {
     elif [[ "$line" == /* ]]; then
       path="${line%% *}"
     fi
-    [[ -n "$path" && -f "$path" ]] || continue
-    base="$(basename "$path")"
-    parent="$(basename "$(dirname "$path")")"
-    cp -a "$path" "$lib/$base"
-    mkdir -p "$lib/$parent"
-    cp -a "$path" "$lib/$parent/$base"
+    [[ -n "$path" ]] || continue
+    install_real_library "$path" "$lib"
   done <<<"$out"
 }
 
@@ -87,7 +124,10 @@ stage_host_docker_client() {
     die "找不到 Docker socket"
   fi
   dest="$STATE_DIR/docker-cli"
-  if [[ ! -f "$dest/bin/docker" || ! -f "$dest/bin/docker-compose" ]] \
+  # 旧副本保留了断开的符号链接。标记变化时重新复制，否则域名服务仍会找不到 docker。
+  local lib_stamp="real-libs-1"
+  if [[ ! -f "$dest/bin/docker" || ! -f "$dest/bin/docker-compose" || ! -f "$dest/.lib-stamp" ]] \
+    || [[ "$(cat "$dest/.lib-stamp")" != "$lib_stamp" ]] \
     || ! cmp -s "$bin" "$dest/bin/docker" \
     || ! cmp -s "$plugin" "$dest/bin/docker-compose"; then
     command -v ldd >/dev/null 2>&1 || die "需要 ldd 才能把 docker 客户端放进域名服务"
@@ -98,6 +138,7 @@ stage_host_docker_client() {
     chmod 755 "$dest/bin/docker" "$dest/bin/docker-compose"
     copy_dynamic_libs "$dest/bin/docker" "$dest/lib"
     copy_dynamic_libs "$dest/bin/docker-compose" "$dest/lib"
+    printf '%s\n' "$lib_stamp" >"$dest/.lib-stamp"
   fi
   mkdir -p "$dest/lib"
   export Z3CZ_DOCKER_CLI="$dest/bin/docker"

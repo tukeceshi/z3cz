@@ -101,13 +101,14 @@ export function readEnvValue(content, key) {
  * @param {string} content
  * @param {string | null} applyError
  */
-export function siteAddressStatus(content, applyError) {
+export function siteAddressStatus(content, applyError, applying = false) {
   const raw = readEnvValue(content, "Z3CZ_SITE_ADDRESS");
   const siteAddress = raw && raw !== ":80" ? raw : null;
   return {
     siteAddress,
     httpOnly: siteAddress === null,
     applyError: applyError || null,
+    applying: Boolean(applying),
   };
 }
 
@@ -163,7 +164,11 @@ export function createSiteAddressServer(options) {
         writeJson(
           response,
           200,
-          siteAddressStatus(readFile(options.envFile), options.readApplyError())
+          siteAddressStatus(
+            readFile(options.envFile),
+            options.readApplyError(),
+            applying
+          )
         );
         return;
       }
@@ -197,7 +202,9 @@ export function createSiteAddressServer(options) {
     }
     const current = readFile(options.envFile);
     const publicAddress = siteAddress === ":80" ? null : siteAddress;
-    if (isSiteAddressApplied(current, siteAddress)) {
+    const applied = isSiteAddressApplied(current, siteAddress);
+    const previousError = options.readApplyError();
+    if (applied && !previousError) {
       writeJson(response, 200, {
         accepted: true,
         siteAddress: publicAddress,
@@ -205,7 +212,9 @@ export function createSiteAddressServer(options) {
       });
       return;
     }
-    writeFile(options.envFile, applySiteAddressEnv(current, siteAddress));
+    if (!applied) {
+      writeFile(options.envFile, applySiteAddressEnv(current, siteAddress));
+    }
     options.writeApplyError(null);
     applying = true;
     writeJson(response, 200, {
@@ -329,6 +338,8 @@ export function hostComposeInvocation(paths) {
   const env = {
     PATH: "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
     HOME: "/root",
+    // 在 chroot 之后由 docker 读取。库目录同时挂在这三个路径上。
+    LD_LIBRARY_PATH: "/lib:/usr/lib:/lib64",
     Z3CZ_RELEASE_DIR: paths.releaseDir,
     Z3CZ_ENV_FILE: paths.envFile,
     Z3CZ_POSTGRES_PASSWORD_FILE: paths.passwordFile,
@@ -353,7 +364,7 @@ export function hostComposeInvocation(paths) {
     chroot: findChroot(),
     args: [
       paths.hostRoot,
-      "docker",
+      "/usr/bin/docker",
       "compose",
       "--env-file",
       paths.envFile,

@@ -12,6 +12,7 @@ export interface SiteDomainStatus {
   readonly siteAddress: string | null;
   readonly httpOnly: boolean;
   readonly applyError: string | null;
+  readonly applying: boolean;
   readonly unavailableReason: SiteDomainUnavailableReason | null;
 }
 

@@ -917,7 +917,12 @@ export const zh: TranslationDictionary = {
       fieldLabel: "公网域名",
       placeholder: "example.com",
       fieldHelp: "不要填写端口、路径或 IP。留空表示取消绑定。",
-      restarting: "已保存。站点即将重启，请用新地址重新打开。",
+      applyingNow: "正在切换域名，请稍候。",
+      switching: "正在切换",
+      switched:
+        "站点已按该域名重启。请用 https://{{domain}} 打开。证书仍要域名已解析到本机，并且 80 和 443 已开放。",
+      switchedHttp: "已取消域名，站点改回 HTTP。",
+      switchFailed: "切换没有完成",
       unchanged: "域名没有变化。",
       saveFailed: "没有保存域名",
       loadFailed: "无法读取域名",

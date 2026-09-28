@@ -951,7 +951,12 @@ export const en = {
       placeholder: "example.com",
       fieldHelp:
         "Do not include a port, path, or IP. Leave empty to remove the domain.",
-      restarting: "Saved. The site will restart. Reopen it at the new address.",
+      applyingNow: "Switching the domain. Please wait.",
+      switching: "Switching",
+      switched:
+        "The site has restarted with this domain. Open https://{{domain}}. A certificate still requires the domain to point at this machine, with ports 80 and 443 open.",
+      switchedHttp: "The domain was removed. The site is back on HTTP.",
+      switchFailed: "The switch did not finish",
       unchanged: "The domain is unchanged.",
       saveFailed: "Could not save the domain",
       loadFailed: "Could not load the domain",
