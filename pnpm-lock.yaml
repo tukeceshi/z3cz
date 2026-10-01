@@ -56,8 +56,8 @@ importers:
         specifier: ^0.8.5
         version: 0.8.5(hono@4.12.26)
       '@hono/zod-validator':
-        specifier: ^0.7.6
-        version: 0.7.6(hono@4.12.26)(zod@4.4.3)
+        specifier: ^0.9.1
+        version: 0.9.1(hono@4.12.26)(zod@4.4.3)
       '@volcengine/tos-sdk':
         specifier: ^2.9.1
         version: 2.9.1
@@ -90,7 +90,7 @@ importers:
         version: 6.10.1
       openai:
         specifier: ^7.20.0
-        version: 7.20.0(undici@7.28.0)(ws@8.21.0(bufferutil@4.1.0)(utf-8-validate@6.0.6))(zod@4.4.3)
+        version: 7.20.0(undici@7.29.0)(ws@8.21.0(bufferutil@4.1.0)(utf-8-validate@6.0.6))(zod@4.4.3)
       postal-mime:
         specifier: ^2.7.4
         version: 2.7.4
@@ -454,7 +454,7 @@ importers:
         version: 10.4.0
       openai:
         specifier: ^7.20.0
-        version: 7.20.0(undici@7.28.0)(ws@8.21.0(bufferutil@4.1.0)(utf-8-validate@6.0.6))(zod@4.4.3)
+        version: 7.20.0(undici@7.29.0)(ws@8.21.0(bufferutil@4.1.0)(utf-8-validate@6.0.6))(zod@4.4.3)
       postal-mime:
         specifier: ^2.7.4
         version: 2.7.4
@@ -1429,10 +1429,10 @@ packages:
     peerDependencies:
       hono: '>=3.0.0'
 
-  '@hono/zod-validator@0.7.6':
-    resolution: {integrity: sha512-Io1B6d011Gj1KknV4rXYz4le5+5EubcWEU/speUjuw9XMMIaP3n78yXLhjd2A3PXaXaUwEAluOiAyLqhBEJgsw==}
+  '@hono/zod-validator@0.9.1':
+    resolution: {integrity: sha512-iiv6w0qrIc0arfvCtUqBWsvl4fXjzaTcQcCJTTtCnkawF9HHGE+KjEl0ox3gQJ6rKZEgE3mLExlQCF72M+mNuw==}
     peerDependencies:
-      hono: '>=3.9.0'
+      hono: '>=4.11.2'
       zod: ^3.25.0 || ^4.0.0
 
   '@img/colour@1.1.0':
@@ -5001,8 +5001,8 @@ packages:
   lexical@0.35.0:
     resolution: {integrity: sha512-3VuV8xXhh5xJA6tzvfDvE0YBCMkIZUmxtRilJQDDdCgJCc+eut6qAv2qbN+pbqvarqcQqPN1UF+8YvsjmyOZpw==}
 
-  lib0@0.2.117:
-    resolution: {integrity: sha512-DeXj9X5xDCjgKLU/7RR+/HQEVzuuEUiwldwOGsHK/sfAfELGWEyTcf0x+uOvCvK3O2zPmZePXWL85vtia6GyZw==}
+  lib0@0.2.119:
+    resolution: {integrity: sha512-vh+TiejVy8Xm+hCdnRfn9BthGNvNUZdEXltNjVZL3TzRIKP3s1lnQh8pWd/Q0wCgY0FPAGVVjFF4ZiHUV3LFgA==}
     engines: {node: '>=16'}
     hasBin: true
 
@@ -7432,7 +7432,7 @@ snapshots:
     dependencies:
       hono: 4.12.26
 
-  '@hono/zod-validator@0.7.6(hono@4.12.26)(zod@4.4.3)':
+  '@hono/zod-validator@0.9.1(hono@4.12.26)(zod@4.4.3)':
     dependencies:
       hono: 4.12.26
       zod: 4.4.3
@@ -11751,7 +11751,7 @@ snapshots:
 
   lexical@0.35.0: {}
 
-  lib0@0.2.117:
+  lib0@0.2.119:
     dependencies:
       isomorphic.js: 0.2.5
 
@@ -12400,9 +12400,9 @@ snapshots:
       regex: 6.1.0
       regex-recursion: 6.0.2
 
-  openai@7.20.0(undici@7.28.0)(ws@8.21.0(bufferutil@4.1.0)(utf-8-validate@6.0.6))(zod@4.4.3):
+  openai@7.20.0(undici@7.29.0)(ws@8.21.0(bufferutil@4.1.0)(utf-8-validate@6.0.6))(zod@4.4.3):
     optionalDependencies:
-      undici: 7.28.0
+      undici: 7.29.0
       ws: 8.21.0(bufferutil@4.1.0)(utf-8-validate@6.0.6)
       zod: 4.4.3
 
@@ -13490,7 +13490,7 @@ snapshots:
 
   yjs@13.6.32:
     dependencies:
-      lib0: 0.2.117
+      lib0: 0.2.119
 
   youch-core@0.3.3:
     dependencies:

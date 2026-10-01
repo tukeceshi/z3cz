@@ -57,7 +57,7 @@
     "@hono/node-server": "^1.19.9",
     "@hono/node-ws": "^1.2.0",
     "@hono/oauth-providers": "^0.8.5",
-    "@hono/zod-validator": "^0.7.6",
+    "@hono/zod-validator": "^0.9.1",
     "agents": "^0.13.2",
     "aws4fetch": "^1.0.20",
     "cron-parser": "^5.5.0",
