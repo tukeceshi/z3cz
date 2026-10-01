@@ -78,7 +78,7 @@
     "wavesurfer.js": "^7.12.1"
   },
   "devDependencies": {
-    "@shikijs/langs": "^3.23.0",
+    "@shikijs/langs": "^4.4.3",
     "@shikijs/themes": "^3.23.0",
     "@tailwindcss/vite": "^4.3.0",
     "@testing-library/react": "^16.3.0",
