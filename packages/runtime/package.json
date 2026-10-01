@@ -30,7 +30,7 @@
     "@dafthunk/types": "workspace:*",
     "@dafthunk/utils": "workspace:*",
     "@google/genai": "^1.52.0",
-    "jsonpath-plus": "^10.4.0",
+    "jsonpath-plus": "^11.1.0",
     "openai": "^7.20.0",
     "postal-mime": "^2.7.4",
     "twilio": "^5.13.1",
